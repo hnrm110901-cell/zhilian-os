@@ -2,14 +2,16 @@
 错误监控和追踪模块
 提供错误日志记录、性能监控和告警功能
 """
+
 import os
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
-from enum import Enum
-import traceback
 import time
+import traceback
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 logger = structlog.get_logger()
@@ -17,6 +19,7 @@ logger = structlog.get_logger()
 
 class ErrorSeverity(str, Enum):
     """错误严重程度"""
+
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -26,6 +29,7 @@ class ErrorSeverity(str, Enum):
 
 class ErrorCategory(str, Enum):
     """错误类别"""
+
     DATABASE = "database"
     AUTHENTICATION = "authentication"
     AUTHORIZATION = "authorization"
@@ -39,6 +43,7 @@ class ErrorCategory(str, Enum):
 @dataclass
 class ErrorRecord:
     """错误记录"""
+
     error_id: str
     timestamp: datetime
     severity: ErrorSeverity
@@ -55,6 +60,7 @@ class ErrorRecord:
 @dataclass
 class PerformanceMetric:
     """性能指标"""
+
     metric_id: str
     timestamp: datetime
     endpoint: str
@@ -222,8 +228,7 @@ class ErrorMonitor:
         return metric_id
 
     def get_error_summary(
-        self,
-        time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
+        self, time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
     ) -> Dict[str, Any]:
         """
         获取错误摘要
@@ -236,10 +241,7 @@ class ErrorMonitor:
         """
         cutoff_time = datetime.now() - timedelta(minutes=time_window_minutes)
 
-        recent_errors = [
-            err for err in self.error_records
-            if err.timestamp >= cutoff_time
-        ]
+        recent_errors = [err for err in self.error_records if err.timestamp >= cutoff_time]
 
         # 按严重程度统计
         severity_counts = defaultdict(int)
@@ -273,8 +275,7 @@ class ErrorMonitor:
         }
 
     def get_performance_summary(
-        self,
-        time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
+        self, time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
     ) -> Dict[str, Any]:
         """
         获取性能摘要
@@ -287,10 +288,7 @@ class ErrorMonitor:
         """
         cutoff_time = datetime.now() - timedelta(minutes=time_window_minutes)
 
-        recent_metrics = [
-            metric for metric in self.performance_metrics
-            if metric.timestamp >= cutoff_time
-        ]
+        recent_metrics = [metric for metric in self.performance_metrics if metric.timestamp >= cutoff_time]
 
         if not recent_metrics:
             return {
@@ -319,11 +317,7 @@ class ErrorMonitor:
         }
 
         # 找出最慢的端点
-        slowest_endpoints = sorted(
-            endpoint_avg.items(),
-            key=lambda x: x[1]["avg_duration_ms"],
-            reverse=True
-        )[:5]
+        slowest_endpoints = sorted(endpoint_avg.items(), key=lambda x: x[1]["avg_duration_ms"], reverse=True)[:5]
 
         return {
             "time_window_minutes": time_window_minutes,
@@ -377,15 +371,9 @@ class ErrorMonitor:
         """
         cutoff_time = datetime.now() - timedelta(hours=hours)
 
-        self.error_records = [
-            err for err in self.error_records
-            if err.timestamp >= cutoff_time
-        ]
+        self.error_records = [err for err in self.error_records if err.timestamp >= cutoff_time]
 
-        self.performance_metrics = [
-            metric for metric in self.performance_metrics
-            if metric.timestamp >= cutoff_time
-        ]
+        self.performance_metrics = [metric for metric in self.performance_metrics if metric.timestamp >= cutoff_time]
 
         logger.info(
             "Cleared old monitoring records",

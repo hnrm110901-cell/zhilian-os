@@ -2,10 +2,12 @@
 Agent服务 - Agent Service
 管理所有智能体的初始化和调用
 """
-import time
+
 import os
+import time
+from typing import Any, Dict, Optional
+
 import structlog
-from typing import Dict, Any, Optional
 
 logger = structlog.get_logger()
 
@@ -32,6 +34,7 @@ class AgentService:
         # 初始化排班Agent
         try:
             from ..agents.schedule_agent import ScheduleAgent
+
             self._agents["schedule"] = ScheduleAgent()
             logger.info("ScheduleAgent初始化成功")
         except Exception as e:
@@ -41,6 +44,7 @@ class AgentService:
         # 初始化订单Agent
         try:
             from ..agents.order_agent import OrderAgent
+
             self._agents["order"] = OrderAgent()
             logger.info("OrderAgent初始化成功")
         except Exception as e:
@@ -50,6 +54,7 @@ class AgentService:
         # 初始化库存Agent
         try:
             from ..agents.inventory_agent import InventoryAgent
+
             self._agents["inventory"] = InventoryAgent()
             logger.info("InventoryAgent初始化成功")
         except Exception as e:
@@ -59,6 +64,7 @@ class AgentService:
         # 初始化决策Agent
         try:
             from ..agents.decision_agent import DecisionAgent
+
             self._agents["decision"] = DecisionAgent()
             logger.info("DecisionAgent初始化成功")
         except Exception as e:
@@ -68,6 +74,7 @@ class AgentService:
         # 初始化KPIAgent
         try:
             from ..agents.kpi_agent import KPIAgent
+
             self._agents["kpi"] = KPIAgent()
             logger.info("KPIAgent初始化成功")
         except Exception as e:
@@ -77,6 +84,7 @@ class AgentService:
         # 初始化运维Agent（屯象OS 运维方案）
         try:
             from ..agents.ops_agent import OpsAgent
+
             self._agents["ops"] = OpsAgent()
             logger.info("OpsAgent初始化成功")
         except Exception as e:
@@ -86,6 +94,7 @@ class AgentService:
         # 初始化绩效Agent（屯象OS 绩效方案）
         try:
             from ..agents.performance_agent import PerformanceAgent
+
             self._agents["performance"] = PerformanceAgent()
             logger.info("PerformanceAgent初始化成功")
         except Exception as e:
@@ -103,8 +112,10 @@ class AgentService:
         # 业财税资金 Agent（可选，仅 FCT_ENABLED 时加载）
         try:
             from ..core.config import settings
+
             if getattr(settings, "FCT_ENABLED", False):
                 from ..agents.fct_agent import FctAgent
+
                 self._agents["fct"] = FctAgent()
                 logger.info("FctAgent初始化成功")
         except Exception as e:
@@ -119,22 +130,14 @@ class AgentService:
         Returns:
             Dict包含每个Agent的状态信息
         """
-        status = {
-            "total_agents": len(self._agents),
-            "agents": {}
-        }
+        status = {"total_agents": len(self._agents), "agents": {}}
 
         for agent_name, agent in self._agents.items():
-            status["agents"][agent_name] = {
-                "initialized": True,
-                "type": type(agent).__name__
-            }
+            status["agents"][agent_name] = {"initialized": True, "type": type(agent).__name__}
 
         return status
 
-    async def execute_agent(
-        self, agent_type: str, input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute_agent(self, agent_type: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行Agent - 使用统一的execute接口
 
@@ -172,12 +175,15 @@ class AgentService:
         try:
             # Special handling for decision agent - use database service
             if agent_type == "decision" and action in (
-                "get_decision_report", "analyze_kpi", "get_recommendations", "get_insights"
+                "get_decision_report",
+                "analyze_kpi",
+                "get_recommendations",
+                "get_insights",
             ):
                 from src.services.decision_service import decision_service
+
                 report = await decision_service.get_decision_report(
-                    start_date=params.get("start_date"),
-                    end_date=params.get("end_date")
+                    start_date=params.get("start_date"), end_date=params.get("end_date")
                 )
                 # 按 action 映射到前端期望的字段
                 if action == "analyze_kpi":
@@ -188,9 +194,7 @@ class AgentService:
                     }
                 elif action == "get_recommendations":
                     result_data = {
-                        "recommendations": report.get("recommendations_summary", {}).get(
-                            "critical_recommendations", []
-                        ),
+                        "recommendations": report.get("recommendations_summary", {}).get("critical_recommendations", []),
                         "total": report.get("recommendations_summary", {}).get("total_recommendations", 0),
                     }
                 elif action == "get_insights":
@@ -230,45 +234,45 @@ class AgentService:
                         reservation_time=params["reservation_time"],
                         party_size=params["party_size"],
                         reservation_type=params.get("reservation_type", "regular"),
-                        **{k: v for k, v in params.items() if k not in [
-                            "customer_name", "customer_phone", "reservation_date",
-                            "reservation_time", "party_size", "reservation_type"
-                        ]}
+                        **{
+                            k: v
+                            for k, v in params.items()
+                            if k
+                            not in [
+                                "customer_name",
+                                "customer_phone",
+                                "reservation_date",
+                                "reservation_time",
+                                "party_size",
+                                "reservation_type",
+                            ]
+                        },
                     )
                 elif action == "list":
                     result_data = await reservation_service.get_reservations(
                         reservation_date=params.get("reservation_date"),
                         status=params.get("status"),
-                        limit=params.get("limit", 100)
+                        limit=params.get("limit", 100),
                     )
                 elif action == "get":
-                    result_data = await reservation_service.get_reservation_by_id(
-                        reservation_id=params["reservation_id"]
-                    )
+                    result_data = await reservation_service.get_reservation_by_id(reservation_id=params["reservation_id"])
                 elif action == "confirm":
                     result_data = await reservation_service.update_reservation_status(
-                        reservation_id=params["reservation_id"],
-                        status="confirmed",
-                        notes=params.get("notes")
+                        reservation_id=params["reservation_id"], status="confirmed", notes=params.get("notes")
                     )
                 elif action == "cancel":
                     result_data = await reservation_service.cancel_reservation(
-                        reservation_id=params["reservation_id"],
-                        reason=params.get("reason")
+                        reservation_id=params["reservation_id"], reason=params.get("reason")
                     )
                 elif action == "assign_table":
                     result_data = await reservation_service.assign_table(
-                        reservation_id=params["reservation_id"],
-                        table_number=params["table_number"]
+                        reservation_id=params["reservation_id"], table_number=params["table_number"]
                     )
                 elif action == "upcoming":
-                    result_data = await reservation_service.get_upcoming_reservations(
-                        days=params.get("days", 7)
-                    )
+                    result_data = await reservation_service.get_upcoming_reservations(days=params.get("days", 7))
                 elif action == "statistics":
                     result_data = await reservation_service.get_reservation_statistics(
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 else:
                     return {
@@ -353,17 +357,16 @@ class AgentService:
                             customer_name=params.get("customer_name"),
                             customer_phone=params.get("customer_phone"),
                             notes=params.get("notes"),
-                            **{k: v for k, v in params.items() if k not in [
-                                "table_number", "items", "customer_name", "customer_phone", "notes"
-                            ]}
-                        )
+                            **{
+                                k: v
+                                for k, v in params.items()
+                                if k not in ["table_number", "items", "customer_name", "customer_phone", "notes"]
+                            },
+                        ),
                     )
                 elif action == "get_order":
                     result_data = await _order_call_or_test_fallback(
-                        "get_order",
-                        order_service.get_order(
-                            order_id=params["order_id"]
-                        )
+                        "get_order", order_service.get_order(order_id=params["order_id"])
                     )
                 elif action == "list_orders":
                     result_data = await _order_call_or_test_fallback(
@@ -373,41 +376,30 @@ class AgentService:
                             table_number=params.get("table_number"),
                             start_date=params.get("start_date"),
                             end_date=params.get("end_date"),
-                            limit=params.get("limit", 100)
-                        )
+                            limit=params.get("limit", 100),
+                        ),
                     )
                 elif action == "update_order_status":
                     result_data = await _order_call_or_test_fallback(
                         "update_order_status",
                         order_service.update_order_status(
-                            order_id=params["order_id"],
-                            status=params["status"],
-                            notes=params.get("notes")
-                        )
+                            order_id=params["order_id"], status=params["status"], notes=params.get("notes")
+                        ),
                     )
                 elif action == "add_items":
                     result_data = await _order_call_or_test_fallback(
-                        "add_items",
-                        order_service.add_items(
-                            order_id=params["order_id"],
-                            items=params["items"]
-                        )
+                        "add_items", order_service.add_items(order_id=params["order_id"], items=params["items"])
                     )
                 elif action == "cancel_order":
                     result_data = await _order_call_or_test_fallback(
-                        "cancel_order",
-                        order_service.cancel_order(
-                            order_id=params["order_id"],
-                            reason=params.get("reason")
-                        )
+                        "cancel_order", order_service.cancel_order(order_id=params["order_id"], reason=params.get("reason"))
                     )
                 elif action == "get_order_statistics":
                     result_data = await _order_call_or_test_fallback(
                         "get_order_statistics",
                         order_service.get_order_statistics(
-                            start_date=params.get("start_date"),
-                            end_date=params.get("end_date")
-                        )
+                            start_date=params.get("start_date"), end_date=params.get("end_date")
+                        ),
                     )
                 else:
                     return {
@@ -436,31 +428,28 @@ class AgentService:
             # Special handling for service agent - use database service
             if agent_type == "service":
                 from src.services.service_service import ServiceQualityService
+
                 service_store_id = params.get("store_id") or "STORE001"
                 service_quality_service = ServiceQualityService(store_id=service_store_id)
 
                 if action == "monitor_service_quality" or action == "get_service_quality_metrics":
                     result_data = await service_quality_service.get_service_quality_metrics(
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 elif action == "track_staff_performance" or action == "get_staff_performance":
                     result_data = await service_quality_service.get_staff_performance(
-                        staff_id=params.get("staff_id"),
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        staff_id=params.get("staff_id"), start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 elif action == "record_service_quality":
                     result_data = await service_quality_service.record_service_quality(
                         metric_name=params["metric_name"],
                         value=params["value"],
                         record_date=params.get("record_date"),
-                        **{k: v for k, v in params.items() if k not in ["metric_name", "value", "record_date"]}
+                        **{k: v for k, v in params.items() if k not in ["metric_name", "value", "record_date"]},
                     )
                 elif action == "get_service_report":
                     result_data = await service_quality_service.get_service_report(
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 else:
                     return {
@@ -492,17 +481,12 @@ class AgentService:
 
                 if action == "monitor_inventory":
                     result_data = await inventory_service.monitor_inventory(
-                        category=params.get("category"),
-                        status=params.get("status")
+                        category=params.get("category"), status=params.get("status")
                     )
                 elif action == "get_item":
-                    result_data = await inventory_service.get_item(
-                        item_id=params["item_id"]
-                    )
+                    result_data = await inventory_service.get_item(item_id=params["item_id"])
                 elif action == "generate_restock_alerts":
-                    result_data = await inventory_service.generate_restock_alerts(
-                        category=params.get("category")
-                    )
+                    result_data = await inventory_service.generate_restock_alerts(category=params.get("category"))
                 elif action == "record_transaction":
                     result_data = await inventory_service.record_transaction(
                         item_id=params["item_id"],
@@ -511,17 +495,15 @@ class AgentService:
                         unit_cost=params.get("unit_cost"),
                         reference_id=params.get("reference_id"),
                         notes=params.get("notes"),
-                        performed_by=params.get("performed_by")
+                        performed_by=params.get("performed_by"),
                     )
                 elif action == "get_inventory_statistics":
                     result_data = await inventory_service.get_inventory_statistics(
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 elif action == "get_inventory_report":
                     result_data = await inventory_service.get_inventory_report(
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 else:
                     return {
@@ -555,36 +537,27 @@ class AgentService:
                     result_data = await schedule_service.create_schedule(
                         schedule_date=params["schedule_date"],
                         shifts=params["shifts"],
-                        **{k: v for k, v in params.items() if k not in ["schedule_date", "shifts"]}
+                        **{k: v for k, v in params.items() if k not in ["schedule_date", "shifts"]},
                     )
                 elif action == "get_schedule":
                     result_data = await schedule_service.get_schedule(
-                        start_date=params["start_date"],
-                        end_date=params.get("end_date")
+                        start_date=params["start_date"], end_date=params.get("end_date")
                     )
                 elif action == "get_schedule_by_date":
-                    result_data = await schedule_service.get_schedule_by_date(
-                        schedule_date=params["schedule_date"]
-                    )
+                    result_data = await schedule_service.get_schedule_by_date(schedule_date=params["schedule_date"])
                 elif action == "update_schedule":
                     result_data = await schedule_service.update_schedule(
-                        schedule_id=params["schedule_id"],
-                        **{k: v for k, v in params.items() if k != "schedule_id"}
+                        schedule_id=params["schedule_id"], **{k: v for k, v in params.items() if k != "schedule_id"}
                     )
                 elif action == "delete_schedule":
-                    result_data = await schedule_service.delete_schedule(
-                        schedule_id=params["schedule_id"]
-                    )
+                    result_data = await schedule_service.delete_schedule(schedule_id=params["schedule_id"])
                 elif action == "get_employee_schedules":
                     result_data = await schedule_service.get_employee_schedules(
-                        employee_id=params["employee_id"],
-                        start_date=params["start_date"],
-                        end_date=params.get("end_date")
+                        employee_id=params["employee_id"], start_date=params["start_date"], end_date=params.get("end_date")
                     )
                 elif action == "get_schedule_statistics":
                     result_data = await schedule_service.get_schedule_statistics(
-                        start_date=params["start_date"],
-                        end_date=params["end_date"]
+                        start_date=params["start_date"], end_date=params["end_date"]
                     )
                 else:
                     return {
@@ -613,13 +586,13 @@ class AgentService:
             # Special handling for training agent - use database service
             if agent_type == "training":
                 from src.services.training_service import TrainingService
+
                 training_store_id = params.get("store_id") or "STORE001"
                 training_service = TrainingService(store_id=training_store_id)
 
                 if action == "assess_training_needs":
                     result_data = await training_service.assess_training_needs(
-                        staff_id=params.get("staff_id"),
-                        position=params.get("position")
+                        staff_id=params.get("staff_id"), position=params.get("position")
                     )
                 elif action == "record_training_completion":
                     result_data = await training_service.record_training_completion(
@@ -627,28 +600,24 @@ class AgentService:
                         course_name=params["course_name"],
                         completion_date=params["completion_date"],
                         score=params.get("score"),
-                        **{k: v for k, v in params.items() if k not in ["staff_id", "course_name", "completion_date", "score"]}
+                        **{
+                            k: v for k, v in params.items() if k not in ["staff_id", "course_name", "completion_date", "score"]
+                        },
                     )
                 elif action == "get_training_progress" or action == "track_training_progress":
                     result_data = await training_service.get_training_progress(
-                        staff_id=params.get("staff_id"),
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        staff_id=params.get("staff_id"), start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 elif action == "get_training_statistics":
                     result_data = await training_service.get_training_statistics(
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 elif action == "get_training_report":
                     result_data = await training_service.get_training_report(
-                        start_date=params.get("start_date"),
-                        end_date=params.get("end_date")
+                        start_date=params.get("start_date"), end_date=params.get("end_date")
                     )
                 elif action == "get_employee_training_history":
-                    result_data = await training_service.get_employee_training_history(
-                        staff_id=params["staff_id"]
-                    )
+                    result_data = await training_service.get_employee_training_history(staff_id=params["staff_id"])
                 else:
                     return {
                         "success": False,

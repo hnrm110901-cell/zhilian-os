@@ -2,17 +2,18 @@
 菜品服务
 管理菜品主档的业务逻辑
 """
+
 import os
 from decimal import Decimal
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import joinedload
-import structlog
+from typing import Any, Dict, List, Optional
 
+import structlog
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import joinedload
+from src.core.database import get_db_session
 from src.models.dish import Dish, DishCategory, DishIngredient
 from src.models.inventory import InventoryItem
 from src.services.base_service import BaseService
-from src.core.database import get_db_session
 
 logger = structlog.get_logger()
 
@@ -34,10 +35,7 @@ class DishService(BaseService):
 
         async with self.get_session() as session:
             # 创建菜品
-            dish = Dish(
-                store_id=store_id,
-                **dish_data
-            )
+            dish = Dish(store_id=store_id, **dish_data)
 
             # 计算毛利率
             if dish.price and dish.cost:
@@ -70,16 +68,8 @@ class DishService(BaseService):
         async with self.get_session() as session:
             stmt = (
                 select(Dish)
-                .options(
-                    joinedload(Dish.category),
-                    joinedload(Dish.ingredients).joinedload(DishIngredient.ingredient)
-                )
-                .where(
-                    and_(
-                        Dish.id == dish_id,
-                        Dish.store_id == store_id
-                    )
-                )
+                .options(joinedload(Dish.category), joinedload(Dish.ingredients).joinedload(DishIngredient.ingredient))
+                .where(and_(Dish.id == dish_id, Dish.store_id == store_id))
             )
 
             result = await session.execute(stmt)
@@ -113,11 +103,7 @@ class DishService(BaseService):
         store_id = self.require_store_id()
 
         async with self.get_session() as session:
-            stmt = (
-                select(Dish)
-                .options(joinedload(Dish.category))
-                .where(Dish.store_id == store_id)
-            )
+            stmt = select(Dish).options(joinedload(Dish.category)).where(Dish.store_id == store_id)
 
             # 应用过滤条件
             if category_id:
@@ -170,12 +156,7 @@ class DishService(BaseService):
         store_id = self.require_store_id()
 
         async with self.get_session() as session:
-            stmt = select(Dish).where(
-                and_(
-                    Dish.id == dish_id,
-                    Dish.store_id == store_id
-                )
-            )
+            stmt = select(Dish).where(and_(Dish.id == dish_id, Dish.store_id == store_id))
 
             result = await session.execute(stmt)
             dish = result.scalar_one_or_none()
@@ -216,12 +197,7 @@ class DishService(BaseService):
         store_id = self.require_store_id()
 
         async with self.get_session() as session:
-            stmt = select(Dish).where(
-                and_(
-                    Dish.id == dish_id,
-                    Dish.store_id == store_id
-                )
-            )
+            stmt = select(Dish).where(and_(Dish.id == dish_id, Dish.store_id == store_id))
 
             result = await session.execute(stmt)
             dish = result.scalar_one_or_none()
@@ -241,14 +217,7 @@ class DishService(BaseService):
 
             return True
 
-    async def add_ingredient(
-        self,
-        dish_id: str,
-        ingredient_id: str,
-        quantity: float,
-        unit: str,
-        **kwargs
-    ) -> DishIngredient:
+    async def add_ingredient(self, dish_id: str, ingredient_id: str, quantity: float, unit: str, **kwargs) -> DishIngredient:
         """
         为菜品添加食材
 
@@ -266,12 +235,7 @@ class DishService(BaseService):
 
         async with self.get_session() as session:
             # 验证菜品存在
-            dish_stmt = select(Dish).where(
-                and_(
-                    Dish.id == dish_id,
-                    Dish.store_id == store_id
-                )
-            )
+            dish_stmt = select(Dish).where(and_(Dish.id == dish_id, Dish.store_id == store_id))
             dish_result = await session.execute(dish_stmt)
             dish = dish_result.scalar_one_or_none()
 
@@ -280,10 +244,7 @@ class DishService(BaseService):
 
             # 验证食材存在
             ingredient_stmt = select(InventoryItem).where(
-                and_(
-                    InventoryItem.id == ingredient_id,
-                    InventoryItem.store_id == store_id
-                )
+                and_(InventoryItem.id == ingredient_id, InventoryItem.store_id == store_id)
             )
             ingredient_result = await session.execute(ingredient_stmt)
             ingredient = ingredient_result.scalar_one_or_none()
@@ -293,12 +254,7 @@ class DishService(BaseService):
 
             # 创建关联
             dish_ingredient = DishIngredient(
-                store_id=store_id,
-                dish_id=dish_id,
-                ingredient_id=ingredient_id,
-                quantity=quantity,
-                unit=unit,
-                **kwargs
+                store_id=store_id, dish_id=dish_id, ingredient_id=ingredient_id, quantity=quantity, unit=unit, **kwargs
             )
 
             session.add(dish_ingredient)
@@ -329,15 +285,8 @@ class DishService(BaseService):
             # 获取菜品及其食材
             stmt = (
                 select(Dish)
-                .options(
-                    joinedload(Dish.ingredients).joinedload(DishIngredient.ingredient)
-                )
-                .where(
-                    and_(
-                        Dish.id == dish_id,
-                        Dish.store_id == store_id
-                    )
-                )
+                .options(joinedload(Dish.ingredients).joinedload(DishIngredient.ingredient))
+                .where(and_(Dish.id == dish_id, Dish.store_id == store_id))
             )
 
             result = await session.execute(stmt)
@@ -352,19 +301,18 @@ class DishService(BaseService):
 
             for dish_ingredient in dish.ingredients:
                 ingredient = dish_ingredient.ingredient
-                cost = (
-                    Decimal(str(dish_ingredient.quantity)) *
-                    Decimal(str(ingredient.unit_price or 0))
-                )
+                cost = Decimal(str(dish_ingredient.quantity)) * Decimal(str(ingredient.unit_price or 0))
                 total_ingredient_cost += cost
 
-                ingredients_cost.append({
-                    "ingredient_name": ingredient.name,
-                    "quantity": float(dish_ingredient.quantity),
-                    "unit": dish_ingredient.unit,
-                    "unit_price": str(Decimal(str(ingredient.unit_price or 0))),
-                    "cost": str(cost),
-                })
+                ingredients_cost.append(
+                    {
+                        "ingredient_name": ingredient.name,
+                        "quantity": float(dish_ingredient.quantity),
+                        "unit": dish_ingredient.unit,
+                        "unit_price": str(Decimal(str(ingredient.unit_price or 0))),
+                        "cost": str(cost),
+                    }
+                )
 
             # 成本分解
             breakdown = {
@@ -395,12 +343,7 @@ class DishService(BaseService):
         async with self.get_session() as session:
             stmt = (
                 select(Dish)
-                .where(
-                    and_(
-                        Dish.store_id == store_id,
-                        Dish.is_available == True
-                    )
-                )
+                .where(and_(Dish.store_id == store_id, Dish.is_available == True))
                 .order_by(Dish.total_sales.desc())
                 .limit(limit)
             )
@@ -431,10 +374,7 @@ class DishCategoryService(BaseService):
         store_id = self.require_store_id()
 
         async with self.get_session() as session:
-            category = DishCategory(
-                store_id=store_id,
-                **category_data
-            )
+            category = DishCategory(store_id=store_id, **category_data)
 
             session.add(category)
             await session.flush()
@@ -455,12 +395,7 @@ class DishCategoryService(BaseService):
         async with self.get_session() as session:
             stmt = (
                 select(DishCategory)
-                .where(
-                    and_(
-                        DishCategory.store_id == store_id,
-                        DishCategory.is_active == True
-                    )
-                )
+                .where(and_(DishCategory.store_id == store_id, DishCategory.is_active == True))
                 .order_by(DishCategory.sort_order, DishCategory.name)
             )
 

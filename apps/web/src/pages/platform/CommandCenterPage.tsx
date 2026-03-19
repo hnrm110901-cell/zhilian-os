@@ -144,9 +144,9 @@ const CommandCenterPage: React.FC = () => {
   const [dispatchLoading, setDispatchLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const overviewTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const eventsTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const clockTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const overviewTimer = useRef<ReturnType<typeof setInterval>>(undefined);
+  const eventsTimer = useRef<ReturnType<typeof setInterval>>(undefined);
+  const clockTimer = useRef<ReturnType<typeof setInterval>>(undefined);
 
   // ── 数据拉取 ────────────────────────────────────────────────────────────
 

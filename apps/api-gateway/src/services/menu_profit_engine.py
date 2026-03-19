@@ -8,6 +8,7 @@ Task4: MenuProfitEngine — 菜品渠道毛利分析引擎
   gross_margin  = gross_profit / revenue_fen  (revenue_fen > 0 时)
   label         = 赚钱 (>30%) / 勉强 (>0%) / 亏钱 (≤0%)
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -17,10 +18,9 @@ from typing import List, Optional
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.models.channel_config import SalesChannelConfig
 from src.models.dish import Dish
 from src.models.dish_channel import DishChannelConfig
-from src.models.channel_config import SalesChannelConfig
 from src.models.store import Store
 from src.services.bom_resolver import BOMResolverService
 
@@ -30,19 +30,20 @@ logger = structlog.get_logger()
 @dataclass
 class DishChannelProfit:
     """单道菜 × 单渠道的毛利分析结果"""
+
     dish_id: str
     dish_name: str
     channel: str
     store_id: str
     price_fen: int
-    revenue_fen: Decimal                # 扣佣后到手金额
-    bom_cost_fen: Decimal               # BOM 食材成本
-    packaging_cost_fen: int             # 包材费
-    delivery_cost_fen: int              # 配送费
-    total_cost_fen: Decimal             # 总成本
-    gross_profit_fen: Decimal           # 毛利
-    gross_margin_pct: float             # 毛利率（0~1 float）
-    label: str                          # 赚钱 / 勉强 / 亏钱
+    revenue_fen: Decimal  # 扣佣后到手金额
+    bom_cost_fen: Decimal  # BOM 食材成本
+    packaging_cost_fen: int  # 包材费
+    delivery_cost_fen: int  # 配送费
+    total_cost_fen: Decimal  # 总成本
+    gross_profit_fen: Decimal  # 毛利
+    gross_margin_pct: float  # 毛利率（0~1 float）
+    label: str  # 赚钱 / 勉强 / 亏钱
     bom_source_ids: List[str] = field(default_factory=list)
 
 
@@ -101,16 +102,12 @@ class MenuProfitEngine:
             return None
 
         # 取菜品名称
-        dish_result = await session.execute(
-            select(Dish).where(Dish.id == dish_id)
-        )
+        dish_result = await session.execute(select(Dish).where(Dish.id == dish_id))
         dish: Optional[Dish] = dish_result.scalar_one_or_none()
         dish_name = dish.name if dish else str(dish_id)
 
         # 2. 门店 brand_id
-        store_result = await session.execute(
-            select(Store).where(Store.id == store_id)
-        )
+        store_result = await session.execute(select(Store).where(Store.id == store_id))
         store: Optional[Store] = store_result.scalar_one_or_none()
         brand_id = store.brand_id if store else None
 
@@ -190,9 +187,7 @@ class MenuProfitEngine:
 
         results: List[DishChannelProfit] = []
         for dcc in dccs:
-            profit = await MenuProfitEngine.get_dish_channel_profit(
-                session, str(dcc.dish_id), dcc.channel, store_id
-            )
+            profit = await MenuProfitEngine.get_dish_channel_profit(session, str(dcc.dish_id), dcc.channel, store_id)
             if profit is not None:
                 results.append(profit)
 

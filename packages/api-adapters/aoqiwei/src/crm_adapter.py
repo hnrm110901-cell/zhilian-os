@@ -1,20 +1,29 @@
 """
-奥琦玮 CRM 开放平台适配器（会员 & 交易接口）
+微生活会员系统适配器（奥琦玮旗下，会员 & 交易接口）
 
-Base URL: https://welcrm.com
+Base URL: https://api.acewill.net
 文档: https://www.yuque.com/acewillomp/odh93w（密码: cw01）
+
+请求规范（官方文档）：
+  - 所有接口仅支持 POST
+  - Content-Type: multipart/form-data（不是 JSON！）
+  - 业务参数 JSON 放在 req 字段
+  - 公共参数: appid, v(2.0), ts(秒级时间戳), sig(MD5签名), fmt(JSON)
 
 签名算法（官方 PHP demo 还原，必须严格遵守）：
   1. 所有业务参数递归按 ASCII key 排序（PHP ksort，3层递归）
   2. PHP http_build_query 等价拼接（RFC 1738，跳过 None/空字符串）
   3. 末尾追加 &appid=X&appkey=X&v=2.0&ts=X（秒级整数时间戳）
   4. 对整体做 MD5（小写 hex）→ 得到 sig
-  请求体发送：biz_params + appid + v + ts + sig（appkey 仅用于签名，不发送）
+  appkey 仅用于签名计算，不发送到请求体中
+
+响应格式: {"errcode": 0, "errmsg": "OK", "res": {...}}
 
 注意：MD5 是 API 方要求，非我方选择。
 """
 import asyncio
 import hashlib
+import json as _json
 import os
 import time
 from typing import Any, Dict, List, Optional
@@ -106,9 +115,9 @@ class AoqiweiCrmAdapter:
     """
     奥琦玮 CRM 会员 & 交易接口适配器。
 
-    对应奥琦玮系统：welcrm.com（非供应链 openapi.acescm.cn）。
+    对应奥琦玮系统：api.acewill.net（原 welcrm.com，非供应链 openapi.acescm.cn）。
     环境变量：
-        AOQIWEI_CRM_BASE_URL — 默认 https://welcrm.com
+        AOQIWEI_CRM_BASE_URL — 默认 https://api.acewill.net
         AOQIWEI_CRM_APPID    — CRM AppID
         AOQIWEI_CRM_APPKEY   — CRM AppKey（签名密钥，不发送到请求体）
         AOQIWEI_CRM_TIMEOUT  — 超时秒数，默认 30
@@ -117,7 +126,7 @@ class AoqiweiCrmAdapter:
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.base_url = config.get(
-            "base_url", os.getenv("AOQIWEI_CRM_BASE_URL", "https://welcrm.com")
+            "base_url", os.getenv("AOQIWEI_CRM_BASE_URL", "https://api.acewill.net")
         )
         self.appid = config.get("appid", os.getenv("AOQIWEI_CRM_APPID", ""))
         self.appkey = config.get("appkey", os.getenv("AOQIWEI_CRM_APPKEY", ""))
@@ -149,20 +158,27 @@ class AoqiweiCrmAdapter:
             ts=ts,
         )
 
-    def _build_request_body(self, biz_params: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_request_body(self, biz_params: Dict[str, Any]) -> Dict[str, str]:
         """
-        构建带签名的完整请求体。
-        appkey 仅用于签名计算，不包含在发送的请求体中。
+        构建带签名的 multipart/form-data 请求体。
+
+        微生活 API 要求：
+          - 业务参数 JSON 序列化后放在 req 字段
+          - 公共参数: appid, v, ts, sig, fmt 作为独立表单字段
+          - appkey 仅用于签名计算，不包含在发送的请求体中
         """
         ts = int(time.time())
         sig = self._sign(biz_params, ts)
-        return {
-            **biz_params,
+        body: Dict[str, str] = {
             "appid": self.appid,
             "v": _API_VERSION,
-            "ts": ts,
+            "ts": str(ts),
             "sig": sig,
+            "fmt": "JSON",
         }
+        if biz_params:
+            body["req"] = _json.dumps(biz_params, ensure_ascii=False)
+        return body
 
     async def _request(
         self,
@@ -170,9 +186,9 @@ class AoqiweiCrmAdapter:
         biz_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        POST 请求，带指数退避重试。
-        CRM API 响应格式: {"status": 1, "info": "ok", "data": {...}}
-        业务错误（status != 1）立即抛出，不重试。
+        POST 请求（multipart/form-data），带指数退避重试。
+        微生活 API 响应格式: {"errcode": 0, "errmsg": "OK", "res": {...}}
+        业务错误（errcode != 0）立即抛出，不重试。
         """
         body = self._build_request_body(biz_params or {})
         last_exc: Optional[Exception] = None
@@ -181,19 +197,21 @@ class AoqiweiCrmAdapter:
             if attempt > 0:
                 await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
             try:
-                response = await self._client.post(endpoint, json=body)
+                response = await self._client.post(endpoint, data=body)
                 response.raise_for_status()
                 result = response.json()
 
-                status = result.get("status", 0)
-                if status != 1:
-                    info = result.get("info", "未知错误")
-                    raise Exception(f"奥琦玮CRM业务错误 [status={status}]: {info}")
+                errcode = result.get("errcode", -1)
+                if errcode != 0:
+                    errmsg = result.get("errmsg", "未知错误")
+                    raise Exception(
+                        f"微生活CRM业务错误 [errcode={errcode}]: {errmsg}"
+                    )
 
-                return result.get("data", result)
+                return result.get("res", result)
 
             except Exception as e:
-                if "奥琦玮CRM业务错误" in str(e):
+                if "微生活CRM业务错误" in str(e):
                     raise
                 last_exc = e
                 logger.warning(
@@ -294,7 +312,7 @@ class AoqiweiCrmAdapter:
         )
         try:
             return await self._request(
-                "/deal/",
+                "/deal/commit",
                 {
                     "cno": cno,
                     "shop_id": shop_id,
@@ -370,7 +388,7 @@ class AoqiweiCrmAdapter:
 
         logger.info("获取会员信息", cno=cno, mobile=mobile)
         try:
-            return await self._request("/member/info", params)
+            return await self._request("/user/accountBasicsInfo", params)
         except Exception as e:
             logger.warning("获取会员信息失败", error=str(e))
             return {}

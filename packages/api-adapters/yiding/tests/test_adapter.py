@@ -1,17 +1,18 @@
 """
 易订适配器测试 - YiDing Adapter Tests
+
+基于真实易订API格式编写
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
 from src.adapter import YiDingAdapter
+from src.client import YiDingAPIError
+from src.mapper import YiDingMapper
 from src.types import (
     YiDingConfig,
-    CreateReservationDTO,
-    TableType,
-    ReservationStatus
+    ReservationStatus,
 )
 
 
@@ -19,12 +20,12 @@ from src.types import (
 def config():
     """测试配置"""
     return YiDingConfig(
-        base_url="https://api-test.yiding.com",
-        app_id="test_app_id",
-        app_secret="test_app_secret",
+        base_url="https://open.zhidianfan.com/yidingopen/",
+        appid="test_appid",
+        secret="test_secret",
         timeout=5,
         max_retries=2,
-        cache_ttl=60
+        cache_ttl=60,
     )
 
 
@@ -38,242 +39,272 @@ class TestYiDingAdapter:
     """易订适配器测试"""
 
     def test_get_system_name(self, adapter):
-        """测试获取系统名称"""
         assert adapter.get_system_name() == "yiding"
 
     @pytest.mark.asyncio
     async def test_health_check_success(self, adapter):
-        """测试健康检查成功"""
-        with patch.object(adapter.client, 'ping', return_value=True):
-            result = await adapter.health_check()
-            assert result is True
+        with patch.object(adapter.client, "ping", return_value=True):
+            assert await adapter.health_check() is True
 
     @pytest.mark.asyncio
     async def test_health_check_failure(self, adapter):
-        """测试健康检查失败"""
-        with patch.object(adapter.client, 'ping', side_effect=Exception("Connection failed")):
-            result = await adapter.health_check()
-            assert result is False
+        with patch.object(adapter.client, "ping", side_effect=Exception("fail")):
+            assert await adapter.health_check() is False
 
     @pytest.mark.asyncio
-    async def test_create_reservation(self, adapter):
-        """测试创建预订"""
-        # Mock数据
-        reservation_data: CreateReservationDTO = {
-            "store_id": "STORE001",
-            "customer_name": "张三",
-            "customer_phone": "13800138000",
-            "reservation_date": "2026-02-20",
-            "reservation_time": "18:00",
-            "party_size": 4,
-            "table_type": TableType.MEDIUM,
-            "special_requests": "靠窗位置"
-        }
-
+    async def test_get_order_list(self, adapter):
+        """测试订单列表（5.2）"""
         mock_response = {
-            "success": True,
-            "data": {
-                "id": "12345",
-                "store_id": "STORE001",
-                "customer_id": "CUST001",
-                "customer_name": "张三",
-                "customer_phone": "13800138000",
-                "reservation_date": "2026-02-20",
-                "reservation_time": "18:00",
-                "party_size": 4,
-                "table_type": "medium",
-                "table_number": "M001",
-                "status": "pending",
-                "deposit_amount": 10000,
-                "estimated_amount": 40000,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-        }
-
-        with patch.object(adapter.client, 'post', return_value=mock_response):
-            reservation = await adapter.create_reservation(reservation_data)
-
-            assert reservation["external_id"] == "12345"
-            assert reservation["customer_name"] == "张三"
-            assert reservation["party_size"] == 4
-            assert reservation["status"] == ReservationStatus.PENDING
-
-    @pytest.mark.asyncio
-    async def test_get_reservation(self, adapter):
-        """测试查询预订"""
-        mock_response = {
-            "success": True,
-            "data": {
-                "id": "12345",
-                "store_id": "STORE001",
-                "customer_id": "CUST001",
-                "customer_name": "张三",
-                "customer_phone": "13800138000",
-                "reservation_date": "2026-02-20",
-                "reservation_time": "18:00",
-                "party_size": 4,
-                "table_type": "medium",
-                "status": "confirmed",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-        }
-
-        with patch.object(adapter.client, 'get', return_value=mock_response):
-            reservation = await adapter.get_reservation("12345")
-
-            assert reservation["external_id"] == "12345"
-            assert reservation["status"] == ReservationStatus.CONFIRMED
-
-    @pytest.mark.asyncio
-    async def test_get_customer_by_phone(self, adapter):
-        """测试根据手机号查询客户"""
-        mock_response = {
-            "success": True,
-            "data": {
-                "id": "CUST001",
-                "phone": "13800138000",
-                "name": "张三",
-                "member_level": "VIP",
-                "points": 1000,
-                "visit_count": 15,
-                "total_spent": 480000,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-        }
-
-        with patch.object(adapter.client, 'get', return_value=mock_response):
-            customer = await adapter.get_customer_by_phone("13800138000")
-
-            assert customer is not None
-            assert customer["phone"] == "13800138000"
-            assert customer["name"] == "张三"
-            assert customer["member_level"] == "VIP"
-
-    @pytest.mark.asyncio
-    async def test_get_customer_not_found(self, adapter):
-        """测试查询不存在的客户"""
-        from src.client import YiDingAPIError
-
-        with patch.object(
-            adapter.client,
-            'get',
-            side_effect=YiDingAPIError("Not found", status_code=404)
-        ):
-            customer = await adapter.get_customer_by_phone("99999999999")
-            assert customer is None
-
-    @pytest.mark.asyncio
-    async def test_get_available_tables(self, adapter):
-        """测试查询可用桌台"""
-        mock_response = {
-            "success": True,
+            "error_code": "0",
+            "error_msg": "",
             "data": [
                 {
-                    "id": "T001",
-                    "table_number": "M001",
-                    "table_type": "medium",
-                    "capacity": 4,
-                    "min_capacity": 2,
-                    "status": "available",
-                    "location": "大厅"
+                    "hotel_id": "30",
+                    "hotel_name": "尝在一起闲鲜餐厅",
+                    "resv_order": "16655654654765465",
+                    "resv_date": "2026-03-17",
+                    "area_code": "01",
+                    "table_code": "001",
+                    "resv_num": 8,
+                    "vip_phone": "18667872695",
+                    "vip_name": "张三",
+                    "meal_type_code": "3",
+                    "meal_type_name": "晚市",
+                    "app_user_code": "1001",
+                    "app_user_name": "李经理",
+                    "dest_time": "18:00",
+                    "remark": "靠窗位置",
+                    "is_dish": 1,
+                    "deposit": 1,
+                    "deposit_amount": "100",
+                    "order_type": 1,
+                    "pay_type": 1,
+                    "paymount": 800,
+                    "status": 1,
                 },
-                {
-                    "id": "T002",
-                    "table_number": "M002",
-                    "table_type": "medium",
-                    "capacity": 4,
-                    "min_capacity": 2,
-                    "status": "available",
-                    "location": "大厅"
-                }
-            ]
+            ],
         }
 
-        with patch.object(adapter.client, 'get', return_value=mock_response):
-            tables = await adapter.get_available_tables(
-                store_id="STORE001",
-                date="2026-02-20",
-                time="18:00",
-                party_size=4
+        with patch.object(adapter.client, "get", return_value=mock_response):
+            orders = await adapter.get_order_list(
+                start_date="2026-03-17", end_date="2026-03-17"
             )
 
-            assert len(tables) == 2
-            assert tables[0]["table_number"] == "M001"
-            assert tables[0]["capacity"] == 4
+            assert len(orders) == 1
+            o = orders[0]
+            assert o["external_id"] == "16655654654765465"
+            assert o["customer_name"] == "张三"
+            assert o["customer_phone"] == "18667872695"
+            assert o["party_size"] == 8
+            assert o["status"] == ReservationStatus.PENDING
+            assert o["raw_status"] == 1
+            assert o["meal_type_name"] == "晚市"
+            assert o["deposit_amount"] == "100"
+            assert o["pay_amount"] == 800
 
     @pytest.mark.asyncio
-    async def test_cancel_reservation(self, adapter):
-        """测试取消预订"""
-        mock_response = {"success": True}
-
-        with patch.object(adapter.client, 'delete', return_value=mock_response):
-            await adapter.cancel_reservation("12345", reason="客户临时有事")
-            # 验证没有抛出异常
-
-    @pytest.mark.asyncio
-    async def test_cache_hit(self, adapter):
-        """测试缓存命中"""
-        # 第一次调用,设置缓存
+    async def test_get_member_info(self, adapter):
+        """测试会员信息查询（4.1）"""
         mock_response = {
-            "success": True,
+            "error_code": 0,
+            "error_msg": "",
             "data": {
-                "id": "12345",
-                "store_id": "STORE001",
-                "customer_id": "CUST001",
-                "customer_name": "张三",
-                "customer_phone": "13800138000",
-                "reservation_date": "2026-02-20",
-                "reservation_time": "18:00",
-                "party_size": 4,
-                "table_type": "medium",
-                "status": "confirmed",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
+                "sum_amount": 4732,
+                "vip_sex": "男",
+                "vip_name": "邱琪潇",
+                "vip_company": "某公司",
+                "remark": "",
+                "first_class_value": "沉睡用户",
+                "sub_value": "vip",
+                "per_person": 3.87,
+                "last_ordered": "2026-01-12",
+                "vip_address": "",
+                "vip_phone": "13777575146",
+                "short_phone_num": "",
+                "sum_ordered": 298,
+                "detest": "辣椒",
+                "tag": "常客",
+                "hobby": "海鲜",
+                "created_at": "2025-05-27 13:59:42",
+            },
         }
 
-        with patch.object(adapter.client, 'get', return_value=mock_response) as mock_get:
-            # 第一次调用
-            reservation1 = await adapter.get_reservation("12345")
-            assert mock_get.call_count == 1
+        with patch.object(adapter.client, "get", return_value=mock_response):
+            member = await adapter.get_member_info("13777575146")
 
-            # 第二次调用应该命中缓存
-            reservation2 = await adapter.get_reservation("12345")
-            assert mock_get.call_count == 1  # 没有增加
+            assert member is not None
+            assert member["phone"] == "13777575146"
+            assert member["name"] == "邱琪潇"
+            assert member["total_amount"] == 4732
+            assert member["total_visits"] == 298
+            assert member["first_class_value"] == "沉睡用户"
+            assert member["detest"] == "辣椒"
+            assert member["hobby"] == "海鲜"
 
-            assert reservation1["id"] == reservation2["id"]
+    @pytest.mark.asyncio
+    async def test_get_member_info_not_found(self, adapter):
+        """测试查询不存在的会员"""
+        mock_response = {
+            "error_code": 0,
+            "error_msg": "",
+            "data": None,
+        }
+
+        with patch.object(adapter.client, "get", return_value=mock_response):
+            member = await adapter.get_member_info("99999999999")
+            assert member is None
+
+    @pytest.mark.asyncio
+    async def test_get_pending_orders(self, adapter):
+        """测试获取待处理订单（2.1轮询）"""
+        mock_response = {
+            "error_code": "0",
+            "error_msg": "",
+            "requestId": 1234,
+            "data": [
+                {
+                    "resv_order": "ORDER001",
+                    "resv_date": "2026-03-18",
+                    "resv_num": 4,
+                    "vip_phone": "13800138000",
+                    "vip_name": "王五",
+                    "status": 1,
+                    "dest_time": "12:00",
+                    "is_dish": 0,
+                    "deposit": 0,
+                    "order_type": 1,
+                },
+            ],
+        }
+
+        with patch.object(adapter.client, "get", return_value=mock_response):
+            orders = await adapter.get_pending_orders()
+            assert len(orders) == 1
+            assert orders[0]["customer_name"] == "王五"
+
+    @pytest.mark.asyncio
+    async def test_check_table_status(self, adapter):
+        """测试桌位预订状态检查（2.3）"""
+        mock_response = {
+            "error_code": 0,
+            "error_msg": "",
+            "data": {"status": 1},
+        }
+
+        with patch.object(adapter.client, "get", return_value=mock_response):
+            is_reserved = await adapter.check_table_status(
+                table_code="001",
+                meal_type_code="3",
+                resv_date="2026-03-18",
+            )
+            assert is_reserved is True
+
+    @pytest.mark.asyncio
+    async def test_get_order_list_v2(self, adapter):
+        """测试订单列表V2（5.3）"""
+        mock_response = {
+            "error_code": "0",
+            "error_msg": "",
+            "data": [
+                {
+                    "hotel_id": "30",
+                    "hotel_name": "尝在一起",
+                    "resv_order": "V2_ORDER_001",
+                    "resv_date": "2026-03-15",
+                    "table_area_name": "大厅",
+                    "table_name": "A03",
+                    "resv_num": 6,
+                    "vip_phone": "13900139000",
+                    "vip_name": "赵六",
+                    "meal_type_name": "午市",
+                    "app_user_name": "李经理",
+                    "dest_time": "11:30",
+                    "remark": "",
+                    "is_dish": 1,
+                    "deposit": 0,
+                    "deposit_amount": "0",
+                    "order_type": 1,
+                    "status": 3,
+                    "paymount": 1200,
+                    "sourceName": "大众点评",
+                    "resvOrderTypeName": "普通预订",
+                    "billNo": "224355",
+                    "inTableTime": "2026-03-15 11:37:08",
+                },
+            ],
+        }
+
+        with patch.object(adapter.client, "get", return_value=mock_response):
+            orders = await adapter.get_order_list_v2(
+                start_date="2026-03-15", end_date="2026-03-18"
+            )
+
+            assert len(orders) == 1
+            o = orders[0]
+            assert o["status"] == ReservationStatus.COMPLETED
+            assert o["raw_status"] == 3
+            assert o["pay_amount"] == 1200
+            assert o["source_name"] == "大众点评"
+            assert o["table_area_name"] == "大厅"
+            assert o["in_table_time"] == "2026-03-15 11:37:08"
 
 
 class TestYiDingMapper:
     """数据映射器测试"""
 
-    def test_map_status(self):
-        """测试状态映射"""
-        from src.mapper import YiDingMapper
-
+    def test_map_status_numeric(self):
+        """测试数字状态码映射"""
         mapper = YiDingMapper()
 
-        assert mapper._map_status("pending") == ReservationStatus.PENDING
-        assert mapper._map_status("confirmed") == ReservationStatus.CONFIRMED
-        assert mapper._map_status("arrived") == ReservationStatus.SEATED
-        assert mapper._map_status("finished") == ReservationStatus.COMPLETED
-        assert mapper._map_status("cancelled") == ReservationStatus.CANCELLED
-        assert mapper._map_status("noshow") == ReservationStatus.NO_SHOW
+        assert mapper._map_status(1) == ReservationStatus.PENDING
+        assert mapper._map_status(2) == ReservationStatus.SEATED
+        assert mapper._map_status(3) == ReservationStatus.COMPLETED
+        assert mapper._map_status(4) == ReservationStatus.CANCELLED
+        assert mapper._map_status(6) == ReservationStatus.TABLE_CHANGE
 
-    def test_map_table_type(self):
-        """测试桌型映射"""
-        from src.mapper import YiDingMapper
-
+    def test_map_status_string(self):
+        """测试字符串状态码映射"""
         mapper = YiDingMapper()
 
-        assert mapper._map_table_type("small") == TableType.SMALL
-        assert mapper._map_table_type("medium") == TableType.MEDIUM
-        assert mapper._map_table_type("large") == TableType.LARGE
-        assert mapper._map_table_type("round") == TableType.ROUND
-        assert mapper._map_table_type("private") == TableType.PRIVATE_ROOM
+        assert mapper._map_status("1") == ReservationStatus.PENDING
+        assert mapper._map_status("2") == ReservationStatus.SEATED
+        assert mapper._map_status("3") == ReservationStatus.COMPLETED
+
+    def test_compute_reservation_stats(self):
+        """测试预订统计计算"""
+        mapper = YiDingMapper()
+
+        reservations = [
+            {
+                "status": ReservationStatus.PENDING,
+                "party_size": 4,
+                "deposit_amount": "100",
+                "pay_amount": 0,
+            },
+            {
+                "status": ReservationStatus.COMPLETED,
+                "party_size": 8,
+                "deposit_amount": "200",
+                "pay_amount": 1500,
+            },
+            {
+                "status": ReservationStatus.COMPLETED,
+                "party_size": 6,
+                "deposit_amount": "0",
+                "pay_amount": 1000,
+            },
+        ]
+
+        stats = mapper.compute_reservation_stats(
+            reservations, "S001", "2026-03-01", "2026-03-18"
+        )
+
+        assert stats["total_reservations"] == 3
+        assert stats["average_party_size"] == 6.0
+        assert stats["total_deposit"] == 300.0
+        assert stats["total_pay_amount"] == 2500.0
+        assert stats["status_breakdown"]["pending"] == 1
+        assert stats["status_breakdown"]["completed"] == 2
 
 
 class TestYiDingCache:
@@ -281,11 +312,9 @@ class TestYiDingCache:
 
     @pytest.mark.asyncio
     async def test_cache_set_and_get(self):
-        """测试缓存设置和获取"""
         from src.cache import YiDingCache
 
         cache = YiDingCache(ttl=60)
-
         test_data = {"id": "test123", "name": "Test"}
         await cache.set_reservation("test123", test_data)
 
@@ -294,21 +323,13 @@ class TestYiDingCache:
 
     @pytest.mark.asyncio
     async def test_cache_invalidation(self):
-        """测试缓存失效"""
         from src.cache import YiDingCache
 
         cache = YiDingCache(ttl=60)
-
         test_data = {"id": "test123", "name": "Test"}
         await cache.set_reservation("test123", test_data)
 
-        # 验证缓存存在
-        cached = await cache.get_reservation("test123")
-        assert cached is not None
-
-        # 清除缓存
         await cache.invalidate_reservation("test123")
 
-        # 验证缓存已清除
         cached = await cache.get_reservation("test123")
         assert cached is None

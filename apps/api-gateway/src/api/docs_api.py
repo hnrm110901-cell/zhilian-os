@@ -4,6 +4,7 @@
 - GET  /api/v1/open/docs/auth-guide   鉴权方式说明
 - POST /api/v1/open/sandbox/register  沙箱账号快速创建
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -42,13 +43,18 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
             {"name": "orders[].order_id", "type": "string", "required": True, "description": "外部系统订单 ID（用于幂等）"},
             {"name": "orders[].store_id", "type": "string", "required": True, "description": "门店 ID"},
             {"name": "orders[].total_amount", "type": "number", "required": True, "description": "订单总额（元）"},
-            {"name": "orders[].status", "type": "string", "required": True, "description": "订单状态：pending/completed/cancelled"},
+            {
+                "name": "orders[].status",
+                "type": "string",
+                "required": True,
+                "description": "订单状态：pending/completed/cancelled",
+            },
         ],
         "response_example": {
             "code": 200,
             "message": "订单同步成功",
             "data": {"synced_count": 5, "errors": []},
-            "timestamp": "2026-03-07T10:00:00"
+            "timestamp": "2026-03-07T10:00:00",
         },
         "code_examples": {
             "python": (
@@ -99,14 +105,14 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
             ),
             "curl": (
                 "TS=$(date +%s)\n"
-                "BODY='{\"orders\":[{\"order_id\":\"ORD_001\",\"store_id\":\"STORE001\",\"total_amount\":188.0,\"status\":\"completed\"}]}'\n"
-                "SIG=$(echo -n \"${TS}:${BODY}\" | openssl dgst -sha256 -hmac \"$API_SECRET\" | awk '{print $2}')\n\n"
+                'BODY=\'{"orders":[{"order_id":"ORD_001","store_id":"STORE001","total_amount":188.0,"status":"completed"}]}\'\n'
+                'SIG=$(echo -n "${TS}:${BODY}" | openssl dgst -sha256 -hmac "$API_SECRET" | awk \'{print $2}\')\n\n'
                 "curl -X POST https://api.zhilian-os.com/v1/open/data/orders \\\n"
                 "  -H 'Content-Type: application/json' \\\n"
-                "  -H \"X-API-Key: $API_KEY\" \\\n"
-                "  -H \"X-Timestamp: $TS\" \\\n"
-                "  -H \"X-Signature: $SIG\" \\\n"
-                "  -d \"$BODY\""
+                '  -H "X-API-Key: $API_KEY" \\\n'
+                '  -H "X-Timestamp: $TS" \\\n'
+                '  -H "X-Signature: $SIG" \\\n'
+                '  -d "$BODY"'
             ),
         },
     },
@@ -128,7 +134,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
             "code": 200,
             "message": "会员同步成功",
             "data": {"synced_count": 20, "errors": []},
-            "timestamp": "2026-03-07T10:00:00"
+            "timestamp": "2026-03-07T10:00:00",
         },
         "code_examples": {
             "python": "# 参见订单同步示例，替换 endpoint 和 body 即可\nbody = json.dumps({'members': [{'phone': '13800138000', 'name': '张三', 'points': 500}]})",
@@ -157,7 +163,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 "dish_001": {"dish_name": "招牌鱼头", "predicted_sales": 35},
                 "dish_002": {"dish_name": "红烧肉", "predicted_sales": 28},
             },
-            "timestamp": "2026-03-07T10:00:00"
+            "timestamp": "2026-03-07T10:00:00",
         },
         "code_examples": {
             "python": (
@@ -169,7 +175,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 "print(resp.json()['data'])"
             ),
             "nodejs": "const resp = await axios.get('/api/v1/open/ai/predict-sales', { params: { store_id: 'STORE001', date: '2026-03-08' }, headers });",
-            "curl": "curl -G https://api.zhilian-os.com/v1/open/ai/predict-sales -d store_id=STORE001 -d date=2026-03-08 -H \"X-API-Key: $API_KEY\" ...",
+            "curl": 'curl -G https://api.zhilian-os.com/v1/open/ai/predict-sales -d store_id=STORE001 -d date=2026-03-08 -H "X-API-Key: $API_KEY" ...',
         },
     },
     {
@@ -191,7 +197,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 {"item": "鲈鱼", "quantity": 20, "unit": "条"},
                 {"item": "猪五花", "quantity": 15, "unit": "kg"},
             ],
-            "timestamp": "2026-03-07T10:00:00"
+            "timestamp": "2026-03-07T10:00:00",
         },
         "code_examples": {
             "python": "# 同 predict-sales，替换路径和参数",
@@ -222,7 +228,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 "segment": "high_value",
                 "favorite_dishes": ["招牌鱼头", "红烧肉"],
             },
-            "timestamp": "2026-03-07T10:00:00"
+            "timestamp": "2026-03-07T10:00:00",
         },
         "code_examples": {
             "python": (
@@ -232,7 +238,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 ")"
             ),
             "nodejs": "const resp = await axios.get(`/api/v1/open/marketing/customer/${customerId}/profile`, { headers });",
-            "curl": "curl https://api.zhilian-os.com/v1/open/marketing/customer/13800138000/profile -H \"X-API-Key: $API_KEY\" ...",
+            "curl": 'curl https://api.zhilian-os.com/v1/open/marketing/customer/13800138000/profile -H "X-API-Key: $API_KEY" ...',
         },
     },
     {
@@ -244,8 +250,18 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
         "description": "AI 根据场景和目标客群生成差异化优惠券方案，含预期转化率和 ROI",
         "tier_required": "pro",
         "request_params": [
-            {"name": "scenario", "type": "string", "required": True, "description": "场景：traffic_decline/new_product_launch/member_day/default"},
-            {"name": "target_segment", "type": "string", "required": True, "description": "目标客群：high_value/at_risk/new/potential"},
+            {
+                "name": "scenario",
+                "type": "string",
+                "required": True,
+                "description": "场景：traffic_decline/new_product_launch/member_day/default",
+            },
+            {
+                "name": "target_segment",
+                "type": "string",
+                "required": True,
+                "description": "目标客群：high_value/at_risk/new/potential",
+            },
             {"name": "store_id", "type": "string", "required": True, "description": "门店 ID"},
         ],
         "response_example": {
@@ -259,7 +275,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 "expected_conversion": 0.25,
                 "expected_roi": 3.5,
             },
-            "timestamp": "2026-03-07T10:00:00"
+            "timestamp": "2026-03-07T10:00:00",
         },
         "code_examples": {
             "python": (
@@ -270,7 +286,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 ")"
             ),
             "nodejs": "const resp = await axios.post('/api/v1/open/marketing/coupon-strategy', { scenario: 'traffic_decline', target_segment: 'at_risk', store_id: 'STORE001' }, { headers });",
-            "curl": "curl -X POST https://api.zhilian-os.com/v1/open/marketing/coupon-strategy -d '{\"scenario\":\"traffic_decline\",\"target_segment\":\"at_risk\",\"store_id\":\"STORE001\"}' ...",
+            "curl": 'curl -X POST https://api.zhilian-os.com/v1/open/marketing/coupon-strategy -d \'{"scenario":"traffic_decline","target_segment":"at_risk","store_id":"STORE001"}\' ...',
         },
     },
     # ── Level 4: 高级能力 ──────────────────────────────────────────────────────
@@ -284,7 +300,12 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
         "tier_required": "enterprise",
         "request_params": [
             {"name": "scenario", "type": "string", "required": True, "description": "场景描述，自然语言"},
-            {"name": "context.user_role", "type": "string", "required": False, "description": "角色：store_manager/chef/waiter"},
+            {
+                "name": "context.user_role",
+                "type": "string",
+                "required": False,
+                "description": "角色：store_manager/chef/waiter",
+            },
             {"name": "context.urgency", "type": "string", "required": False, "description": "紧急程度：low/medium/high"},
         ],
         "response_example": {
@@ -298,7 +319,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 "key_steps": ["提前30分钟备餐", "安排专职收台员", "15分钟结账提醒"],
                 "estimated_time_minutes": 45,
             },
-            "timestamp": "2026-03-07T10:00:00"
+            "timestamp": "2026-03-07T10:00:00",
         },
         "code_examples": {
             "python": (
@@ -309,7 +330,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
                 ")"
             ),
             "nodejs": "const resp = await axios.post('/api/v1/open/advanced/sop-query', { scenario: '晚高峰翻台效率低', context: { urgency: 'high' } }, { headers });",
-            "curl": "curl -X POST https://api.zhilian-os.com/v1/open/advanced/sop-query -d '{\"scenario\":\"晚高峰翻台效率低\"}' ...",
+            "curl": 'curl -X POST https://api.zhilian-os.com/v1/open/advanced/sop-query -d \'{"scenario":"晚高峰翻台效率低"}\' ...',
         },
     },
 ]
@@ -372,6 +393,7 @@ AUTH_GUIDE = {
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+
 @docs_router.get("/endpoints")
 async def get_endpoint_catalog(level: Optional[int] = None):
     """获取结构化端点目录，可按 Level 过滤"""
@@ -382,10 +404,7 @@ async def get_endpoint_catalog(level: Optional[int] = None):
     return {
         "total": len(catalog),
         "levels": sorted(grouped.keys()),
-        "by_level": {
-            str(lvl): {"count": len(eps), "endpoints": eps}
-            for lvl, eps in sorted(grouped.items())
-        },
+        "by_level": {str(lvl): {"count": len(eps), "endpoints": eps} for lvl, eps in sorted(grouped.items())},
     }
 
 
@@ -396,6 +415,7 @@ async def get_auth_guide():
 
 
 # ── Sandbox ────────────────────────────────────────────────────────────────────
+
 
 class SandboxRegisterRequest(BaseModel):
     name: str

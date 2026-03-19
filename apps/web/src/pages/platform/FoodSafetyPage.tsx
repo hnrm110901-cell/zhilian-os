@@ -14,8 +14,9 @@
  *   GET    /api/v1/food-safety/stats            — 统计概览
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { Alert, message } from 'antd';
 import {
-  ZCard, ZBadge, ZButton, ZEmpty, ZAlert, ZSkeleton, ZModal,
+  ZCard, ZBadge, ZButton, ZEmpty, ZSkeleton, ZModal,
 } from '../../design-system/components';
 import type { ZTableColumn } from '../../design-system/components';
 import ZTable from '../../design-system/components/ZTable';
@@ -182,7 +183,7 @@ const FoodSafetyPage: React.FC = () => {
       });
       setStats(res);
     } catch (err) {
-      console.error('加载统计数据失败', err);
+      message.error('加载统计数据失败');
     }
   }, [brandId]);
 
@@ -201,7 +202,7 @@ const FoodSafetyPage: React.FC = () => {
       setTraces(res.items);
       setTraceTotal(res.total);
     } catch (err) {
-      console.error('加载溯源记录失败', err);
+      message.error('加载溯源记录失败');
     } finally {
       setLoading(false);
     }
@@ -221,7 +222,7 @@ const FoodSafetyPage: React.FC = () => {
       setInspections(res.items);
       setInspectionTotal(res.total);
     } catch (err) {
-      console.error('加载检查记录失败', err);
+      message.error('加载检查记录失败');
     } finally {
       setLoading(false);
     }
@@ -234,7 +235,7 @@ const FoodSafetyPage: React.FC = () => {
       });
       setExpiringItems(res.items);
     } catch (err) {
-      console.error('加载预警数据失败', err);
+      message.error('加载预警数据失败');
     }
   }, [brandId]);
 
@@ -256,7 +257,7 @@ const FoodSafetyPage: React.FC = () => {
       fetchTraces();
       fetchStats();
     } catch (err) {
-      console.error('召回失败', err);
+      message.error('召回失败');
     }
   };
 
@@ -667,7 +668,7 @@ const FoodSafetyPage: React.FC = () => {
         onClose={() => setShowTraceModal(false)}
       >
         <div className={styles.modalBody}>
-          {formErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{formErr}</ZAlert>}
+          {formErr && <Alert type="error" message={formErr} className={styles.modalErr} />}
 
           <div className={styles.fieldGrid}>
             <div className={styles.fieldRow}>
@@ -842,7 +843,7 @@ const FoodSafetyPage: React.FC = () => {
         onClose={() => setShowInspModal(false)}
       >
         <div className={styles.modalBody}>
-          {formErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{formErr}</ZAlert>}
+          {formErr && <Alert type="error" message={formErr} className={styles.modalErr} />}
 
           <div className={styles.fieldGrid}>
             <div className={styles.fieldRow}>

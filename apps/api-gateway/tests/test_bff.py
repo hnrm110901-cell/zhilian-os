@@ -451,8 +451,10 @@ class TestSmHomeEdgeHubStatusIncluded:
 
         user = MagicMock()
         user.store_id = "S001"
+        user.brand_id = "BRAND001"
 
-        with patch("src.api.bff._cache_get",       new=AM(return_value=None)), \
+        with patch("src.api.bff.validate_store_brand", new=AM(return_value=None)), \
+             patch("src.api.bff._cache_get",       new=AM(return_value=None)), \
              patch("src.api.bff._cache_set",        new=AM(return_value=None)), \
              patch("src.api.bff._fetch_health_score",       return_value=None), \
              patch("src.api.bff._fetch_top3_decisions",     return_value=[]), \

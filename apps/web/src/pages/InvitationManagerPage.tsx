@@ -11,6 +11,7 @@ import {
   EyeOutlined, TeamOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../utils/apiClient';
+import { useAuthStore } from '../stores/authStore';
 import styles from './InvitationManagerPage.module.css';
 
 const { TextArea } = Input;
@@ -63,7 +64,8 @@ const InvitationManagerPage: React.FC = () => {
   const [rsvpData, setRsvpData] = useState<any>(null);
   const [form] = Form.useForm();
   const [aiForm] = Form.useForm();
-  const storeId = 'STORE_001'; // default
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.store_id || '';
 
   const loadItems = useCallback(async () => {
     setLoading(true);

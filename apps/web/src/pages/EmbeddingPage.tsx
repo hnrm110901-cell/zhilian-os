@@ -4,10 +4,13 @@ import { ExperimentOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
+import { useAuthStore } from '../stores/authStore';
 
 const { Option } = Select;
 
 const EmbeddingPage: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const defaultStoreId = user?.store_id || '';
   const [modelStatus, setModelStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [training, setTraining] = useState(false);
@@ -107,11 +110,11 @@ const EmbeddingPage: React.FC = () => {
           </Card>
           <Card title="训练模型">
             <Form form={trainForm} layout="inline" onFinish={trainModel}>
-              <Form.Item name="store_id" label="门店" initialValue="STORE001">
+              <Form.Item name="store_id" label="门店" initialValue={defaultStoreId}>
                 <Select style={{ width: 120 }}>
-                  {stores.length > 0 ? stores.map((s: any) => (
+                  {stores.map((s: any) => (
                     <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-                  )) : <Option value="STORE001">门店001</Option>}
+                  ))}
                 </Select>
               </Form.Item>
               <Form.Item name="epochs" label="训练轮数" initialValue={10}>
@@ -164,11 +167,11 @@ const EmbeddingPage: React.FC = () => {
         <Card>
           <Form form={recForm} layout="inline" onFinish={getRecommendations} style={{ marginBottom: 16 }}>
             <Form.Item name="customer_id" label="顾客ID" rules={[{ required: true }]}><Input placeholder="顾客ID" /></Form.Item>
-            <Form.Item name="store_id" label="门店" initialValue="STORE001">
+            <Form.Item name="store_id" label="门店" initialValue={defaultStoreId}>
               <Select style={{ width: 120 }}>
-                {stores.length > 0 ? stores.map((s: any) => (
+                {stores.map((s: any) => (
                   <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-                )) : <Option value="STORE001">门店001</Option>}
+                ))}
               </Select>
             </Form.Item>
             <Form.Item name="top_k" label="数量" initialValue={5}><InputNumber min={1} max={20} /></Form.Item>

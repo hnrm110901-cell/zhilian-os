@@ -2,10 +2,13 @@
 企业微信消息服务
 WeChat Work Message Service
 """
+
 import os
+from typing import Any, Dict, Optional
+
 import httpx
 import structlog
-from typing import Dict, Any, Optional
+
 from ..core.config import settings
 from ..utils.retry_helper import WECHAT_RETRY_CONFIG, async_retry
 
@@ -38,7 +41,7 @@ class WeChatWorkMessageService:
                     "corpid": settings.WECHAT_CORP_ID,
                     "corpsecret": settings.WECHAT_CORP_SECRET,
                 },
-                timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
             )
             data = response.json()
 
@@ -49,21 +52,12 @@ class WeChatWorkMessageService:
             expires_in = data.get("expires_in", 7200)
 
             # 缓存token，提前5分钟过期
-            await redis_cache.set(
-                self._cache_key,
-                access_token,
-                expire=expires_in - 300
-            )
+            await redis_cache.set(self._cache_key, access_token, expire=expires_in - 300)
 
             logger.info("企业微信access_token获取成功并已缓存", expires_in=expires_in)
             return access_token
 
-    async def send_text_message(
-        self,
-        user_id: str,
-        content: str,
-        safe: int = 0
-    ) -> Dict[str, Any]:
+    async def send_text_message(self, user_id: str, content: str, safe: int = 0) -> Dict[str, Any]:
         """
         发送文本消息
 
@@ -83,56 +77,31 @@ class WeChatWorkMessageService:
                 "touser": user_id,
                 "msgtype": "text",
                 "agentid": settings.WECHAT_AGENT_ID,
-                "text": {
-                    "content": content
-                },
-                "safe": safe
+                "text": {"content": content},
+                "safe": safe,
             }
 
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    send_url,
-                    json=message_data,
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
-                )
+                response = await client.post(send_url, json=message_data, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
                 result = response.json()
 
                 if result.get("errcode", 0) == 0:
-                    logger.info(
-                        "企业微信文本消息发送成功",
-                        user_id=user_id,
-                        invaliduser=result.get("invaliduser", "")
-                    )
+                    logger.info("企业微信文本消息发送成功", user_id=user_id, invaliduser=result.get("invaliduser", ""))
                     return {
                         "success": True,
                         "invaliduser": result.get("invaliduser", ""),
                         "invalidparty": result.get("invalidparty", ""),
-                        "invalidtag": result.get("invalidtag", "")
+                        "invalidtag": result.get("invalidtag", ""),
                     }
                 else:
-                    logger.error(
-                        "企业微信消息发送失败",
-                        error=result.get("errmsg"),
-                        errcode=result.get("errcode")
-                    )
-                    return {
-                        "success": False,
-                        "error": result.get("errmsg"),
-                        "errcode": result.get("errcode")
-                    }
+                    logger.error("企业微信消息发送失败", error=result.get("errmsg"), errcode=result.get("errcode"))
+                    return {"success": False, "error": result.get("errmsg"), "errcode": result.get("errcode")}
 
         except Exception as e:
             logger.error("企业微信消息发送异常", error=str(e), exc_info=e)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
-    async def send_markdown_message(
-        self,
-        user_id: str,
-        content: str
-    ) -> Dict[str, Any]:
+    async def send_markdown_message(self, user_id: str, content: str) -> Dict[str, Any]:
         """
         发送Markdown消息
 
@@ -151,46 +120,26 @@ class WeChatWorkMessageService:
                 "touser": user_id,
                 "msgtype": "markdown",
                 "agentid": settings.WECHAT_AGENT_ID,
-                "markdown": {
-                    "content": content
-                }
+                "markdown": {"content": content},
             }
 
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    send_url,
-                    json=message_data,
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
-                )
+                response = await client.post(send_url, json=message_data, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
                 result = response.json()
 
                 if result.get("errcode", 0) == 0:
                     logger.info("企业微信Markdown消息发送成功", user_id=user_id)
                     return {"success": True}
                 else:
-                    logger.error(
-                        "企业微信Markdown消息发送失败",
-                        error=result.get("errmsg")
-                    )
-                    return {
-                        "success": False,
-                        "error": result.get("errmsg")
-                    }
+                    logger.error("企业微信Markdown消息发送失败", error=result.get("errmsg"))
+                    return {"success": False, "error": result.get("errmsg")}
 
         except Exception as e:
             logger.error("企业微信Markdown消息发送异常", error=str(e))
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     async def send_card_message(
-        self,
-        user_id: str,
-        title: str,
-        description: str,
-        url: str,
-        btntxt: str = "详情"
+        self, user_id: str, title: str, description: str, url: str, btntxt: str = "详情"
     ) -> Dict[str, Any]:
         """
         发送文本卡片消息
@@ -213,41 +162,23 @@ class WeChatWorkMessageService:
                 "touser": user_id,
                 "msgtype": "textcard",
                 "agentid": settings.WECHAT_AGENT_ID,
-                "textcard": {
-                    "title": title,
-                    "description": description,
-                    "url": url,
-                    "btntxt": btntxt
-                }
+                "textcard": {"title": title, "description": description, "url": url, "btntxt": btntxt},
             }
 
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    send_url,
-                    json=message_data,
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
-                )
+                response = await client.post(send_url, json=message_data, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
                 result = response.json()
 
                 if result.get("errcode", 0) == 0:
                     logger.info("企业微信卡片消息发送成功", user_id=user_id)
                     return {"success": True}
                 else:
-                    logger.error(
-                        "企业微信卡片消息发送失败",
-                        error=result.get("errmsg")
-                    )
-                    return {
-                        "success": False,
-                        "error": result.get("errmsg")
-                    }
+                    logger.error("企业微信卡片消息发送失败", error=result.get("errmsg"))
+                    return {"success": False, "error": result.get("errmsg")}
 
         except Exception as e:
             logger.error("企业微信卡片消息发送异常", error=str(e))
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
 
 # 创建全局实例

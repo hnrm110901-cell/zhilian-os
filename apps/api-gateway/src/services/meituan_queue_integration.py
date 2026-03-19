@@ -4,13 +4,15 @@ Meituan Queue Integration Helper
 
 在本地排队操作时自动同步到美团系统
 """
-from typing import Dict, Any, Optional
+
 import time
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 import structlog
 
-from .meituan_queue_service import meituan_queue_service
 from ..models.queue import Queue, QueueStatus
+from .meituan_queue_service import meituan_queue_service
 
 logger = structlog.get_logger()
 
@@ -103,9 +105,7 @@ class MeituanQueueIntegration:
         """
         try:
             # 映射状态
-            meituan_status = meituan_queue_service.map_local_status_to_meituan(
-                queue.status.value
-            )
+            meituan_status = meituan_queue_service.map_local_status_to_meituan(queue.status.value)
 
             # 计算队列位置
             index = await self._calculate_queue_index(queue)
@@ -154,14 +154,14 @@ class MeituanQueueIntegration:
         Returns:
             队列位置（从1开始）
         """
+        from sqlalchemy import and_, func, select
+
         from ..core.database import get_db_session
-        from sqlalchemy import select, and_, func
 
         async with get_db_session() as session:
             # 计算前面有多少个等待的订单
             result = await session.execute(
-                select(func.count(Queue.queue_id))
-                .where(
+                select(func.count(Queue.queue_id)).where(
                     and_(
                         Queue.store_id == queue.store_id,
                         Queue.status == QueueStatus.WAITING,
@@ -225,7 +225,11 @@ class MeituanQueueIntegration:
                         "orderId": queue_data["queue_id"],
                         "index": await self._calculate_queue_index_by_id(queue_data["queue_id"]),
                         "num": queue_data["queue_number"],
-                        "takeNumTime": int(queue_data["created_at"].timestamp() * 1000) if isinstance(queue_data["created_at"], datetime) else int(time.time() * 1000),
+                        "takeNumTime": (
+                            int(queue_data["created_at"].timestamp() * 1000)
+                            if isinstance(queue_data["created_at"], datetime)
+                            else int(time.time() * 1000)
+                        ),
                     },
                 )
 
@@ -275,13 +279,12 @@ class MeituanQueueIntegration:
 
     async def _calculate_queue_index_by_id(self, queue_id: str) -> int:
         """根据queue_id计算队列位置"""
-        from ..core.database import get_db_session
         from sqlalchemy import select
 
+        from ..core.database import get_db_session
+
         async with get_db_session() as session:
-            result = await session.execute(
-                select(Queue).where(Queue.queue_id == queue_id)
-            )
+            result = await session.execute(select(Queue).where(Queue.queue_id == queue_id))
             queue = result.scalar_one_or_none()
 
             if queue:

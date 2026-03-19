@@ -12,7 +12,7 @@ const agentColor: Record<string, string> = { decision: 'purple', inventory: 'blu
 const AgentMemoryPage: React.FC = () => {
   const [memories, setMemories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [agentFilter, setAgentFilter] = useState('');
   const [lastN, setLastN] = useState(20);
@@ -79,7 +79,7 @@ const AgentMemoryPage: React.FC = () => {
             <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 140 }}>
               {stores.length > 0 ? stores.map((s: any) => (
                 <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-              )) : <Option value="STORE001">STORE001</Option>}
+              ))}
             </Select>
             <span>智能体：</span>
             <Select value={agentFilter} onChange={setAgentFilter} style={{ width: 120 }} allowClear placeholder="全部">

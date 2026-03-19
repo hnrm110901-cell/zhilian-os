@@ -487,7 +487,7 @@ const ComplianceEnginePage: React.FC = () => {
         </h2>
 
         {alerts.length === 0 ? (
-          <ZEmpty description="暂无未处理告警" />
+          <ZEmpty text="暂无未处理告警" />
         ) : (
           <div className={styles.alertList}>
             {alerts.slice(0, 10).map((a) => (
@@ -546,7 +546,7 @@ const ComplianceEnginePage: React.FC = () => {
       <ZCard className={styles.tableCard}>
         {scores.length === 0 ? (
           <div className={styles.centered}>
-            <ZEmpty description="暂无评分数据，请先点击「重新计算」" />
+            <ZEmpty text="暂无评分数据，请先点击「重新计算」" />
           </div>
         ) : (
           <ZTable<ComplianceScore>

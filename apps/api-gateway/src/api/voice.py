@@ -4,20 +4,21 @@ Voice Interaction API
 
 提供Shokz设备管理和语音交互接口
 """
-import os
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
+import os
+from typing import List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_permission
 from src.core.permissions import Permission
-from src.services.voice_command_service import voice_command_service
-from src.core.database import get_db
-from src.services.shokz_service import shokz_service, DeviceType, DeviceRole
-from src.services.voice_orchestrator import voice_orchestrator
 from src.models import User
+from src.services.shokz_service import DeviceRole, DeviceType, shokz_service
+from src.services.voice_command_service import voice_command_service
+from src.services.voice_orchestrator import voice_orchestrator
 
 logger = structlog.get_logger()
 
@@ -29,6 +30,7 @@ router = APIRouter()
 
 class RegisterDeviceRequest(BaseModel):
     """注册设备请求"""
+
     device_id: str = Field(..., description="设备ID")
     device_type: str = Field(..., description="设备类型: opencomm_2, openrun_pro_2")
     role: str = Field(..., description="设备角色: front_of_house, cashier, kitchen")
@@ -38,12 +40,14 @@ class RegisterDeviceRequest(BaseModel):
 
 class VoiceCommandRequest(BaseModel):
     """语音命令请求"""
+
     device_id: str = Field(..., description="设备ID")
     duration_seconds: int = Field(5, description="录音时长（秒）")
 
 
 class VoiceNotificationRequest(BaseModel):
     """语音通知请求"""
+
     device_id: str = Field(..., description="设备ID")
     message: str = Field(..., description="通知消息")
     priority: str = Field("normal", description="优先级: normal, high, urgent")
@@ -390,6 +394,7 @@ async def broadcast_voice_notification(
 
 class SimpleVoiceCommandRequest(BaseModel):
     """简单语音指令请求（有状态版本）"""
+
     voice_text: str = Field(..., description="语音识别文本")
     store_id: str = Field(..., description="门店ID")
     session_id: Optional[str] = Field(None, description="会话ID（复用已有会话；不传则创建新会话）")
@@ -397,6 +402,7 @@ class SimpleVoiceCommandRequest(BaseModel):
 
 class MeituanQueueBroadcastRequest(BaseModel):
     """美团排队播报请求"""
+
     store_id: str = Field(..., description="门店ID")
     queue_count: int = Field(..., description="排队数量")
     estimated_wait_time: int = Field(..., description="预计等待时间（分钟）")
@@ -404,6 +410,7 @@ class MeituanQueueBroadcastRequest(BaseModel):
 
 class TimeoutOrderAlertRequest(BaseModel):
     """超时订单告警请求"""
+
     store_id: str = Field(..., description="门店ID")
     table_number: str = Field(..., description="桌号")
     wait_time: int = Field(..., description="等待时间（分钟）")
@@ -413,7 +420,7 @@ class TimeoutOrderAlertRequest(BaseModel):
 async def handle_simple_voice_command(
     request: SimpleVoiceCommandRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     处理简单语音指令 (轻量级MVP)
@@ -442,7 +449,7 @@ async def handle_simple_voice_command(
             voice_text=request.voice_text,
             store_id=request.store_id,
             user_id=current_user.id,
-            success=result["success"]
+            success=result["success"],
         )
 
         return result
@@ -454,8 +461,7 @@ async def handle_simple_voice_command(
 
 @router.post("/broadcast/meituan-queue", summary="美团排队播报")
 async def broadcast_meituan_queue(
-    request: MeituanQueueBroadcastRequest,
-    current_user: User = Depends(get_current_active_user)
+    request: MeituanQueueBroadcastRequest, current_user: User = Depends(get_current_active_user)
 ):
     """
     美团排队自动播报
@@ -464,16 +470,10 @@ async def broadcast_meituan_queue(
     """
     try:
         result = await voice_command_service.broadcast_meituan_queue_update(
-            store_id=request.store_id,
-            queue_count=request.queue_count,
-            estimated_wait_time=request.estimated_wait_time
+            store_id=request.store_id, queue_count=request.queue_count, estimated_wait_time=request.estimated_wait_time
         )
 
-        logger.info(
-            "meituan_queue_broadcast",
-            store_id=request.store_id,
-            queue_count=request.queue_count
-        )
+        logger.info("meituan_queue_broadcast", store_id=request.store_id, queue_count=request.queue_count)
 
         return result
 
@@ -483,10 +483,7 @@ async def broadcast_meituan_queue(
 
 
 @router.post("/alert/timeout-order", summary="超时订单告警")
-async def alert_timeout_order(
-    request: TimeoutOrderAlertRequest,
-    current_user: User = Depends(get_current_active_user)
-):
+async def alert_timeout_order(request: TimeoutOrderAlertRequest, current_user: User = Depends(get_current_active_user)):
     """
     超时订单告警
 
@@ -494,16 +491,11 @@ async def alert_timeout_order(
     """
     try:
         result = await voice_command_service.alert_timeout_order(
-            store_id=request.store_id,
-            table_number=request.table_number,
-            wait_time=request.wait_time
+            store_id=request.store_id, table_number=request.table_number, wait_time=request.wait_time
         )
 
         logger.warning(
-            "timeout_order_alert",
-            store_id=request.store_id,
-            table_number=request.table_number,
-            wait_time=request.wait_time
+            "timeout_order_alert", store_id=request.store_id, table_number=request.table_number, wait_time=request.wait_time
         )
 
         return result

@@ -2,10 +2,12 @@
 Quality API - 菜品质量检测接口
 前缀: /api/v1/quality
 """
+
 from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-import structlog
 
 from ..agents.quality_agent import quality_agent
 
@@ -15,6 +17,7 @@ router = APIRouter(prefix="/api/v1/quality", tags=["quality"])
 
 # ── Request / Response schemas ────────────────────────────────
 
+
 class InspectRequest(BaseModel):
     store_id: str
     dish_name: str
@@ -22,12 +25,11 @@ class InspectRequest(BaseModel):
     dish_id: Optional[str] = None
     image_url: Optional[str] = None
     media_type: Optional[str] = None
-    recipient_ids: Optional[List[str]] = Field(
-        default=None, description="企业微信告警接收人ID列表"
-    )
+    recipient_ids: Optional[List[str]] = Field(default=None, description="企业微信告警接收人ID列表")
 
 
 # ── Endpoints ─────────────────────────────────────────────────
+
 
 @router.post("/inspect")
 async def inspect_dish(req: InspectRequest):

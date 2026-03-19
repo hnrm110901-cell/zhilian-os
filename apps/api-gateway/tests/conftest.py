@@ -15,13 +15,90 @@ for _k, _v in {
 }.items():
     os.environ.setdefault(_k, _v)
 
+import sys
 import pytest
 import asyncio
 from typing import AsyncGenerator, Generator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
+# ---------------------------------------------------------------------------
+# Pre-load core modules BEFORE any test file is collected.
+# Many test files use sys.modules.setdefault("src.core.config", MagicMock(...))
+# to avoid importing Settings when env vars are missing.  By eagerly importing
+# the real modules here (env vars are already set above), setdefault() becomes
+# a no-op and no test file can pollute the global module cache.
+# ---------------------------------------------------------------------------
+import src.core.config   # noqa: F401
+import src.core.database  # noqa: F401
+import src.core.security  # noqa: F401
+import src.services.agent_service  # noqa: F401 — preload to prevent mock injection
+import src.services.redis_cache_service  # noqa: F401 — preload to prevent mock injection
+import src.services.wechat_work_message_service  # noqa: F401
+import src.services.wechat_alert_service  # noqa: F401
+import src.services.waste_guard_service  # noqa: F401
+import src.services.waste_reasoning_service  # noqa: F401
+
 from src.models import Base
+
+# ---------------------------------------------------------------------------
+# Snapshot sys.modules after all conftest imports so we can detect and undo
+# pollution from test files that do sys.modules["x"] = MagicMock() at module
+# level.  We use pytest_collect_file to restore between file collections.
+# ---------------------------------------------------------------------------
+_SYS_MODULES_SNAPSHOT = dict(sys.modules)
+
+
+def _restore_sys_modules():
+    """Undo sys.modules pollution from test files."""
+    import types as _types
+    # Restore any snapshot modules that were overwritten with mocks
+    for key, orig in _SYS_MODULES_SNAPSHOT.items():
+        if sys.modules.get(key) is not orig:
+            sys.modules[key] = orig
+    # Remove mock modules that were added after conftest loaded
+    added = set(sys.modules) - set(_SYS_MODULES_SNAPSHOT)
+    for key in added:
+        mod = sys.modules.get(key)
+        if mod is None:
+            continue
+        if hasattr(mod, '_mock_name'):
+            del sys.modules[key]
+        elif isinstance(mod, _types.ModuleType) and not hasattr(mod, '__file__'):
+            del sys.modules[key]
+
+
+def pytest_collect_file(parent, file_path):
+    """Restore sys.modules before each test file is collected."""
+    _restore_sys_modules()
+
+
+# ---------------------------------------------------------------------------
+# Also restore core modules before each test function runs.
+# This catches pollution that occurs during collection of one file and
+# affects tests in later files (e.g. celery_tasks decorated with FakeCelery).
+# We only restore modules from the snapshot, NOT remove test-specific mocks,
+# to avoid breaking tests that rely on their own module-level setdefault stubs.
+# ---------------------------------------------------------------------------
+_CORE_MODULES_TO_PROTECT = [
+    k for k in _SYS_MODULES_SNAPSHOT
+    if k.startswith("src.core.") or k.startswith("src.models")
+    or k.startswith("src.services.") or k == "structlog"
+]
+
+
+_SECURITY_SETTINGS_ORIG = src.core.security.settings
+
+
+def pytest_runtest_setup(item):
+    """Restore core modules before each test to prevent cross-file pollution."""
+    for key in _CORE_MODULES_TO_PROTECT:
+        orig = _SYS_MODULES_SNAPSHOT.get(key)
+        if orig is not None and sys.modules.get(key) is not orig:
+            sys.modules[key] = orig
+    # Restore security.settings if it was replaced by a test file at module level
+    if src.core.security.settings is not _SECURITY_SETTINGS_ORIG:
+        src.core.security.settings = _SECURITY_SETTINGS_ORIG
 
 
 # 测试数据库URL - 优先使用PostgreSQL，回退到SQLite

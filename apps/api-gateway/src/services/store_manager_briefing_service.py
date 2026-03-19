@@ -40,19 +40,26 @@ _BASE_URL = os.getenv("APP_BASE_URL", "https://your-domain.com")
 
 # ── 内部聚合 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_health(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     try:
         from .private_domain_health_service import calculate_health_score
+
         return await calculate_health_score(store_id, db)
     except Exception as exc:
         logger.warning("briefing.health_failed", store_id=store_id, error=str(exc))
-        return {"total_score": 0, "grade": {"level": "未知", "color": "default", "desc": "-"},
-                "top_actions": [], "dimensions": []}
+        return {
+            "total_score": 0,
+            "grade": {"level": "未知", "color": "default", "desc": "-"},
+            "top_actions": [],
+            "dimensions": [],
+        }
 
 
 async def _get_top3_decisions(store_id: str, db: AsyncSession) -> List[Dict[str, Any]]:
     try:
         from .decision_priority_engine import DecisionPriorityEngine
+
         engine = DecisionPriorityEngine()
         result = await engine.get_top_decisions(store_id=store_id, db=db, limit=3)
         return result.get("decisions", []) if isinstance(result, dict) else result[:3]
@@ -65,6 +72,7 @@ async def _get_yesterday_story(store_id: str, db: AsyncSession) -> Dict[str, Any
     yesterday = datetime.date.today() - datetime.timedelta(days=1)
     try:
         from .case_story_generator import CaseStoryGenerator
+
         return await CaseStoryGenerator.generate_daily_story(store_id, yesterday, db)
     except Exception as exc:
         logger.warning("briefing.story_failed", store_id=store_id, error=str(exc))
@@ -73,8 +81,9 @@ async def _get_yesterday_story(store_id: str, db: AsyncSession) -> Dict[str, Any
 
 async def _get_ai_trust_summary(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     try:
-        row = (await db.execute(
-            text("""
+        row = (
+            await db.execute(
+                text("""
                 SELECT
                     ROUND(AVG(trust_score)::numeric, 1) AS avg_trust,
                     COUNT(CASE WHEN outcome = 'success' THEN 1 END) AS success,
@@ -83,15 +92,16 @@ async def _get_ai_trust_summary(store_id: str, db: AsyncSession) -> Dict[str, An
                 FROM decision_logs
                 WHERE store_id = :s AND created_at >= NOW() - INTERVAL '30 days'
             """),
-            {"s": store_id},
-        )).fetchone()
+                {"s": store_id},
+            )
+        ).fetchone()
         if not row or row[0] is None:
             return {"avg_trust": 0, "success_count": 0, "evaluated_count": 0, "saved_yuan": 0}
         return {
-            "avg_trust":       float(row[0]),
-            "success_count":   int(row[1]),
+            "avg_trust": float(row[0]),
+            "success_count": int(row[1]),
             "evaluated_count": int(row[2]),
-            "saved_yuan":      round(float(row[3]), 2),
+            "saved_yuan": round(float(row[3]), 2),
         }
     except Exception as exc:
         logger.warning("briefing.trust_failed", error=str(exc))
@@ -100,11 +110,12 @@ async def _get_ai_trust_summary(store_id: str, db: AsyncSession) -> Dict[str, An
 
 async def _get_churn_risk_count(store_id: str, db: AsyncSession) -> int:
     try:
-        row = (await db.execute(
-            text("SELECT COUNT(*) FROM private_domain_members "
-                 "WHERE store_id = :s AND risk_score >= 0.6"),
-            {"s": store_id},
-        )).fetchone()
+        row = (
+            await db.execute(
+                text("SELECT COUNT(*) FROM private_domain_members " "WHERE store_id = :s AND risk_score >= 0.6"),
+                {"s": store_id},
+            )
+        ).fetchone()
         return int(row[0]) if row else 0
     except Exception as exc:
         logger.warning("briefing.churn_failed", error=str(exc))
@@ -112,6 +123,7 @@ async def _get_churn_risk_count(store_id: str, db: AsyncSession) -> int:
 
 
 # ── 简报组装 ──────────────────────────────────────────────────────────────────
+
 
 async def generate_briefing(
     store_id: str,
@@ -133,7 +145,7 @@ async def generate_briefing(
             "push_text":      str,            # 企微推送正文（纯文本）
         }
     """
-    today     = datetime.date.today()
+    today = datetime.date.today()
     yesterday = today - datetime.timedelta(days=1)
 
     health, decisions, story, churn, trust = (
@@ -147,14 +159,15 @@ async def generate_briefing(
     # 今日核心行动（取健康分最薄弱维度的第1条建议）
     top_action = (
         health.get("top_actions", [{}])[0].get("action", "保持现有私域运营节奏")
-        if health.get("top_actions") else "保持现有私域运营节奏"
+        if health.get("top_actions")
+        else "保持现有私域运营节奏"
     )
 
     # 昨日经营摘要
-    cost_m    = story.get("cost_metrics", {})
+    cost_m = story.get("cost_metrics", {})
     revenue_y = cost_m.get("revenue_yuan", 0)
     cost_rate = cost_m.get("actual_cost_rate_pct", 0)
-    waste_y   = cost_m.get("waste_cost_yuan", 0)
+    waste_y = cost_m.get("waste_cost_yuan", 0)
 
     # 构建企微推送文本（决策型：含¥影响+置信度）
     push_lines: List[str] = [
@@ -168,13 +181,10 @@ async def generate_briefing(
     if decisions:
         push_lines.append("━━ 今日Top3决策 ━━")
         for i, d in enumerate(decisions, 1):
-            title      = d.get("title") or d.get("description") or d.get("action", "-")
-            impact     = d.get("expected_impact_yuan") or d.get("financial_impact_yuan", 0)
+            title = d.get("title") or d.get("description") or d.get("action", "-")
+            impact = d.get("expected_impact_yuan") or d.get("financial_impact_yuan", 0)
             confidence = d.get("confidence", 0)
-            push_lines.append(
-                f"{i}. {title[:20]}"
-                f" | ¥{impact:,.0f} | 置信度{confidence:.0%}"
-            )
+            push_lines.append(f"{i}. {title[:20]}" f" | ¥{impact:,.0f} | 置信度{confidence:.0%}")
 
     if trust.get("avg_trust", 0) > 0:
         push_lines.append("━━ AI信任分 ━━")
@@ -196,30 +206,31 @@ async def generate_briefing(
     push_text = "\n".join(push_lines)
 
     return {
-        "store_id":       store_id,
-        "briefing_date":  str(today),
-        "generated_at":   datetime.datetime.utcnow().isoformat(),
-        "health":         {
+        "store_id": store_id,
+        "briefing_date": str(today),
+        "generated_at": datetime.datetime.utcnow().isoformat(),
+        "health": {
             "total_score": health.get("total_score", 0),
-            "grade":       health.get("grade", {}),
+            "grade": health.get("grade", {}),
             "top_actions": health.get("top_actions", []),
         },
         "top3_decisions": decisions,
         "yesterday": {
-            "date":             str(yesterday),
-            "revenue_yuan":     revenue_y,
-            "cost_rate_pct":    cost_rate,
-            "waste_yuan":       waste_y,
-            "narrative":        story.get("narrative", "-"),
+            "date": str(yesterday),
+            "revenue_yuan": revenue_y,
+            "cost_rate_pct": cost_rate,
+            "waste_yuan": waste_y,
+            "narrative": story.get("narrative", "-"),
         },
-        "churn_risk":       churn,
+        "churn_risk": churn,
         "ai_trust_summary": trust,
-        "top_action":       top_action,
-        "push_text":        push_text,
+        "top_action": top_action,
+        "push_text": push_text,
     }
 
 
 # ── 企微推送 ──────────────────────────────────────────────────────────────────
+
 
 async def push_briefing(
     store_id: str,
@@ -238,17 +249,17 @@ async def push_briefing(
         {"briefing": {...}, "pushed": bool, "push_result": Any}
     """
     briefing = await generate_briefing(store_id, db)
-    pushed   = False
+    pushed = False
     push_result: Any = None
 
     if not dry_run:
         try:
             from .wechat_service import wechat_service
+
             if wechat_service:
                 push_result = await wechat_service.send_text(briefing["push_text"])
                 pushed = True
-                logger.info("briefing.pushed", store_id=store_id,
-                            score=briefing["health"]["total_score"])
+                logger.info("briefing.pushed", store_id=store_id, score=briefing["health"]["total_score"])
             else:
                 logger.warning("briefing.wechat_not_configured", store_id=store_id)
         except Exception as exc:
@@ -256,7 +267,7 @@ async def push_briefing(
             push_result = {"error": str(exc)}
 
     return {
-        "briefing":    briefing,
-        "pushed":      pushed,
+        "briefing": briefing,
+        "pushed": pushed,
         "push_result": push_result,
     }

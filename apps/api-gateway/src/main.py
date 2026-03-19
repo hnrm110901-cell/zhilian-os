@@ -2,23 +2,25 @@
 屯象OS API Gateway
 主应用入口 — 餐饮人的好伙伴
 """
+
+import time
+
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
-import structlog
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
-    GCCollector,
+    CollectorRegistry,
+    Counter,
     Gauge,
+    GCCollector,
     Histogram,
     PlatformCollector,
     ProcessCollector,
-    Counter,
-    CollectorRegistry,
     generate_latest,
 )
-import time
 
 from src.core.config import settings
 # 核心模块
@@ -122,15 +124,172 @@ from src.api import supplier_intelligence
 from src.api import review_action
 from src.api import compliance_engine
 # Batch 3 — 自动化闭环层：智能采购 / 日清日结 / 指挥中心
-from src.api import auto_procurement
-from src.api import financial_closing
-from src.api import command_center
+# Batch 2 — 智能决策层：供应商智能 / 评论行动 / 合规引擎
+# Batch 1 — 数据融合层：集成中心 / 全渠道营收 / 三角对账
+# Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账
+# Month 2 (P0+P1) — 抖音 / 食品安全 / 健康证
+# Month 1 (P0) — 外部集成：电子发票 / 饿了么 / 支付对账
+# Onboarding Engine — 企业诊断与数据入库
+# Phase P4 — 预订Agent: AI智能整合（屯象独有）
+# Phase P3 — 预订Agent: EO执行引擎（宴小猪能力）
+# Phase P2 — 预订Agent: 宴会销控引擎
+# Phase P1 — 预订Agent: 渠道中台 + 客户风控
+# Phase 1 — 运营智能层：渠道毛利 API
+# ARCH-004 可信执行层 / FEAT-004 动态菜单 / ARCH-003 门店记忆层 / 本体论 L2 API / FCT 公开接口
+# Phase 8 — 多阶段工作流引擎（Day N 晚上 17:00-22:00 规划 Day N+1）
+# Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
+# Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
+# Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
+# Phase 4 — L2 融合层（多源食材ID规范化）
+# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库 / 损耗事件
+# Phase 2 本体层 API — 推理层 / 企微 Action FSM / 自然语言查询
+# Phase 1 本体层 — BOM 版本化配方管理
+# Phase 1: CRUD API
+# 需要外部适配器的模块 (会在适配器不可用时返回错误)
+# 逐步启用的模块
+# 核心模块
+from src.api import (
+    adapters,
+    agent_collaboration,
+    agent_configs,
+    agent_memory,
+    agents,
+    ai_accuracy,
+    ai_evolution_dashboard,
+    ai_pillars,
+    alerts_webhook,
+    analytics,
+    approval,
+    audit,
+    auth,
+    auto_procurement,
+    backups,
+    bank_reconciliation,
+    banquet,
+    banquet_agent,
+    banquet_lifecycle,
+    banquet_sales_api,
+    benchmark,
+    blindbox,
+    bom,
+    bulk_import,
+    chain_expansion,
+    channel_analytics,
+    channel_profit,
+    command_center,
+    competitive_analysis,
+    compliance,
+    compliance_engine,
+    cross_store_insights,
+    customer360,
+    customer_risk,
+    daily_hub,
+    dashboard,
+    dashboard_preferences,
+    data_security,
+    decision_validator,
+    dianping,
+    dish_master,
+    dish_rd_agent,
+    dishes,
+    douyin,
+    e_invoice,
+    edge_node,
+    eleme,
+    embedding,
+    employees,
+    enterprise,
+    event_orders,
+    event_sourcing,
+    execution,
+    export_jobs,
+    external_factors,
+    fct_public,
+    federated,
+    federated_learning,
+    finance,
+    financial_closing,
+    food_safety,
+    forecast,
+    fusion,
+    governance,
+    hardware_integration,
+    health,
+    health_certificates,
+    hq_dashboard,
+    human_in_the_loop,
+    integration_hub,
+    integrations,
+    inventory,
+    knowledge_rules,
+    kpis,
+    l3_knowledge,
+    l4_reasoning,
+    l5_action,
+    llm,
+    meituan_queue,
+    meituan_reservation,
+    members,
+    menu,
+    merchants,
+    mobile,
+    model_marketplace,
+    monitoring,
+    multi_store,
+    neural,
+    notifications,
+    omni_channel,
+    onboarding,
+    ontology,
+    ontology_api,
+    ops,
+    orders,
+    payment_reconciliation,
+    performance_compute,
+    pos,
+    pos_sync,
+    pos_webhook,
+    prep_suggestion,
+    private_domain,
+    quality,
+    queue,
+    raas,
+    recommendations,
+    reconciliation,
+    report_templates,
+    reservation_ai,
+    reservations,
+    review_action,
+)
+from src.api import roles as roles_api
+from src.api import (
+    scheduler,
+    schedules,
+    soldout,
+    store_memory,
+    stores,
+    supplier_agent,
+    supplier_b2b,
+    supplier_intelligence,
+    tasks,
+    tri_reconciliation,
+    vector_index,
+    voice,
+    voice_ws,
+    waste_events,
+    wechat_actions,
+    wechat_triggers,
+    workflow,
+    workforce,
+)
+from src.api.phase5_apis import i18n_router, industry_router, platform_router, supply_chain_router
+from src.core.config import settings
+from src.middleware.audit_log import AuditLogMiddleware
+from src.middleware.hr_operation_audit import HROperationAuditMiddleware
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.middleware.audit_log import AuditLogMiddleware
 from src.middleware.security_headers import SecurityHeadersMiddleware
 from src.middleware.store_access import StoreAccessMiddleware
-from src.middleware.hr_operation_audit import HROperationAuditMiddleware
 
 # 配置结构化日志
 logger = structlog.get_logger()
@@ -388,24 +547,25 @@ GCCollector(registry=METRICS_REGISTRY)
 
 # 创建Prometheus指标
 REQUEST_COUNT = Counter(
-    'http_requests_total',
-    'Total HTTP requests',
-    ['method', 'endpoint', 'status'],
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "endpoint", "status"],
     registry=METRICS_REGISTRY,
 )
 
 REQUEST_DURATION = Histogram(
-    'http_request_duration_seconds',
-    'HTTP request duration in seconds',
-    ['method', 'endpoint'],
+    "http_request_duration_seconds",
+    "HTTP request duration in seconds",
+    ["method", "endpoint"],
     registry=METRICS_REGISTRY,
 )
 
 ACTIVE_REQUESTS = Gauge(
-    'http_requests_active',
-    'Number of active HTTP requests',
+    "http_requests_active",
+    "Number of active HTTP requests",
     registry=METRICS_REGISTRY,
 )
+
 
 # Prometheus metrics端点
 @app.get("/metrics", include_in_schema=False)
@@ -415,10 +575,8 @@ async def metrics():
 
     Exposes application metrics in Prometheus format for scraping.
     """
-    return Response(
-        content=generate_latest(METRICS_REGISTRY),
-        media_type=CONTENT_TYPE_LATEST
-    )
+    return Response(content=generate_latest(METRICS_REGISTRY), media_type=CONTENT_TYPE_LATEST)
+
 
 # Prometheus中间件
 @app.middleware("http")
@@ -443,24 +601,18 @@ async def prometheus_middleware(request, call_next):
         response = await call_next(request)
 
         # 记录请求指标
-        REQUEST_COUNT.labels(
-            method=request.method,
-            endpoint=request.url.path,
-            status=response.status_code
-        ).inc()
+        REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path, status=response.status_code).inc()
 
         # 记录请求时长
         duration = time.time() - start_time
-        REQUEST_DURATION.labels(
-            method=request.method,
-            endpoint=request.url.path
-        ).observe(duration)
+        REQUEST_DURATION.labels(method=request.method, endpoint=request.url.path).observe(duration)
 
         return response
 
     finally:
         # 减少活跃请求计数
         ACTIVE_REQUESTS.dec()
+
 
 # 注册路由 - 核心模块
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
@@ -475,6 +627,7 @@ app.include_router(approval.router, prefix="/api/v1", tags=["approval"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
 # store_health 须在 stores 之前注册，避免 /stores/{store_id} 把 "health" 当成 store_id 拦截
 from src.api import store_health
+
 app.include_router(store_health.router, prefix="/api/v1", tags=["store_health"])
 app.include_router(stores.router, prefix="/api/v1", tags=["stores"])
 app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
@@ -513,6 +666,7 @@ app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
 app.include_router(federated.router)
+app.include_router(federated_learning.router, tags=["federated-learning"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 
@@ -587,10 +741,13 @@ app.include_router(export_jobs.router)
 app.include_router(backups.router)
 app.include_router(private_domain.router, tags=["private_domain"])
 from src.api import signal_bus_api
+
 app.include_router(signal_bus_api.router, tags=["signal_bus"])
 from src.api import briefing_api
+
 app.include_router(briefing_api.router, tags=["briefing"])
 from src.api import hq_briefing_api
+
 app.include_router(hq_briefing_api.router, tags=["hq_briefing"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
@@ -610,21 +767,27 @@ app.include_router(dish_rd_agent.router, tags=["dish-rd"])
 app.include_router(supplier_agent.router, tags=["supplier-agent"])
 # Phase 12 — 经营智能体（营收异常 / KPI健康度 / 订单预测 / Top3决策 / 场景识别）
 from src.api import business_intel
+
 app.include_router(business_intel.router, tags=["business-intel"])
 # Phase 12B — 人员智能体（排班优化 / 绩效评分 / 人力成本 / 考勤预警 / 人员配置）
 from src.api import people_agent
+
 app.include_router(people_agent.router, tags=["people-agent"])
 
 from src.api import ops_flow_agent
+
 app.include_router(ops_flow_agent.router, tags=["ops-flow-agent"])
 
 from src.api import agent_okr
+
 app.include_router(agent_okr.router, tags=["agent-okr"])
 
 from src.api import agent_collab
+
 app.include_router(agent_collab.router, tags=["agent-collab"])
 
 from src.api import fct_advanced
+
 app.include_router(fct_advanced.router, tags=["fct-advanced"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 app.include_router(governance.router, prefix="/api/v1", tags=["governance"])
@@ -632,133 +795,165 @@ app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashbo
 
 # 营销 Agent — 顾客画像 / 发券策略 / 活动管理
 from src.api import marketing_agent
+
 app.include_router(marketing_agent.router, tags=["marketing_agent"])
 
 # aPaaS 开放平台 — ISV 开发者自助注册 + 能力目录
 from src.api import open_platform
+
 app.include_router(open_platform.router, tags=["open_platform"])
 
 # aPaaS 开发者文档 + 沙箱 — Phase 2 Month 2
 from src.api.docs_api import docs_router, sandbox_router
+
 app.include_router(docs_router, tags=["developer_docs"])
 app.include_router(sandbox_router, tags=["developer_docs"])
 
 # aPaaS ISV 生命周期管理 — Phase 2 Month 3
 from src.api import isv_management
+
 app.include_router(isv_management.router, tags=["isv_management"])
 
 # aPaaS 插件市场 — Phase 3 Month 4
 from src.api import plugin_marketplace
+
 app.include_router(plugin_marketplace.router, tags=["plugin_marketplace"])
 
 # aPaaS 收入分成 — Phase 3 Month 5
 from src.api import revenue_sharing
+
 app.include_router(revenue_sharing.router, tags=["revenue_sharing"])
 
 # aPaaS 平台分析 + 评分 — Phase 3 Month 6
 from src.api import platform_analytics
+
 app.include_router(platform_analytics.router, tags=["platform_analytics"])
 
 # aPaaS Webhook 事件订阅 — Phase 4 Month 10
 from src.api import webhooks
+
 app.include_router(webhooks.router, tags=["webhooks"])
 
 # aPaaS API 计量计费 — Phase 4 Month 11
 from src.api import api_billing
+
 app.include_router(api_billing.router, tags=["api_billing"])
 
 # aPaaS ISV 开发者控制台 — Phase 4 Month 12
 from src.api import developer_console
+
 app.include_router(developer_console.router, tags=["developer_console"])
 
 # 业财税资金 Agent — Phase 5 Month 1: 经营事件中心 + 利润归因基础
 from src.api import business_events
+
 app.include_router(business_events.router, tags=["business_events"])
 
 # 业财税资金 Agent — Phase 5 Month 2: 税务智能引擎 + 现金流预测
 from src.api import tax_cashflow
+
 app.include_router(tax_cashflow.router, tags=["finance_agent"])
 
 # 业财税资金 Agent — Phase 5 Month 3: 结算风控引擎 + 角色驾驶舱
-from src.api import settlement_risk, role_dashboards
+from src.api import role_dashboards, settlement_risk
+
 app.include_router(settlement_risk.router, tags=["settlement_risk"])
 app.include_router(role_dashboards.router, tags=["role_dashboards"])
 
 # 业财税资金 Agent — Phase 5 Month 4: 预算管理 + 财务预警体系
-from src.api.budget_alerts import budget_router, alerts_router
+from src.api.budget_alerts import alerts_router, budget_router
+
 app.include_router(budget_router)
 app.include_router(alerts_router)
 
 # 业财税资金 Agent — Phase 5 Month 5: 财务健康评分系统
 from src.api import finance_health
+
 app.include_router(finance_health.router)
 
 # 业财税资金 Agent — Phase 5 Month 6: CFO工作台·多店财务综合驾驶舱
 from src.api import cfo_dashboard
+
 app.include_router(cfo_dashboard.router)
 
 # 业财税资金 Agent — Phase 5 Month 7: 智能财务预测引擎
 from src.api import financial_forecast
+
 app.include_router(financial_forecast.router)
 
 # 业财税资金 Agent — Phase 5 Month 8: 财务异常检测引擎
 from src.api import financial_anomaly
+
 app.include_router(financial_anomaly.router)
 
 # 业财税资金 Agent — Phase 5 Month 9: 多店财务对标排名引擎
 from src.api import performance_ranking
+
 app.include_router(performance_ranking.router)
 
 # 业财税资金 Agent — Phase 5 Month 10: 财务智能建议引擎
 from src.api import financial_recommendation
+
 app.include_router(financial_recommendation.router)
 
 # Phase 6 Month 1: 菜品盈利能力分析引擎
 from src.api import dish_profitability
+
 app.include_router(dish_profitability.router)
 
 # Phase 6 Month 2: 菜单优化建议引擎
 from src.api import menu_optimization
+
 app.include_router(menu_optimization.router)
 
 # Phase 6 Month 3: 菜品成本预警引擎
 from src.api import dish_cost_alert
+
 app.include_router(dish_cost_alert.router)
 
 # Phase 6 Month 4: 跨店菜品对标引擎
 from src.api import dish_benchmark
+
 app.include_router(dish_benchmark.router)
 
 # Phase 6 Month 5: 菜品智能定价引擎
 from src.api import dish_pricing
+
 app.include_router(dish_pricing.router)
 
 # Phase 6 Month 6: 菜品生命周期管理引擎
 from src.api import dish_lifecycle
+
 app.include_router(dish_lifecycle.router)
 
 # Phase 6 Month 7: 菜品销售预测引擎
 from src.api import dish_forecast
+
 app.include_router(dish_forecast.router)
 
 # Phase 6 Month 8: 菜品综合健康评分引擎
 from src.api import dish_health
+
 app.include_router(dish_health.router)
 
 # Phase 6 Month 9: 菜品营收归因引擎
 from src.api import dish_attribution
+
 app.include_router(dish_attribution.router)
 
 # Phase 6 Month 10: 菜品组合矩阵分析引擎
 from src.api import menu_matrix
+
 app.include_router(menu_matrix.router)
 
 # Phase 6 Month 11: 菜品成本压缩机会引擎
 from src.api import cost_compression
+
 app.include_router(cost_compression.router)
 
 # Phase 6 Month 12: 菜品经营综合月报引擎
 from src.api import dish_monthly_summary
+
 app.include_router(dish_monthly_summary.router)
 
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
@@ -786,10 +981,10 @@ app.include_router(event_orders.router, prefix="/api/v1", tags=["event-orders"])
 # Phase P4 — 预订AI助手
 app.include_router(reservation_ai.router, prefix="/api/v1", tags=["reservation-ai"])
 
-# 替换易订 — R1 客户自助预订H5 / R3 桌台平面图 / R4 AI邀请函
-from src.api import public_reservation, floor_plan, invitation
 # 预订数据分析引擎 — 8维度深度分析
-from src.api import reservation_analytics
+# 替换易订 — R1 客户自助预订H5 / R3 桌台平面图 / R4 AI邀请函
+from src.api import floor_plan, invitation, public_reservation, reservation_analytics
+
 app.include_router(public_reservation.router, tags=["public_reservation"])
 app.include_router(floor_plan.router, tags=["floor_plan"])
 app.include_router(invitation.router, tags=["invitation"])
@@ -797,73 +992,113 @@ app.include_router(reservation_analytics.router, tags=["reservation_analytics"])
 
 # 全链路用餐旅程（预订→到店→用餐→离店→售后）
 from src.api import dining_journey
+
 app.include_router(dining_journey.router, tags=["dining_journey"])
 
 # P0 补齐 — 餐段配置 + 预排菜（替代易订PRO缺口）
 from src.api import meal_period_config, pre_order
+
 app.include_router(meal_period_config.router, tags=["meal_period_config"])
 app.include_router(pre_order.router, tags=["pre_order"])
 
 # P1 补齐 — 预订单/锁位单 + 销售业绩 + 营销触达 + RFM配置
-from src.api import reservation_receipt, sales_performance, marketing_touchpoint, rfm_config
+from src.api import marketing_touchpoint, reservation_receipt, rfm_config, sales_performance
+
 app.include_router(reservation_receipt.router, tags=["reservation_receipt"])
 app.include_router(sales_performance.router, tags=["sales_performance"])
 app.include_router(marketing_touchpoint.router, tags=["marketing_touchpoint"])
 app.include_router(rfm_config.router, tags=["rfm_config"])
 
 # P2 补齐 — 客户资源分配 + 来电记录/路线发送
-from src.api import customer_allocation, call_record
+from src.api import call_record, customer_allocation
+
 app.include_router(customer_allocation.router, tags=["customer_allocation"])
 app.include_router(call_record.router, tags=["call_record"])
 
 # 全链路闭环桥接
 from src.api import lifecycle
+
 app.include_router(lifecycle.router, tags=["lifecycle"])
 
 # Sprint 1 — CDP 统一消费者身份
 from src.api import cdp
+
 app.include_router(cdp.router, tags=["cdp"])
 # Sprint 3 — MemberAgent + BossAgent
 from src.api import member_agent
+
 app.include_router(member_agent.router, tags=["cdp-agent"])
 # Sprint 4 — 裂变引擎 + FloorAgent + MenuAgent + 增收月报
 from src.api import growth_agent
+
 app.include_router(growth_agent.router, tags=["cdp-growth"])
 # Sprint 5 — CostAgent + KitchenAgent + StoreAgent
 from src.api import ops_intelligence
+
 app.include_router(ops_intelligence.router, tags=["cdp-ops"])
 # Sprint 6 — PeopleAgent + OntologyAgent + TenantReplicator
 from src.api import platform_agent
+
 app.include_router(platform_agent.router, tags=["cdp-platform"])
 # CDP 监控仪表盘
 from src.api import cdp_monitor
+
 app.include_router(cdp_monitor.router, tags=["cdp-monitor"])
+
+# P3 — 营销任务（总部创建 → 店长分配 → 员工执行）
+from src.api import hq_marketing_tasks
+from src.api import sm_marketing_tasks
+
+app.include_router(hq_marketing_tasks.router, tags=["HQ-营销任务"])
+app.include_router(sm_marketing_tasks.router, tags=["SM-营销任务"])
 
 # P0 — 食材成本真相引擎
 from src.api import cost_truth
+
 app.include_router(cost_truth.router, tags=["cost_truth"])
 # P1 — Unified Brain 每日1决策
 from src.api import unified_brain
+
 app.include_router(unified_brain.router, tags=["unified_brain"])
 # P2 — 跨客户食材价格基准网络
 from src.api import price_benchmark
+
 app.include_router(price_benchmark.router, tags=["price_benchmark"])
 
 # BFF 聚合路由（角色驱动前端，4种角色各一个聚合端点）
 from src.api import bff
+
 app.include_router(bff.router, tags=["bff"])
+
+# BFF 会员数据聚合（三源融合：member_syncs + consumer_identities + private_domain_members）
+from src.api import bff_member
+
+app.include_router(bff_member.router, tags=["BFF-会员"])
+
+# BFF 会员画像（P1 到店识客：多源聚合 + AI话术 + Redis缓存）
+from src.api import bff_member_profile
+
+app.include_router(bff_member_profile.router, tags=["BFF-会员画像"])
+
+# BFF 发券（P2 双轨发券：微生活券透传 + 屯象服务券）
+from src.api import bff_coupon
+
+app.include_router(bff_coupon.router, tags=["BFF-发券"])
 
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
+
 app.include_router(decision_hub.router, tags=["decision_hub"])
 app.include_router(monthly_report.router, tags=["monthly_report"])
 
 # Phase 9 — Edge Hub（门店边缘硬件层：主机/设备/耳机绑定/告警）
 from src.api import edge_hub
+
 app.include_router(edge_hub.router, tags=["edge_hub"])
 
 # v2.0 MVP #3 — 损耗Top5排名（含¥归因）
 from src.api import waste_guard
+
 app.include_router(waste_guard.router, tags=["waste_guard"])
 
 # HR模块 — 薪酬/假勤/审批/招聘/绩效/合同/报表（部分 API 文件尚未实现，跳过缺失项）
@@ -930,6 +1165,11 @@ except ImportError as _e:
     import structlog as _sl
     _sl.get_logger().warning("HR API 模块未实现，跳过注册", error=str(_e))
 
+# 知识OS层 — 技能图谱 / 知识采集 / 技能护照 / 行为模式 / 离职风险
+from src.api.knowledge import router as knowledge_router
+
+app.include_router(knowledge_router, tags=["knowledge"])
+
 # Month 1 (P0) — 外部集成
 app.include_router(e_invoice.router, prefix="/api/v1", tags=["e-invoices"])
 app.include_router(eleme.router, tags=["eleme"])
@@ -971,6 +1211,7 @@ app.include_router(wechat_attendance_router, prefix="/api/v1", tags=["webhooks"]
 if getattr(settings, "FCT_ENABLED", False):
     try:
         from src.api import fct
+
         app.include_router(fct.router, prefix="/api/v1/fct", tags=["fct"])
     except ImportError:
         logger.warning("FCT_ENABLED=True 但 src/api/fct.py 不存在，FCT 模块未加载")
@@ -986,6 +1227,7 @@ async def startup_event():
     # 启动企微 Action 升级巡检（Phase 2 M2.2）
     try:
         from src.services.wechat_action_fsm import get_wechat_fsm
+
         fsm = get_wechat_fsm()
         await fsm.start_escalation_monitor(interval_seconds=60)
         logger.info("企微 Action 升级巡检已启动")
@@ -995,11 +1237,13 @@ async def startup_event():
     # Initialize database
     try:
         from src.core.database import init_db
+
         await init_db()
         logger.info("数据库初始化成功")
 
         # 加载多租户 Schema 映射
         from src.core.database import reload_schema_map_from_db
+
         await reload_schema_map_from_db()
     except Exception as e:
         logger.error("数据库初始化失败", error=str(e))
@@ -1009,6 +1253,7 @@ async def startup_event():
     # Start scheduler for automated tasks
     try:
         from src.services.scheduler import get_scheduler
+
         scheduler = get_scheduler()
         await scheduler.start()
         logger.info("定时任务调度器启动成功")
@@ -1019,6 +1264,7 @@ async def startup_event():
     try:
         from src.core.database import get_db as _get_db
         from src.services.knowledge_rule_service import KnowledgeRuleService
+
         async for db in _get_db():
             svc = KnowledgeRuleService(db)
             rules_result = await svc.seed_rules()
@@ -1039,6 +1285,7 @@ async def startup_event():
     try:
         from src.core.database import async_session_factory
         from src.services.ontology_sync_pipeline import register_sync_listeners
+
         register_sync_listeners(async_session_factory)
         logger.info("Neo4j 本体同步管道注册成功")
     except Exception as e:
@@ -1047,6 +1294,7 @@ async def startup_event():
     # Initialize Redis cache
     try:
         from src.services.redis_cache_service import redis_cache
+
         await redis_cache.initialize()
         logger.info("Redis缓存服务启动成功")
     except Exception as e:
@@ -1061,6 +1309,7 @@ async def shutdown_event():
     # Stop scheduler
     try:
         from src.services.scheduler import get_scheduler
+
         scheduler = get_scheduler()
         await scheduler.stop()
         logger.info("定时任务调度器已停止")
@@ -1070,6 +1319,7 @@ async def shutdown_event():
     # Close member service
     try:
         from src.services.member_service import member_service
+
         await member_service.close()
         logger.info("会员服务已关闭")
     except Exception as e:
@@ -1078,6 +1328,7 @@ async def shutdown_event():
     # Close POS service
     try:
         from src.services.pos_service import pos_service
+
         await pos_service.close()
         logger.info("POS服务已关闭")
     except Exception as e:
@@ -1086,6 +1337,7 @@ async def shutdown_event():
     # Close Redis cache
     try:
         from src.services.redis_cache_service import redis_cache
+
         await redis_cache.close()
         logger.info("Redis缓存服务已关闭")
     except Exception as e:
@@ -1094,6 +1346,7 @@ async def shutdown_event():
     # Close database connections
     try:
         from src.core.database import close_db
+
         await close_db()
         logger.info("数据库连接已关闭")
     except Exception as e:
@@ -1103,7 +1356,7 @@ async def shutdown_event():
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """全局异常处理"""
-    from src.core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+    from src.core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
 
     # 记录错误到监控系统
     error_id = error_monitor.log_error(

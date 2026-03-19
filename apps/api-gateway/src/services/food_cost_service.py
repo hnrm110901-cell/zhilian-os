@@ -13,7 +13,6 @@ from typing import Optional
 import structlog
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.dish import Dish
 from src.models.store import Store
 from src.services.bom_service import BOMService
@@ -36,20 +35,22 @@ class FoodCostService:
 
         total_cost_fen = 0.0
         items = []
-        for item in (bom.items or []):
+        for item in bom.items or []:
             uc = item.unit_cost or 0
             qty = float(item.standard_qty)
             item_cost_fen = qty * uc
             total_cost_fen += item_cost_fen
-            items.append({
-                "ingredient_id": item.ingredient_id,
-                "standard_qty": qty,
-                "unit": item.unit,
-                "unit_cost_fen": uc,
-                "item_cost_fen": item_cost_fen,
-                "item_cost_yuan": round(item_cost_fen / 100, 2),
-                "cost_pct": 0.0,
-            })
+            items.append(
+                {
+                    "ingredient_id": item.ingredient_id,
+                    "standard_qty": qty,
+                    "unit": item.unit,
+                    "unit_cost_fen": uc,
+                    "item_cost_fen": item_cost_fen,
+                    "item_cost_yuan": round(item_cost_fen / 100, 2),
+                    "cost_pct": 0.0,
+                }
+            )
 
         # 按成本贡献降序
         items.sort(key=lambda x: x["item_cost_fen"], reverse=True)
@@ -73,9 +74,7 @@ class FoodCostService:
         }
 
     @staticmethod
-    async def get_store_food_cost_variance(
-        store_id: str, start_date: date, end_date: date, db: AsyncSession
-    ) -> dict:
+    async def get_store_food_cost_variance(store_id: str, start_date: date, end_date: date, db: AsyncSession) -> dict:
         """门店实际 vs 理论食材成本差异分析"""
         end_exclusive = end_date + timedelta(days=1)
 
@@ -188,9 +187,7 @@ class FoodCostService:
         }
 
     @staticmethod
-    async def get_hq_food_cost_ranking(
-        start_date: date, end_date: date, db: AsyncSession
-    ) -> dict:
+    async def get_hq_food_cost_ranking(start_date: date, end_date: date, db: AsyncSession) -> dict:
         """总部跨店食材成本排名（按差异率倒序）"""
         result = await db.execute(select(Store).where(Store.is_active == True))
         stores = result.scalars().all()
@@ -204,10 +201,12 @@ class FoodCostService:
                     end_date=end_date,
                     db=db,
                 )
-                store_results.append({
-                    "store_name": store.name,
-                    **variance,
-                })
+                store_results.append(
+                    {
+                        "store_name": store.name,
+                        **variance,
+                    }
+                )
             except Exception as e:
                 logger.warning("food_cost_ranking.store_failed", store_id=store.id, error=str(e))
 
@@ -218,11 +217,7 @@ class FoodCostService:
 
         total_stores = len(store_results)
         over_budget = sum(1 for s in store_results if s["variance_status"] in ("warning", "critical"))
-        avg_actual_pct = (
-            round(sum(s["actual_cost_pct"] for s in store_results) / total_stores, 2)
-            if total_stores > 0
-            else 0.0
-        )
+        avg_actual_pct = round(sum(s["actual_cost_pct"] for s in store_results) / total_stores, 2) if total_stores > 0 else 0.0
 
         return {
             "start_date": start_date.isoformat(),

@@ -94,5 +94,6 @@ class TestTrainingService:
             score=85
         )
 
-        assert result["success"] is True
         assert result["staff_id"] == "EMP001"
+        assert result["course_name"] == "服务技能培训"
+        assert result["passed"] is True

@@ -113,6 +113,7 @@ const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage'));
 const QueueManagementPage = lazy(() => import('./pages/QueueManagementPage'));
 const AgentMemoryPage = lazy(() => import('./pages/AgentMemoryPage'));
 const WeChatTriggersPage = lazy(() => import('./pages/WeChatTriggersPage'));
+const IMChannelPage = lazy(() => import('./pages/IMChannelPage'));
 const EventSourcingPage = lazy(() => import('./pages/EventSourcingPage'));
 const MeituanQueuePage = lazy(() => import('./pages/MeituanQueuePage'));
 const VectorIndexPage = lazy(() => import('./pages/VectorIndexPage'));
@@ -209,6 +210,29 @@ const SmProfile   = lazy(() => import('./pages/sm/Profile'));
 // Platform Admin layout + pages (admin.zlsjos.cn / www.admin.zlsjos.cn)
 const PlatformAdminLayout        = lazy(() => import('./layouts/PlatformAdminLayout'));
 const PlatformAdminHome          = lazy(() => import('./pages/platform/PlatformAdminHome'));
+// Level 1 — 平台新增页面
+const ModelVersionPage           = lazy(() => import('./pages/platform/ModelVersionPage'));
+const PromptWarehousePage        = lazy(() => import('./pages/platform/PromptWarehousePage'));
+const CrossMerchantLearningPage  = lazy(() => import('./pages/platform/CrossMerchantLearningPage'));
+const ModuleAuthPage             = lazy(() => import('./pages/platform/ModuleAuthPage'));
+const KeyManagementPage          = lazy(() => import('./pages/platform/KeyManagementPage'));
+const DeliveryTrackingPage       = lazy(() => import('./pages/platform/DeliveryTrackingPage'));
+const RenewalAlertPage           = lazy(() => import('./pages/platform/RenewalAlertPage'));
+
+// Ops Admin layout + pages (Level 2 — 商户管理运维后台)
+const OpsAdminLayout             = lazy(() => import('./layouts/OpsAdminLayout'));
+const OpsHomePage                = lazy(() => import('./pages/ops/OpsHomePage'));
+const DataPipelinePage           = lazy(() => import('./pages/ops/DataPipelinePage'));
+const MenuImportPage             = lazy(() => import('./pages/ops/MenuImportPage'));
+const BomImportPage              = lazy(() => import('./pages/ops/BomImportPage'));
+const ChannelDataPage            = lazy(() => import('./pages/ops/ChannelDataPage'));
+const OpsBusinessRulesPage       = lazy(() => import('./pages/ops/BusinessRulesPage'));
+const StoreTemplatePage          = lazy(() => import('./pages/ops/StoreTemplatePage'));
+const AgentTrainingPage          = lazy(() => import('./pages/ops/AgentTrainingPage'));
+const DataIsolationPage          = lazy(() => import('./pages/ops/DataIsolationPage'));
+const IoTDevicesPage             = lazy(() => import('./pages/ops/IoTDevicesPage'));
+const ModelMonitorPage           = lazy(() => import('./pages/ops/ModelMonitorPage'));
+const PushStrategyPage           = lazy(() => import('./pages/ops/PushStrategyPage'));
 const PlatformIntegrationsPage   = lazy(() => import('./pages/platform/PlatformIntegrationsPage'));
 const EdgeNodeManagementPage     = lazy(() => import('./pages/platform/EdgeNodeManagementPage'));
 const PlatformAgentsPage         = lazy(() => import('./pages/platform/PlatformAgentsPage'));
@@ -327,6 +351,10 @@ const SmWeeklyReview    = lazy(() => import('./pages/sm/WeeklyReview'));
 const JobStandardLibrary  = lazy(() => import('./pages/hr/JobStandardLibrary'));
 const EmployeeGrowthTrace = lazy(() => import('./pages/hr/EmployeeGrowthTrace'));
 const JobStandardDetail   = lazy(() => import('./pages/hr/JobStandardDetail'));
+const SmMemberProfile = lazy(() => import('./pages/sm/MemberProfile'));
+const HqMarketingTasks = lazy(() => import('./pages/hq/MarketingTasks'));
+const HqMarketingTaskCreate = lazy(() => import('./pages/hq/MarketingTaskCreate'));
+const SmMarketingTasks = lazy(() => import('./pages/sm/MarketingTasks'));
 
 // Role-based views — Employee H5 Self-Service (/emp)
 const EmployeeLayout    = lazy(() => import('./pages/employee/EmployeeLayout'));
@@ -673,7 +701,7 @@ const AppContent: React.FC = () => {
                     <ProtectedRoute requiredRole="admin"><ApprovalManagementPage /></ProtectedRoute>
                   } />
                   <Route path="stores" element={
-                    <ProtectedRoute requiredRole="admin"><StoreManagementPage /></ProtectedRoute>
+                    <ProtectedRoute><StoreManagementPage /></ProtectedRoute>
                   } />
                   <Route path="export-jobs" element={
                     <ProtectedRoute requiredRole="admin"><ExportJobsPage /></ProtectedRoute>
@@ -689,6 +717,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="wechat-triggers" element={
                     <ProtectedRoute requiredRole="admin"><WeChatTriggersPage /></ProtectedRoute>
+                  } />
+                  <Route path="im-channels" element={
+                    <ProtectedRoute requiredRole="admin"><IMChannelPage /></ProtectedRoute>
                   } />
                   <Route path="event-sourcing" element={
                     <ProtectedRoute requiredRole="admin"><EventSourcingPage /></ProtectedRoute>
@@ -969,73 +1000,77 @@ const AppContent: React.FC = () => {
                     <ProtectedRoute><ReservationAnalyticsPage /></ProtectedRoute>
                   } />
                 </Route>
-                <Route path="*" element={<NotFoundPage />} />
 
-                {/* ── 企业管理后台 /platform (admin.zlsjos.cn) ── */}
+                {/* ── Level 1: 屯象智能平台 /platform (admin.zlsjos.cn) ── */}
                 <Route path="/platform" element={
                   <ProtectedRoute requiredRole="admin">
                     <PlatformAdminLayout />
                   </ProtectedRoute>
                 }>
-                  {/* 控制台首页 */}
                   <Route index element={<PlatformAdminHome />} />
-                  {/* 平台分析 → 复用现有页面 */}
+                  {/* 产品工程 */}
                   <Route path="analytics" element={<PlatformAnalyticsPage />} />
-                  {/* 商户管理 → 列表页 + 独立详情页 */}
+                  <Route path="feature-flags" element={<PlatformFeatureFlagsPage />} />
+                  {/* 智能引擎 */}
+                  <Route path="agents" element={<PlatformAgentsPage />} />
+                  <Route path="ontology" element={<PlatformOntologyPage />} />
+                  <Route path="model-versions" element={<ModelVersionPage />} />
+                  <Route path="prompt-warehouse" element={<PromptWarehousePage />} />
+                  <Route path="cross-learning" element={<CrossMerchantLearningPage />} />
+                  {/* 商户生命周期 */}
                   <Route path="merchants" element={<MerchantListPage />} />
                   <Route path="merchants/:brandId" element={<MerchantDetailPage />} />
-                  {/* 门店管理 → 复用现有页面 */}
-                  <Route path="stores" element={<StoreManagementPage />} />
-                  {/* API 集成配置 → 专用接入配置管理页 */}
-                  <Route path="integrations" element={<PlatformIntegrationsPage />} />
-                  {/* 边缘节点管理 → Pi5 注册 / 监控 / Bootstrap Token */}
-                  <Route path="edge-nodes" element={<EdgeNodeManagementPage />} />
-                  {/* 开放平台 → 复用现有页面 */}
-                  <Route path="open-platform" element={<OpenPlatformPage />} />
-                  {/* 系统监控 → 专用平台运维监控大屏 */}
+                  <Route path="module-auth" element={<ModuleAuthPage />} />
+                  <Route path="key-mgmt" element={<KeyManagementPage />} />
+                  <Route path="delivery" element={<DeliveryTrackingPage />} />
+                  <Route path="renewal-alert" element={<RenewalAlertPage />} />
+                  {/* 平台运维 */}
                   <Route path="monitoring" element={<PlatformSystemMonitorPage />} />
-                  {/* 灰度 & 特性开关 → 专用灰度发布管理页 */}
-                  <Route path="feature-flags" element={<PlatformFeatureFlagsPage />} />
-                  {/* 审计日志 → 专用审计日志管理页 */}
                   <Route path="audit-log" element={<PlatformAuditLogPage />} />
-                  {/* 备份管理 → 专用备份管理页 */}
                   <Route path="backup" element={<PlatformBackupPage />} />
-                  {/* 用户管理 → 复用现有页面 */}
+                  <Route path="open-platform" element={<OpenPlatformPage />} />
                   <Route path="users" element={<UserManagementPage />} />
-                  {/* 角色权限 → 复用现有页面 */}
-                  <Route path="roles" element={<RoleManagementPage />} />
-                  {/* Agent 配置与监控 → 专用 Agent 管理页 */}
-                  <Route path="agents" element={<PlatformAgentsPage />} />
-                  {/* 本体图管理 → 专用本体知识图谱管理页 */}
-                  <Route path="ontology" element={<PlatformOntologyPage />} />
-                  {/* 数据主权 → 专用数据主权管理页 */}
-                  <Route path="data-sovereignty" element={<PlatformDataSovereigntyPage />} />
-                  {/* 系统设置 → 平台级配置管理 */}
                   <Route path="settings" element={<SystemSettingsPage />} />
-                  {/* Month 1 (P0) — 外部集成 */}
+                </Route>
+
+                {/* ── Level 2: 商户管理运维后台 /ops ── */}
+                <Route path="/ops" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <OpsAdminLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<OpsHomePage />} />
+                  {/* 数据接入 */}
+                  <Route path="pos" element={<POSPage />} />
+                  <Route path="menu-import" element={<MenuImportPage />} />
+                  <Route path="bom-import" element={<BomImportPage />} />
+                  <Route path="channels" element={<ChannelDataPage />} />
+                  {/* 配置中台 */}
+                  <Route path="rules" element={<OpsBusinessRulesPage />} />
+                  <Route path="store-tpl" element={<StoreTemplatePage />} />
+                  <Route path="agent-train" element={<AgentTrainingPage />} />
+                  <Route path="isolation" element={<DataIsolationPage />} />
+                  {/* 设备运维 */}
+                  <Route path="edge-nodes" element={<EdgeNodeManagementPage />} />
+                  <Route path="iot" element={<IoTDevicesPage />} />
+                  <Route path="voice" element={<VoiceDevicePage />} />
+                  {/* AI运维 */}
+                  <Route path="llm-config" element={<LLMConfigPage />} />
+                  <Route path="model-monitor" element={<ModelMonitorPage />} />
+                  <Route path="push" element={<PushStrategyPage />} />
+                  {/* 数据治理 */}
+                  <Route path="data-sovereignty" element={<PlatformDataSovereigntyPage />} />
+                  <Route path="data-import" element={<DataImportExportPage />} />
+                  <Route path="data-export" element={<ExportJobsPage />} />
+                  {/* 外部集成 */}
+                  <Route path="integrations" element={<PlatformIntegrationsPage />} />
                   <Route path="e-invoices" element={<EInvoicePage />} />
                   <Route path="eleme" element={<ElemePage />} />
-                  <Route path="payment-recon" element={<PaymentReconciliationPage />} />
-                  {/* Month 2 (P0+P1) — 抖音 / 食品安全 / 健康证 */}
                   <Route path="douyin" element={<DouyinPage />} />
-                  <Route path="food-safety" element={<FoodSafetyPage />} />
-                  <Route path="health-certs" element={<HealthCertPage />} />
-                  {/* Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账 */}
-                  <Route path="supplier-b2b" element={<SupplierB2BPage />} />
                   <Route path="dianping" element={<DianpingPage />} />
+                  <Route path="supplier-b2b" element={<SupplierB2BPage />} />
+                  <Route path="payment-recon" element={<PaymentReconciliationPage />} />
                   <Route path="bank-recon" element={<BankReconciliationPage />} />
-                  {/* Batch 1 — 数据融合层 */}
-                  <Route path="integration-hub" element={<IntegrationHubPage />} />
-                  <Route path="omni-channel" element={<OmniChannelPage />} />
-                  <Route path="tri-recon" element={<TriReconciliationPage />} />
-                  {/* Batch 2 — 智能决策层 */}
-                  <Route path="supplier-intel" element={<SupplierIntelPage />} />
-                  <Route path="review-actions" element={<ReviewActionPage />} />
-                  <Route path="compliance-engine" element={<ComplianceEnginePage />} />
-                  {/* Batch 3 — 自动化闭环层 */}
-                  <Route path="auto-procurement" element={<AutoProcurementPage />} />
-                  <Route path="financial-closing" element={<FinancialClosingPage />} />
-                  <Route path="command-center" element={<CommandCenterPage />} />
                 </Route>
 
                 {/* Role-based views — Store Manager (手机) */}
@@ -1071,12 +1106,14 @@ const AppContent: React.FC = () => {
                   <Route path="hr/leave"         element={<SmHRLeave />} />
                   <Route path="hr/growth"        element={<SmHRGrowth />} />
                   <Route path="patrol"   element={<SmPatrol />} />
+                  <Route path="members"  element={<SmMemberProfile />} />
                   <Route path="profile"  element={<SmProfile />} />
                   {/* 日清日结 + 周复盘 */}
                   <Route path="daily-dashboard"  element={<SmDailyDashboard />} />
                   <Route path="daily-settlement" element={<SmDailySettlement />} />
                   <Route path="tasks-abnormal"   element={<SmAbnormalTasks />} />
                   <Route path="weekly-review"    element={<SmWeeklyReview />} />
+                  <Route path="marketing-tasks" element={<SmMarketingTasks />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -1105,26 +1142,45 @@ const AppContent: React.FC = () => {
                   <Route path="kitchen"      element={<FloorKitchen />} />
                 </Route>
 
-                {/* Role-based views — HQ (桌面) */}
+                {/* ── Level 3: 商户经营决策中心 /hq (桌面) ── */}
                 <Route path="/hq" element={
                   <ProtectedRoute>
                     <HQLayout />
                   </ProtectedRoute>
                 }>
                   <Route index element={<HQHome />} />
-                  <Route path="stores"    element={<HQStores />} />
+                  {/* 营收增长 */}
+                  <Route path="stores" element={<HQStores />} />
+                  <Route path="dishes" element={<DishProfitabilityPage />} />
+                  <Route path="channels" element={<ChannelProfitPage />} />
+                  <Route path="members" element={<MemberSystemPage />} />
+                  <Route path="pricing" element={<DynamicPricingPage />} />
+                  {/* 成本管控 */}
+                  <Route path="inventory" element={<InventoryPage />} />
+                  <Route path="supply" element={<SupplyChainManagement />} />
+                  <Route path="waste" element={<WasteReasoningPage />} />
+                  <Route path="bom" element={<BOMManagementPage />} />
+                  <Route path="workforce" element={<HQWorkforce />} />
+                  {/* 品质合规 */}
+                  <Route path="food-safety" element={<FoodSafetyPage />} />
+                  <Route path="quality" element={<QualityManagementPage />} />
+                  <Route path="training" element={<TrainingPage />} />
+                  <Route path="compliance" element={<CompliancePage />} />
+                  {/* 财务结算 */}
+                  <Route path="finance" element={<HQFinance />} />
+                  <Route path="recon" element={<ReconciliationPage />} />
+                  <Route path="settlement" element={<SettlementRiskPage />} />
+                  <Route path="tax" element={<TaxCashflowPage />} />
+                  <Route path="budget" element={<BudgetManagementPage />} />
+                  {/* 经营洞察 */}
                   <Route path="decisions" element={<HQDecisions />} />
-                  <Route path="finance"   element={<HQFinance />} />
-                  <Route path="workforce"       element={<HQWorkforce />} />
-                  <Route path="banquet"         element={<HQBanquet />} />
-                  <Route path="hr"                       element={<HQHr />} />
-                  <Route path="hr/knowledge"             element={<HQHrKnowledge />} />
-                  <Route path="hr/talent-pipeline"       element={<HQHrTalentPipeline />} />
-                  <Route path="hr/lifecycle"             element={<HQHrLifecycle />} />
-                  <Route path="hr/approvals"             element={<HQHrApprovals />} />
-                  <Route path="hr/attendance"            element={<HQHrAttendance />} />
-                  <Route path="hr/payroll"              element={<HQHrPayroll />} />
-                  <Route path="hr/import"               element={<HQHrImport />} />
+                  <Route path="competitive" element={<CompetitiveAnalysis />} />
+                  <Route path="forecast" element={<ForecastPage />} />
+                  <Route path="reports" element={<ReportTemplates />} />
+                  <Route path="banquet" element={<HQBanquet />} />
+                  {/* 营销任务 */}
+                  <Route path="marketing-tasks" element={<HqMarketingTasks />} />
+                  <Route path="marketing-tasks/create" element={<HqMarketingTaskCreate />} />
                 </Route>
 
                 {/* Role-based views — Employee H5 Self-Service (手机) */}
@@ -1136,6 +1192,9 @@ const AppContent: React.FC = () => {
                   <Route path="training"   element={<MyTrainingPage />} />
                   <Route path="profile"    element={<EmployeePortal />} />
                 </Route>
+
+                {/* 404 通配符必须放在所有路由最后 */}
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>

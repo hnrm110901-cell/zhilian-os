@@ -3,11 +3,11 @@ SQLAlchemy租户过滤器
 在Session层自动注入租户隔离条件
 支持PostgreSQL Row-Level Security (RLS)
 """
+
+import structlog
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
-import structlog
-
 from src.core.tenant_context import TenantContext
 
 logger = structlog.get_logger()
@@ -69,14 +69,8 @@ def receive_do_orm_execute(orm_execute_state) -> None:
             # 检查是否已经有store_id过滤条件
             if not _has_store_filter(statement):
                 # 添加租户过滤条件
-                orm_execute_state.statement = statement.where(
-                    table.c.store_id == current_tenant
-                )
-                logger.debug(
-                    "Tenant filter applied",
-                    table=table_name,
-                    tenant_id=current_tenant
-                )
+                orm_execute_state.statement = statement.where(table.c.store_id == current_tenant)
+                logger.debug("Tenant filter applied", table=table_name, tenant_id=current_tenant)
 
 
 async def enable_tenant_filter(session: AsyncSession, use_rls: bool = True) -> None:
@@ -90,26 +84,17 @@ async def enable_tenant_filter(session: AsyncSession, use_rls: bool = True) -> N
     tenant_id = TenantContext.get_current_tenant()
 
     if not tenant_id:
-        logger.warning(
-            "Tenant filter enabled but no tenant context set. "
-            "Queries may return data from all tenants."
-        )
+        logger.warning("Tenant filter enabled but no tenant context set. " "Queries may return data from all tenants.")
         return
 
     # 如果使用PostgreSQL RLS，设置session变量
     if use_rls:
         try:
             # 设置PostgreSQL session变量，RLS策略会自动使用
-            await session.execute(
-                text("SELECT set_config('app.current_tenant', :tenant_id, FALSE)"),
-                {"tenant_id": tenant_id}
-            )
+            await session.execute(text("SELECT set_config('app.current_tenant', :tenant_id, FALSE)"), {"tenant_id": tenant_id})
             logger.info("PostgreSQL RLS tenant context set", tenant_id=tenant_id)
         except Exception as e:
-            logger.warning(
-                "Failed to set PostgreSQL RLS context, falling back to ORM filter",
-                error=str(e)
-            )
+            logger.warning("Failed to set PostgreSQL RLS context, falling back to ORM filter", error=str(e))
             use_rls = False
 
     # 如果不使用RLS或RLS设置失败，使用ORM级别的过滤器

@@ -10,6 +10,7 @@ DishMaster API — 集团菜品主档管理
   GET   /api/v1/dish-master/{dish_master_id}/brand-menus   查询品牌层价格配置
   POST  /api/v1/dish-master/{dish_master_id}/brand-menus   创建品牌层价格配置
 """
+
 from typing import List, Optional
 from uuid import UUID
 
@@ -17,7 +18,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.dish_master import BrandMenu, DishMaster
@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/v1/dish-master", tags=["dish-master"])
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
+
 
 class DishMasterCreate(BaseModel):
     sku_code: str = Field(..., max_length=50, description="集团唯一SKU编码")
@@ -82,6 +83,7 @@ class BrandMenuOut(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/", response_model=List[DishMasterOut])
 async def list_dish_masters(
     brand_id: Optional[str] = Query(None),
@@ -110,9 +112,7 @@ async def create_dish_master(
 ):
     """创建新 SKU 主档"""
     # 唯一性检查
-    existing = await session.execute(
-        select(DishMaster).where(DishMaster.sku_code == body.sku_code)
-    )
+    existing = await session.execute(select(DishMaster).where(DishMaster.sku_code == body.sku_code))
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -132,9 +132,7 @@ async def get_dish_master(
     _current_user: User = Depends(get_current_user),
 ):
     """查询主档详情"""
-    result = await session.execute(
-        select(DishMaster).where(DishMaster.id == dish_master_id)
-    )
+    result = await session.execute(select(DishMaster).where(DishMaster.id == dish_master_id))
     dm = result.scalar_one_or_none()
     if dm is None:
         raise HTTPException(status_code=404, detail="DishMaster not found")
@@ -149,9 +147,7 @@ async def patch_dish_master(
     _current_user: User = Depends(get_current_user),
 ):
     """更新主档信息（部分更新）"""
-    result = await session.execute(
-        select(DishMaster).where(DishMaster.id == dish_master_id)
-    )
+    result = await session.execute(select(DishMaster).where(DishMaster.id == dish_master_id))
     dm = result.scalar_one_or_none()
     if dm is None:
         raise HTTPException(status_code=404, detail="DishMaster not found")
@@ -169,9 +165,7 @@ async def list_brand_menus(
     _current_user: User = Depends(get_current_user),
 ):
     """查询品牌层价格配置列表"""
-    result = await session.execute(
-        select(BrandMenu).where(BrandMenu.dish_master_id == dish_master_id)
-    )
+    result = await session.execute(select(BrandMenu).where(BrandMenu.dish_master_id == dish_master_id))
     return result.scalars().all()
 
 
@@ -188,9 +182,7 @@ async def create_brand_menu(
 ):
     """创建品牌层价格配置"""
     # 确认主档存在
-    dm_result = await session.execute(
-        select(DishMaster).where(DishMaster.id == dish_master_id)
-    )
+    dm_result = await session.execute(select(DishMaster).where(DishMaster.id == dish_master_id))
     if dm_result.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="DishMaster not found")
 

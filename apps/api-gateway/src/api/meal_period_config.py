@@ -7,36 +7,39 @@
 - 超订比例
 - 可用时段查询
 """
+
+import uuid
+from datetime import date, datetime, time, timedelta
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, time, datetime, timedelta
-import uuid
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.meal_period import MealPeriod
 from ..models.reservation import Reservation, ReservationStatus
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
 
 router = APIRouter()
 
 
 # ── Request / Response Models ─────────────────────────────────────
 
+
 class MealPeriodRequest(BaseModel):
     store_id: str
-    name: str                               # 午市/晚市/宵夜
-    start_hour: int                         # 0-23
-    end_hour: int                           # 0-23
+    name: str  # 午市/晚市/宵夜
+    start_hour: int  # 0-23
+    end_hour: int  # 0-23
     is_active: bool = True
-    max_tables: Optional[int] = None        # 最大可预订桌数
-    max_guests: Optional[int] = None        # 最大接待客数
-    reservation_interval: int = 30          # 预订间隔（分钟）
-    last_reservation_offset: int = 60       # 结束前N分钟停止预订
-    overbooking_ratio: int = 0              # 超订比例%
+    max_tables: Optional[int] = None  # 最大可预订桌数
+    max_guests: Optional[int] = None  # 最大接待客数
+    reservation_interval: int = 30  # 预订间隔（分钟）
+    last_reservation_offset: int = 60  # 结束前N分钟停止预订
+    overbooking_ratio: int = 0  # 超订比例%
 
 
 class MealPeriodUpdateRequest(BaseModel):
@@ -68,6 +71,7 @@ def _to_dict(mp: MealPeriod) -> Dict[str, Any]:
 
 
 # ── CRUD Endpoints ───────────────────────────────────────────────
+
 
 @router.get("/api/v1/meal-periods")
 async def list_meal_periods(
@@ -122,9 +126,7 @@ async def update_meal_period(
     current_user: User = Depends(get_current_active_user),
 ):
     """更新餐段配置"""
-    result = await session.execute(
-        select(MealPeriod).where(MealPeriod.id == period_id)
-    )
+    result = await session.execute(select(MealPeriod).where(MealPeriod.id == period_id))
     mp = result.scalar_one_or_none()
     if not mp:
         raise HTTPException(status_code=404, detail="餐段不存在")
@@ -144,9 +146,7 @@ async def delete_meal_period(
     current_user: User = Depends(get_current_active_user),
 ):
     """删除餐段配置"""
-    result = await session.execute(
-        select(MealPeriod).where(MealPeriod.id == period_id)
-    )
+    result = await session.execute(select(MealPeriod).where(MealPeriod.id == period_id))
     mp = result.scalar_one_or_none()
     if not mp:
         raise HTTPException(status_code=404, detail="餐段不存在")
@@ -157,6 +157,7 @@ async def delete_meal_period(
 
 
 # ── 可用时段查询（核心功能） ──────────────────────────────────────
+
 
 @router.get("/api/v1/meal-periods/availability")
 async def get_availability(
@@ -176,9 +177,9 @@ async def get_availability(
     """
     # 获取门店所有启用餐段
     result = await session.execute(
-        select(MealPeriod).where(
-            and_(MealPeriod.store_id == store_id, MealPeriod.is_active == True)
-        ).order_by(MealPeriod.start_hour)
+        select(MealPeriod)
+        .where(and_(MealPeriod.store_id == store_id, MealPeriod.is_active == True))
+        .order_by(MealPeriod.start_hour)
     )
     periods = result.scalars().all()
 
@@ -191,12 +192,14 @@ async def get_availability(
             and_(
                 Reservation.store_id == store_id,
                 Reservation.reservation_date == query_date,
-                Reservation.status.in_([
-                    ReservationStatus.PENDING,
-                    ReservationStatus.CONFIRMED,
-                    ReservationStatus.ARRIVED,
-                    ReservationStatus.SEATED,
-                ]),
+                Reservation.status.in_(
+                    [
+                        ReservationStatus.PENDING,
+                        ReservationStatus.CONFIRMED,
+                        ReservationStatus.ARRIVED,
+                        ReservationStatus.SEATED,
+                    ]
+                ),
             )
         )
     )
@@ -250,29 +253,33 @@ async def get_availability(
                 if slot_time <= now:
                     available = False
 
-            slots.append({
-                "time": slot_time.strftime("%H:%M"),
-                "booked_tables": booked_tables,
-                "booked_guests": booked_guests,
-                "max_tables": max_tables,
-                "max_guests": max_guests,
-                "available": available,
-            })
+            slots.append(
+                {
+                    "time": slot_time.strftime("%H:%M"),
+                    "booked_tables": booked_tables,
+                    "booked_guests": booked_guests,
+                    "max_tables": max_tables,
+                    "max_guests": max_guests,
+                    "available": available,
+                }
+            )
 
             current_minutes += interval
 
-        output_periods.append({
-            "id": str(mp.id),
-            "name": mp.name,
-            "start_hour": mp.start_hour,
-            "end_hour": mp.end_hour,
-            "max_tables": max_tables,
-            "max_guests": max_guests,
-            "overbooking_ratio": overbook,
-            "slots": slots,
-            "total_booked": sum(1 for s in slots if s["booked_tables"] > 0),
-            "total_available": sum(1 for s in slots if s["available"]),
-        })
+        output_periods.append(
+            {
+                "id": str(mp.id),
+                "name": mp.name,
+                "start_hour": mp.start_hour,
+                "end_hour": mp.end_hour,
+                "max_tables": max_tables,
+                "max_guests": max_guests,
+                "overbooking_ratio": overbook,
+                "slots": slots,
+                "total_booked": sum(1 for s in slots if s["booked_tables"] > 0),
+                "total_available": sum(1 for s in slots if s["available"]),
+            }
+        )
 
     return {
         "store_id": store_id,

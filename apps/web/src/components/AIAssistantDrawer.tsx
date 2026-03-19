@@ -65,7 +65,7 @@ interface Props {
   storeId?: string;
 }
 
-const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = 'store_001' }) => {
+const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = '' }) => {
   const [decisions, setDecisions]       = useState<DecisionItem[]>([]);
   const [scenario, setScenario]         = useState<ScenarioInfo | null>(null);
   const [loading, setLoading]           = useState(false);

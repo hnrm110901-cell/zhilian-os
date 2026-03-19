@@ -36,7 +36,7 @@ interface PerformanceResult {
 
 const AgentCollaborationPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [status, setStatus] = useState<CollaborationStatus | null>(null);
   const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null);
@@ -123,7 +123,7 @@ const AgentCollaborationPage: React.FC = () => {
             <Select value={storeId} onChange={setStoreId} style={{ width: 140 }}>
               {stores.length > 0 ? stores.map((s: any) => (
                 <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-              )) : <Option value="STORE001">门店 001</Option>}
+              ))}
             </Select>
             <Button icon={<SyncOutlined />} onClick={loadStatus}>查询状态</Button>
           </Space>

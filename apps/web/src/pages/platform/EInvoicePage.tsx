@@ -10,6 +10,7 @@
  *   POST   /api/v1/e-invoices/{id}/void   — 作废
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { message } from 'antd';
 import {
   ZCard, ZBadge, ZButton, ZEmpty, ZAlert, ZSkeleton, ZModal,
 } from '../../design-system/components';
@@ -69,9 +70,9 @@ function fmtTime(iso?: string): string {
   } catch { return iso; }
 }
 
-const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'error' | 'processing' }> = {
+const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'error' | 'info' }> = {
   draft:        { label: '草稿',   variant: 'default' },
-  issuing:      { label: '开票中', variant: 'processing' },
+  issuing:      { label: '开票中', variant: 'info' },
   issued:       { label: '已开票', variant: 'success' },
   void_pending: { label: '作废中', variant: 'warning' },
   voided:       { label: '已作废', variant: 'error' },
@@ -125,7 +126,7 @@ const EInvoicePage: React.FC = () => {
       setInvoices(listRes);
       setStats(statsRes);
     } catch (err) {
-      console.error('加载发票数据失败', err);
+      message.error('加载发票数据失败');
     } finally {
       setLoading(false);
     }
@@ -140,7 +141,7 @@ const EInvoicePage: React.FC = () => {
       await apiClient.post(`/api/v1/e-invoices/${id}/submit`);
       fetchData();
     } catch (err) {
-      console.error('提交开票失败', err);
+      message.error('提交开票失败');
     }
   };
 
@@ -149,7 +150,7 @@ const EInvoicePage: React.FC = () => {
       await apiClient.post(`/api/v1/e-invoices/${id}/void`);
       fetchData();
     } catch (err) {
-      console.error('作废失败', err);
+      message.error('作废失败');
     }
   };
 
@@ -277,7 +278,7 @@ const EInvoicePage: React.FC = () => {
       title: '状态',
       render: (inv) => {
         const s = STATUS_MAP[inv.status] || { label: inv.status, variant: 'default' as const };
-        return <ZBadge type={s.variant === 'processing' ? 'info' : s.variant} text={s.label} />;
+        return <ZBadge type={s.variant} text={s.label} />;
       },
     },
     {
@@ -398,7 +399,7 @@ const EInvoicePage: React.FC = () => {
         }
       >
         <div className={styles.modalBody}>
-          {createErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{createErr}</ZAlert>}
+          {createErr && <ZAlert variant="error">{createErr}</ZAlert>}
 
           {/* 购方信息 */}
           <div className={styles.fieldGrid}>

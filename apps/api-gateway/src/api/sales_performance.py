@@ -6,27 +6,30 @@
 - 排名和转化率
 - 复用已有 CustomerOwnership 模型做员工-客户绑定
 """
+
+from datetime import date, timedelta
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, timedelta
+from sqlalchemy import and_, case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.reservation import Reservation, ReservationStatus
 from ..models.customer_ownership import CustomerOwnership
+from ..models.reservation import Reservation, ReservationStatus
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, case
 
 router = APIRouter()
 
 
 # ── 预订归属 ─────────────────────────────────────────────────────
 
+
 class AssignReservationRequest(BaseModel):
     reservation_id: str
-    employee_id: str   # 销售员/预订员 employee_id
+    employee_id: str  # 销售员/预订员 employee_id
 
 
 @router.post("/api/v1/sales-performance/assign")
@@ -36,9 +39,7 @@ async def assign_reservation_to_employee(
     current_user: User = Depends(get_current_active_user),
 ):
     """将预订归属到员工（销售员/预订员）"""
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == req.reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == req.reservation_id))
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预订不存在")
@@ -59,6 +60,7 @@ async def assign_reservation_to_employee(
 
 
 # ── 销售业绩统计 ─────────────────────────────────────────────────
+
 
 @router.get("/api/v1/sales-performance/ranking")
 async def get_sales_ranking(
@@ -86,7 +88,7 @@ async def get_sales_ranking(
                 Reservation.store_id == store_id,
                 Reservation.reservation_date >= start_dt,
                 Reservation.reservation_date <= end_dt,
-                Reservation.notes.ilike('%[sales:%'),
+                Reservation.notes.ilike("%[sales:%"),
             )
         )
     )
@@ -97,7 +99,8 @@ async def get_sales_ranking(
     for r in reservations:
         # 提取 [sales:xxx] 标签
         import re
-        match = re.search(r'\[sales:([^\]]+)\]', r.notes or '')
+
+        match = re.search(r"\[sales:([^\]]+)\]", r.notes or "")
         if not match:
             continue
         emp_id = match.group(1)
@@ -147,6 +150,7 @@ async def get_sales_ranking(
 
 # ── 客户归属统计（复用 CustomerOwnership） ────────────────────────
 
+
 @router.get("/api/v1/sales-performance/customer-stats")
 async def get_customer_ownership_stats(
     store_id: str = Query(..., description="门店ID"),
@@ -157,9 +161,9 @@ async def get_customer_ownership_stats(
     query = (
         select(
             CustomerOwnership.owner_employee_id,
-            func.count().label('customer_count'),
-            func.sum(CustomerOwnership.total_spent).label('total_spent'),
-            func.sum(CustomerOwnership.total_visits).label('total_visits'),
+            func.count().label("customer_count"),
+            func.sum(CustomerOwnership.total_spent).label("total_spent"),
+            func.sum(CustomerOwnership.total_visits).label("total_visits"),
         )
         .where(
             and_(
@@ -175,12 +179,14 @@ async def get_customer_ownership_stats(
 
     stats = []
     for r in rows:
-        stats.append({
-            "employee_id": r.owner_employee_id,
-            "customer_count": int(r.customer_count),
-            "total_spent_yuan": round(int(r.total_spent or 0) / 100, 2),
-            "total_visits": int(r.total_visits or 0),
-        })
+        stats.append(
+            {
+                "employee_id": r.owner_employee_id,
+                "customer_count": int(r.customer_count),
+                "total_spent_yuan": round(int(r.total_spent or 0) / 100, 2),
+                "total_visits": int(r.total_visits or 0),
+            }
+        )
 
     return {
         "store_id": store_id,

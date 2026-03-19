@@ -110,7 +110,7 @@ interface ShiftFairnessDetailResp {
   consecutive_alerts: string[];
 }
 
-const defaultStoreId = localStorage.getItem('store_id') || 'STORE001';
+const defaultStoreId = localStorage.getItem('store_id') || '';
 
 const WorkforcePage: React.FC = () => {
   const [storeId] = useState(defaultStoreId);

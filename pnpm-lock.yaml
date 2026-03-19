@@ -182,6 +182,8 @@ importers:
 
   packages/api-adapters/tiancai-shanglong: {}
 
+  packages/api-adapters/weishenghuo: {}
+
   packages/api-adapters/yiding: {}
 
 packages:

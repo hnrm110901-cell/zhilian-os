@@ -6,6 +6,7 @@ WorkforcePushService
 2. 写入 staffing_advice（all_day 建议）
 3. 发送企微决策卡片
 """
+
 from __future__ import annotations
 
 import json
@@ -16,7 +17,6 @@ from typing import Any, Dict, Optional
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.services.labor_demand_service import LaborDemandService
 from src.services.wechat_service import wechat_service
 
@@ -42,8 +42,7 @@ class WorkforcePushService:
     ) -> str:
         periods = forecast.get("periods", {})
         predicted_customers = sum(
-            int((periods.get(p) or {}).get("predicted_customer_count") or 0)
-            for p in ("morning", "lunch", "dinner")
+            int((periods.get(p) or {}).get("predicted_customer_count") or 0) for p in ("morning", "lunch", "dinner")
         )
         morning_need = int((periods.get("morning") or {}).get("total_headcount_needed") or 0)
         lunch_need = int((periods.get("lunch") or {}).get("total_headcount_needed") or 0)
@@ -94,16 +93,14 @@ class WorkforcePushService:
         recommended_headcount = int(forecast.get("daily_peak_headcount") or 0)
 
         current_result = await db.execute(
-            text(
-                """
+            text("""
                 SELECT total_employees
                 FROM schedules
                 WHERE store_id = :sid
                   AND schedule_date = :schedule_date
                 ORDER BY updated_at DESC NULLS LAST
                 LIMIT 1
-                """
-            ),
+                """),
             {"sid": store_id, "schedule_date": advice_date},
         )
         current_row = current_result.fetchone()
@@ -137,8 +134,7 @@ class WorkforcePushService:
         confidence_score = round(sum(confidence_candidates) / 3, 3)
 
         existing = await db.execute(
-            text(
-                """
+            text("""
                 SELECT id
                 FROM staffing_advice
                 WHERE store_id = :sid
@@ -146,16 +142,14 @@ class WorkforcePushService:
                   AND meal_period = CAST(:meal_period AS meal_period_type)
                 ORDER BY created_at DESC
                 LIMIT 1
-                """
-            ),
+                """),
             {"sid": store_id, "advice_date": advice_date, "meal_period": "all_day"},
         )
         existing_row = existing.fetchone()
         if existing_row:
             advice_id = existing_row.id
             await db.execute(
-                text(
-                    """
+                text("""
                     UPDATE staffing_advice
                     SET status = CAST(:status AS staffing_advice_status),
                         recommended_headcount = :recommended_headcount,
@@ -171,8 +165,7 @@ class WorkforcePushService:
                         expires_at = :expires_at,
                         updated_at = NOW()
                     WHERE id = :advice_id
-                    """
-                ),
+                    """),
                 {
                     "status": "pending",
                     "recommended_headcount": recommended_headcount,
@@ -191,8 +184,7 @@ class WorkforcePushService:
             )
         else:
             await db.execute(
-                text(
-                    """
+                text("""
                     INSERT INTO staffing_advice (
                         id, store_id, advice_date, meal_period, status,
                         recommended_headcount, current_scheduled_headcount, headcount_delta,
@@ -208,8 +200,7 @@ class WorkforcePushService:
                         :reason_1, :reason_2, :reason_3, :confidence_score,
                         CAST(:position_breakdown AS JSON), NULL, :expires_at, NOW(), NOW()
                     )
-                    """
-                ),
+                    """),
                 {
                     "store_id": store_id,
                     "advice_date": advice_date,
@@ -247,15 +238,13 @@ class WorkforcePushService:
         )
 
         await db.execute(
-            text(
-                """
+            text("""
                 UPDATE staffing_advice
                 SET push_sent_at = NOW(), updated_at = NOW()
                 WHERE store_id = :sid
                   AND advice_date = :advice_date
                   AND meal_period = CAST(:meal_period AS meal_period_type)
-                """
-            ),
+                """),
             {"sid": store_id, "advice_date": advice_date, "meal_period": "all_day"},
         )
 

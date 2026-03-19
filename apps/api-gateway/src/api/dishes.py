@@ -1,14 +1,15 @@
 """
 菜品管理API端点
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+
 from typing import List, Optional
-from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 
-from src.services.dish_service import DishService, DishCategoryService
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 from src.core.dependencies import get_current_user
 from src.models.user import User
+from src.services.dish_service import DishCategoryService, DishService
 
 router = APIRouter(prefix="/dishes", tags=["dishes"])
 
@@ -167,10 +168,7 @@ async def update_dish(
 ):
     """更新菜品"""
     service = DishService()
-    dish = await service.update_dish(
-        str(dish_id),
-        dish_data.dict(exclude_unset=True)
-    )
+    dish = await service.update_dish(str(dish_id), dish_data.dict(exclude_unset=True))
 
     if not dish:
         raise HTTPException(status_code=404, detail="Dish not found")
@@ -239,18 +237,20 @@ async def get_cost_analysis(
     """
     菜品成本分析：利润率排名、成本分布、高/低利润 Top N
     """
+    from sqlalchemy import select as _select
     from src.core.database import AsyncSessionLocal
     from src.models.dish import Dish as DishModel
-    from sqlalchemy import select as _select
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            _select(DishModel).where(
+            _select(DishModel)
+            .where(
                 DishModel.store_id == store_id,
                 DishModel.is_available == True,
                 DishModel.cost.isnot(None),
                 DishModel.price.isnot(None),
-            ).limit(limit)
+            )
+            .limit(limit)
         )
         dishes = result.scalars().all()
 
@@ -263,15 +263,17 @@ async def get_cost_analysis(
         price = float(d.price)
         cost = float(d.cost)
         margin = round((price - cost) / price * 100, 1) if price > 0 else 0
-        items.append({
-            "dish_id": str(d.id),
-            "name": d.name,
-            "price": price,
-            "cost": cost,
-            "profit_margin": margin,
-            "total_sales": d.total_sales or 0,
-            "total_revenue": float(d.total_revenue or 0),
-        })
+        items.append(
+            {
+                "dish_id": str(d.id),
+                "name": d.name,
+                "price": price,
+                "cost": cost,
+                "profit_margin": margin,
+                "total_sales": d.total_sales or 0,
+                "total_revenue": float(d.total_revenue or 0),
+            }
+        )
         cat = str(d.category_id) if d.category_id else "未分类"
         if cat not in category_map:
             category_map[cat] = {"count": 0, "margins": []}

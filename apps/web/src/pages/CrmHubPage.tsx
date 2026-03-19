@@ -5,10 +5,19 @@ import {
   TeamOutlined,
   RiseOutlined,
   WarningOutlined,
+  SearchOutlined,
+  MobileOutlined,
+  BarChartOutlined,
+  BulbOutlined,
+  MessageOutlined,
+  DollarOutlined,
+  ClockCircleOutlined,
+  ThunderboltOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
-import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, DetailDrawer } from '../design-system/components';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, ZEmpty, DetailDrawer } from '../design-system/components';
 import css from './CrmHubPage.module.css';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -74,70 +83,12 @@ const SIGNAL_URGENCY_TYPE: Record<string, 'critical' | 'warning' | 'default'> = 
 // ── Quick nav ─────────────────────────────────────────────────────────────────
 
 const QUICK_NAV = [
-  { icon: '👥', label: '会员中心',   route: '/members' },
-  { icon: '🔍', label: '客户360',   route: '/customer360' },
-  { icon: '📱', label: '私域运营',   route: '/private-domain' },
-  { icon: '📊', label: '渠道毛利',   route: '/channel-profit' },
-  { icon: '💡', label: '推荐引擎',   route: '/recommendations' },
-  { icon: '💬', label: '企微触发器', route: '/wechat-triggers' },
-];
-
-// ── Demo fallback data ────────────────────────────────────────────────────────
-
-const DEMO_STATS: MemberStats = {
-  total_members: 8640,
-  new_this_month: 312,
-  repurchase_rate: 38.5,
-  dormant_count: 1280,
-  stored_value_yuan: 256800,
-  reach_rate: 62.3,
-};
-
-const DEMO_SEGMENTS: RfmSegment[] = [
-  { segment: 'new',        label: '新客',     count: 1850, pct: 21 },
-  { segment: 'repurchase', label: '复购客',   count: 3920, pct: 45 },
-  { segment: 'high_value', label: '高价值客', count: 640,  pct: 7  },
-  { segment: 'dormant',    label: '沉睡客',   count: 1280, pct: 15 },
-  { segment: 'churn_risk', label: '流失预警', count: 950,  pct: 11 },
-];
-
-const DEMO_SIGNALS: GrowthSignal[] = [
-  {
-    signal_id: 's1', signal_type: 'dormant_reactivation',
-    title: '1280 名沉睡客可唤醒',
-    description: '近 60 天未到店，建议发放"回头客专属 8 折券"，预测转化 15%。',
-    urgency: 'high', created_at: new Date().toISOString(),
-    recommended_action: '一键触达',
-  },
-  {
-    signal_id: 's2', signal_type: 'repurchase_prompt',
-    title: '午市低频客群 320 人',
-    description: '近 30 天仅到店 1 次，适合推送"工作日午市立减 10 元"活动。',
-    urgency: 'medium', created_at: new Date().toISOString(),
-    recommended_action: '生成文案',
-  },
-  {
-    signal_id: 's3', signal_type: 'birthday_care',
-    title: '本周 28 名会员生日',
-    description: '生日关怀券核销率历史均值 43%，建议提前 1 天发放。',
-    urgency: 'medium', created_at: new Date().toISOString(),
-    recommended_action: '批量发券',
-  },
-  {
-    signal_id: 's4', signal_type: 'high_value_care',
-    title: '高价值客 VIP 关怀',
-    description: '12 名月消费 ≥¥800 客户近 14 天未到店，建议专属电话问候。',
-    urgency: 'low', created_at: new Date().toISOString(),
-    recommended_action: '查看名单',
-  },
-];
-
-const DEMO_CHURN: ChurnUser[] = [
-  { customer_id: 'c1', name: '张**', days_since_visit: 75, risk_level: 'high' },
-  { customer_id: 'c2', name: '李**', days_since_visit: 68, risk_level: 'high' },
-  { customer_id: 'c3', name: '王**', days_since_visit: 62, risk_level: 'high' },
-  { customer_id: 'c4', name: '刘**', days_since_visit: 58, risk_level: 'medium' },
-  { customer_id: 'c5', name: '陈**', days_since_visit: 55, risk_level: 'medium' },
+  { icon: <TeamOutlined style={{ fontSize: 22, color: '#0AAF9A' }} />,          label: '会员中心',   route: '/members' },
+  { icon: <SearchOutlined style={{ fontSize: 22, color: '#722ed1' }} />,        label: '客户360',   route: '/customer360' },
+  { icon: <MobileOutlined style={{ fontSize: 22, color: '#1A7A52' }} />,        label: '私域运营',   route: '/private-domain' },
+  { icon: <BarChartOutlined style={{ fontSize: 22, color: '#C8923A' }} />,      label: '渠道毛利',   route: '/channel-profit' },
+  { icon: <BulbOutlined style={{ fontSize: 22, color: '#eb2f96' }} />,          label: '推荐引擎',   route: '/recommendations' },
+  { icon: <MessageOutlined style={{ fontSize: 22, color: '#1890ff' }} />,       label: '企微触发器', route: '/wechat-triggers' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -160,8 +111,8 @@ export default function CrmHubPage() {
   const [signals,  setSignals]  = useState<GrowthSignal[] | null>(null);
   const [churn,    setChurn]    = useState<ChurnUser[] | null>(null);
   const [loading,  setLoading]  = useState(true);
-  const [storeId,  setStoreId]  = useState('S001');
-  const [storeOptions, setStoreOptions] = useState<Array<{ value: string; label: string }>>([{ value: 'S001', label: 'S001' }]);
+  const [storeId,  setStoreId]  = useState(localStorage.getItem('store_id') || '');
+  const [storeOptions, setStoreOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [selectedSignal, setSelectedSignal] = useState<GrowthSignal | null>(null);
 
   useEffect(() => {
@@ -234,22 +185,22 @@ export default function CrmHubPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Resolve display data (API or demo)
-  const d = stats ?? DEMO_STATS;
-  const segs: RfmSegment[] = (segments && segments.length > 0 ? segments : DEMO_SEGMENTS)
+  // Resolve display data (API only — no demo fallback)
+  const d = stats;
+  const segs: RfmSegment[] = (segments ?? [])
     .sort((a, b) => (SEGMENT_META[a.segment]?.order ?? 9) - (SEGMENT_META[b.segment]?.order ?? 9));
-  const sigs: GrowthSignal[] = signals && signals.length > 0 ? signals : DEMO_SIGNALS;
-  const churnList: ChurnUser[] = churn && churn.length > 0 ? churn : DEMO_CHURN;
-  const churnTotal = stats?.dormant_count ?? DEMO_STATS.dormant_count;
+  const sigs: GrowthSignal[] = signals ?? [];
+  const churnList: ChurnUser[] = churn ?? [];
+  const churnTotal = stats?.dormant_count ?? 0;
 
-  const KPI_ITEMS = [
-    { icon: '👥', bg: '#e6f4ff', label: '会员总量',   value: fmtNum(d.total_members),        unit: '人' },
-    { icon: '🆕', bg: 'rgba(26,122,82,0.08)', label: '本月新增',   value: `+${d.new_this_month}`,         unit: '人', sub: '较上月 +8%' },
-    { icon: '🔄', bg: '#fff0f6', label: '复购率',     value: `${d.repurchase_rate.toFixed(1)}`, unit: '%' },
-    { icon: '😴', bg: 'rgba(200,146,58,0.08)', label: '沉睡会员',   value: fmtNum(d.dormant_count),        unit: '人', warn: '需唤醒' },
-    { icon: '💰', bg: '#f9f0ff', label: '储值余额',   value: `¥${fmtMoney(d.stored_value_yuan)}` },
-    { icon: '📡', bg: '#e6fffb', label: '私域触达率', value: `${d.reach_rate.toFixed(1)}`,   unit: '%' },
-  ];
+  const KPI_ITEMS = d ? [
+    { icon: <TeamOutlined style={{ color: '#1890ff' }} />,             bg: 'rgba(24,144,255,0.06)', label: '会员总量',   value: fmtNum(d.total_members),          unit: '人' },
+    { icon: <UserAddOutlined style={{ color: '#1A7A52' }} />,          bg: 'rgba(26,122,82,0.06)',  label: '本月新增',   value: `+${d.new_this_month}`,           unit: '人', sub: '较上月 +8%' },
+    { icon: <ReloadOutlined style={{ color: '#eb2f96' }} />,           bg: 'rgba(235,47,150,0.06)', label: '复购率',     value: `${d.repurchase_rate.toFixed(1)}`, unit: '%' },
+    { icon: <ClockCircleOutlined style={{ color: '#C8923A' }} />,      bg: 'rgba(200,146,58,0.06)', label: '沉睡会员',   value: fmtNum(d.dormant_count),          unit: '人', warn: '需唤醒' },
+    { icon: <DollarOutlined style={{ color: '#722ed1' }} />,           bg: 'rgba(114,46,209,0.06)', label: '储值余额',   value: `¥${fmtMoney(d.stored_value_yuan)}` },
+    { icon: <RadarChartOutlined style={{ color: '#0AAF9A' }} />,       bg: 'rgba(10,175,154,0.06)', label: '私域触达率', value: `${d.reach_rate.toFixed(1)}`,     unit: '%' },
+  ] : [];
 
   return (
     <div className={css.page}>
@@ -275,6 +226,8 @@ export default function CrmHubPage() {
       {/* KPI Strip */}
       {loading ? (
         <ZSkeleton rows={2} block style={{ marginBottom: 16 }} />
+      ) : KPI_ITEMS.length === 0 ? (
+        <ZEmpty description="暂无数据" />
       ) : (
         <div className={css.kpiStrip}>
           {KPI_ITEMS.map(k => (
@@ -301,27 +254,35 @@ export default function CrmHubPage() {
           title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><TeamOutlined style={{ color: '#0AAF9A' }} /><span>人群分层</span></div>}
           extra={<a onClick={() => navigate('/members')} style={{ fontSize: 12 }}>会员中心</a>}
         >
-          <div className={css.segmentList}>
-            {segs.map(seg => {
-              const meta = SEGMENT_META[seg.segment];
-              const color = meta?.color ?? '#8c8c8c';
-              return (
-                <div key={seg.segment} className={css.segmentRow}>
-                  <div className={css.segmentDot} style={{ background: color }} />
-                  <span className={css.segmentName}>{seg.label}</span>
-                  <div className={css.segmentBarTrack}>
-                    <div className={css.segmentBarFill} style={{ width: `${seg.pct}%`, background: color }} />
-                  </div>
-                  <span className={css.segmentCount} style={{ color }}>{fmtNum(seg.count)}</span>
-                  <span className={css.segmentPct}>{seg.pct}%</span>
+          {segs.length === 0 ? (
+            <ZEmpty description="暂无数据" />
+          ) : (
+            <>
+              <div className={css.segmentList}>
+                {segs.map(seg => {
+                  const meta = SEGMENT_META[seg.segment];
+                  const color = meta?.color ?? '#8c8c8c';
+                  return (
+                    <div key={seg.segment} className={css.segmentRow}>
+                      <div className={css.segmentDot} style={{ background: color }} />
+                      <span className={css.segmentName}>{seg.label}</span>
+                      <div className={css.segmentBarTrack}>
+                        <div className={css.segmentBarFill} style={{ width: `${seg.pct}%`, background: color }} />
+                      </div>
+                      <span className={css.segmentCount} style={{ color }}>{fmtNum(seg.count)}</span>
+                      <span className={css.segmentPct}>{seg.pct}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {d && (
+                <div className={css.segmentTotal}>
+                  <span className={css.segmentTotalLabel}>会员总量</span>
+                  <span className={css.segmentTotalValue}>{fmtNum(d.total_members)} 人</span>
                 </div>
-              );
-            })}
-          </div>
-          <div className={css.segmentTotal}>
-            <span className={css.segmentTotalLabel}>会员总量</span>
-            <span className={css.segmentTotalValue}>{fmtNum(d.total_members)} 人</span>
-          </div>
+              )}
+            </>
+          )}
         </ZCard>
 
         {/* Col 2: 增长信号 */}
@@ -329,33 +290,37 @@ export default function CrmHubPage() {
           title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><RiseOutlined style={{ color: '#1A7A52' }} /><span>AI 增长信号</span></div>}
           extra={<a onClick={() => navigate('/private-domain')} style={{ fontSize: 12 }}>私域运营</a>}
         >
-          <div className={css.signalList}>
-            {sigs.slice(0, 4).map(sig => (
-              <div key={sig.signal_id} className={css.signalCard}
-                style={{ cursor: 'pointer' }}
-                onClick={() => setSelectedSignal(sig)}
-              >
-                <div className={css.signalCardTop}>
-                  <span className={css.signalTitle}>{sig.title}</span>
-                  {sig.recommended_action && (
-                    <span className={css.signalAction} onClick={(e) => { e.stopPropagation(); navigate('/private-domain'); }}>
-                      {sig.recommended_action} →
+          {sigs.length === 0 ? (
+            <ZEmpty description="暂无增长信号" />
+          ) : (
+            <div className={css.signalList}>
+              {sigs.slice(0, 4).map(sig => (
+                <div key={sig.signal_id} className={css.signalCard}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setSelectedSignal(sig)}
+                >
+                  <div className={css.signalCardTop}>
+                    <span className={css.signalTitle}>{sig.title}</span>
+                    {sig.recommended_action && (
+                      <span className={css.signalAction} onClick={(e) => { e.stopPropagation(); navigate('/private-domain'); }}>
+                        {sig.recommended_action} →
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <ZBadge
+                      type={SIGNAL_URGENCY_TYPE[sig.urgency] ?? 'default'}
+                      text={sig.urgency === 'high' ? '紧急' : sig.urgency === 'medium' ? '建议' : '参考'}
+                    />
+                    <span style={{ fontSize: 10, color: '#8c8c8c' }}>
+                      {SIGNAL_TYPE_LABEL[sig.signal_type] ?? sig.signal_type}
                     </span>
-                  )}
+                  </div>
+                  <div className={css.signalDesc}>{sig.description}</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <ZBadge
-                    type={SIGNAL_URGENCY_TYPE[sig.urgency] ?? 'default'}
-                    text={sig.urgency === 'high' ? '紧急' : sig.urgency === 'medium' ? '建议' : '参考'}
-                  />
-                  <span style={{ fontSize: 10, color: '#8c8c8c' }}>
-                    {SIGNAL_TYPE_LABEL[sig.signal_type] ?? sig.signal_type}
-                  </span>
-                </div>
-                <div className={css.signalDesc}>{sig.description}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </ZCard>
 
         {/* Col 3: 流失预警 */}
@@ -377,19 +342,23 @@ export default function CrmHubPage() {
               批量挽回
             </ZButton>
           </div>
-          <div className={css.churnList}>
-            {churnList.map(u => (
-              <div key={u.customer_id} className={css.churnRow}>
-                <div className={css.churnAvatar}>{u.name.charAt(0)}</div>
-                <span className={css.churnName}>{u.name}</span>
-                <ZBadge
-                  type={u.risk_level === 'high' ? 'critical' : 'warning'}
-                  text={u.risk_level === 'high' ? '高风险' : '中风险'}
-                />
-                <span className={css.churnDays}>{u.days_since_visit}天未到</span>
-              </div>
-            ))}
-          </div>
+          {churnList.length === 0 ? (
+            <ZEmpty description="暂无流失预警" />
+          ) : (
+            <div className={css.churnList}>
+              {churnList.map(u => (
+                <div key={u.customer_id} className={css.churnRow}>
+                  <div className={css.churnAvatar}>{u.name.charAt(0)}</div>
+                  <span className={css.churnName}>{u.name}</span>
+                  <ZBadge
+                    type={u.risk_level === 'high' ? 'critical' : 'warning'}
+                    text={u.risk_level === 'high' ? '高风险' : '中风险'}
+                  />
+                  <span className={css.churnDays}>{u.days_since_visit}天未到</span>
+                </div>
+              ))}
+            </div>
+          )}
         </ZCard>
       </div>
 
@@ -402,7 +371,7 @@ export default function CrmHubPage() {
               className={css.quickNavItem}
               onClick={() => navigate(n.route)}
             >
-              <span className={css.quickNavIcon}>{n.icon}</span>
+              <span className={css.quickNavIcon} aria-hidden>{n.icon}</span>
               <span className={css.quickNavLabel}>{n.label}</span>
             </button>
           ))}

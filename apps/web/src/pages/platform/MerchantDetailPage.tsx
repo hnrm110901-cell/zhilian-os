@@ -21,6 +21,82 @@ import AgentConfigTab from './merchant-tabs/AgentConfigTab';
 import ChannelsTab from './merchant-tabs/ChannelsTab';
 import styles from './MerchantDetailPage.module.css';
 
+// ── 种子客户 mock（后端未启动时降级展示）─────────────────────────────────────
+const SEED_DETAILS: Record<string, MerchantDetail> = {
+  BRD_CZYZ0001: {
+    brand_id: 'BRD_CZYZ0001', brand_name: '尝在一起', cuisine_type: 'hunan',
+    avg_ticket_yuan: 80, target_food_cost_pct: 35, target_labor_cost_pct: 22,
+    target_rent_cost_pct: 10, target_waste_pct: 3, logo_url: null,
+    status: 'active', created_at: '2026-01-15T00:00:00Z',
+    group: {
+      group_id: 'GRP_CZYZ0001', group_name: '尝在一起餐饮管理有限公司',
+      legal_entity: '尝在一起法人代表', unified_social_credit_code: '91430100CZYZ000001',
+      industry_type: 'chinese_formal', contact_person: '尝在一起联系人',
+      contact_phone: '0731-00000001', address: '湖南省长沙市',
+    },
+    stores: [
+      { id: 'CZYZ-2461', name: '文化城店', code: 'CZYZ-WH001', city: '长沙', district: '', status: 'active', address: '', seats: 80, created_at: '2026-01-15T00:00:00Z' },
+      { id: 'CZYZ-7269', name: '浏小鲜', code: 'CZYZ-LXX001', city: '长沙', district: '', status: 'active', address: '', seats: 60, created_at: '2026-01-15T00:00:00Z' },
+      { id: 'CZYZ-19189', name: '永安店', code: 'CZYZ-YA001', city: '长沙', district: '', status: 'active', address: '', seats: 70, created_at: '2026-01-15T00:00:00Z' },
+    ],
+    users: [
+      { id: 'u1', username: 'czyz_admin', email: 'admin@czyz.com', full_name: '尝在一起管理员', role: 'store_manager', is_active: true, store_id: null, created_at: '2026-01-15T00:00:00Z' },
+    ],
+  },
+  BRD_ZQX0001: {
+    brand_id: 'BRD_ZQX0001', brand_name: '最黔线', cuisine_type: 'guizhou',
+    avg_ticket_yuan: 75, target_food_cost_pct: 36, target_labor_cost_pct: 23,
+    target_rent_cost_pct: 10, target_waste_pct: 3, logo_url: null,
+    status: 'active', created_at: '2026-01-20T00:00:00Z',
+    group: {
+      group_id: 'GRP_ZQX0001', group_name: '老江菜馆餐饮管理有限公司',
+      legal_entity: '最黔线法人代表', unified_social_credit_code: '91430100ZQX0000001',
+      industry_type: 'chinese_formal', contact_person: '最黔线联系人',
+      contact_phone: '0731-00000002', address: '湖南省长沙市',
+    },
+    stores: [
+      { id: 'ZQX-20529', name: '马家湾店', code: 'ZQX-MJW001', city: '长沙', district: '', status: 'active', address: '', seats: 80, created_at: '2026-01-20T00:00:00Z' },
+      { id: 'ZQX-32109', name: '东欣万象店', code: 'ZQX-DXWX001', city: '长沙', district: '', status: 'active', address: '', seats: 90, created_at: '2026-01-20T00:00:00Z' },
+      { id: 'ZQX-32304', name: '合众路店', code: 'ZQX-HZL001', city: '长沙', district: '', status: 'active', address: '', seats: 80, created_at: '2026-01-20T00:00:00Z' },
+      { id: 'ZQX-32305', name: '广州路店', code: 'ZQX-GZL001', city: '长沙', district: '', status: 'active', address: '', seats: 70, created_at: '2026-01-20T00:00:00Z' },
+      { id: 'ZQX-32306', name: '昆明路店', code: 'ZQX-KML001', city: '长沙', district: '', status: 'active', address: '', seats: 80, created_at: '2026-01-20T00:00:00Z' },
+      { id: 'ZQX-32309', name: '仁怀店', code: 'ZQX-RH001', city: '仁怀', district: '', status: 'active', address: '', seats: 60, created_at: '2026-01-20T00:00:00Z' },
+    ],
+    users: [
+      { id: 'u2', username: 'zqx_admin', email: 'admin@zuiqianxian.com', full_name: '最黔线管理员', role: 'store_manager', is_active: true, store_id: null, created_at: '2026-01-20T00:00:00Z' },
+    ],
+  },
+  BRD_SGC0001: {
+    brand_id: 'BRD_SGC0001', brand_name: '尚宫厨', cuisine_type: 'hunan',
+    avg_ticket_yuan: 180, target_food_cost_pct: 33, target_labor_cost_pct: 25,
+    target_rent_cost_pct: 12, target_waste_pct: 2.5, logo_url: null,
+    status: 'active', created_at: '2026-02-01T00:00:00Z',
+    group: {
+      group_id: 'GRP_SGC0001', group_name: '尚宫厨餐饮管理有限公司',
+      legal_entity: '尚宫厨法人代表', unified_social_credit_code: '91430100SGC0000001',
+      industry_type: 'chinese_formal', contact_person: '尚宫厨联系人',
+      contact_phone: '0731-00000003', address: '湖南省长沙市',
+    },
+    stores: [
+      { id: 'SGC-2463', name: '采霞街店', code: 'SGC-CXJ001', city: '长沙', district: '', status: 'active', address: '', seats: 100, created_at: '2026-02-01T00:00:00Z' },
+      { id: 'SGC-7896', name: '湘江水岸店', code: 'SGC-XJSA001', city: '长沙', district: '', status: 'active', address: '', seats: 120, created_at: '2026-02-01T00:00:00Z' },
+      { id: 'SGC-24777', name: '乐城店', code: 'SGC-LC001', city: '长沙', district: '', status: 'active', address: '', seats: 90, created_at: '2026-02-01T00:00:00Z' },
+      { id: 'SGC-36199', name: '啫匠亲城店', code: 'SGC-ZJQC001', city: '长沙', district: '', status: 'active', address: '', seats: 80, created_at: '2026-02-01T00:00:00Z' },
+      { id: 'SGC-41405', name: '酃湖雅院店', code: 'SGC-LHYY001', city: '株洲', district: '', status: 'active', address: '', seats: 110, created_at: '2026-02-01T00:00:00Z' },
+    ],
+    users: [
+      { id: 'u3', username: 'sgc_admin', email: 'admin@shanggongchu.com', full_name: '尚宫厨管理员', role: 'store_manager', is_active: true, store_id: null, created_at: '2026-02-01T00:00:00Z' },
+    ],
+  },
+};
+
+const SEED_CONFIG: ConfigSummary = {
+  im: { configured: false, platform: null, last_sync_status: null, last_sync_at: null },
+  agents: { total: 6, enabled: 0 },
+  channels: { count: 0 },
+  store_count: 0, user_count: 0,
+};
+
 const MerchantDetailPage: React.FC = () => {
   const { brandId } = useParams<{ brandId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,7 +114,13 @@ const MerchantDetailPage: React.FC = () => {
       const data = await apiClient.get<MerchantDetail>(`/api/v1/merchants/${brandId}`);
       setDetail(data);
     } catch {
-      message.error('加载商户详情失败');
+      // 后端未启动时降级显示种子客户
+      const seed = SEED_DETAILS[brandId];
+      if (seed) {
+        setDetail(seed);
+      } else {
+        message.error('加载商户详情失败');
+      }
     } finally {
       setLoading(false);
     }
@@ -49,7 +131,9 @@ const MerchantDetailPage: React.FC = () => {
     try {
       const data = await apiClient.get<ConfigSummary>(`/api/v1/merchants/${brandId}/config-summary`);
       setConfigSummary(data);
-    } catch { /* silent */ }
+    } catch {
+      setConfigSummary(SEED_CONFIG);
+    }
   }, [brandId]);
 
   useEffect(() => { fetchDetail(); fetchConfigSummary(); }, [fetchDetail, fetchConfigSummary]);

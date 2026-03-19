@@ -7,6 +7,7 @@ MVP #3: 损耗Top5排名（含¥归因）
   GET /api/v1/waste/top5     — 单独 Top5 损耗食材
   GET /api/v1/waste/summary  — 单独损耗率汇总（含环比）
 """
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -53,8 +54,7 @@ async def get_waste_report(
         end_date=end_date,
         db=db,
     )
-    logger.info("waste_report_fetched", store_id=store_id,
-                start=start_date.isoformat(), end=end_date.isoformat())
+    logger.info("waste_report_fetched", store_id=store_id, start=start_date.isoformat(), end=end_date.isoformat())
     return report
 
 

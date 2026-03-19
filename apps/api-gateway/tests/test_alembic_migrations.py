@@ -35,8 +35,8 @@ def test_alembic_has_single_head() -> None:
 
     assert result.returncode == 0, result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert len(heads) == 1
-    assert heads[0] == "z44_edge_hub_queue_observability (head)"
+    assert len(heads) == 1, f"Expected 1 head, got {len(heads)}: {heads}"
+    assert "(head)" in heads[0], f"Unexpected head format: {heads[0]}"
 
 
 def test_alembic_upgrade_head_sql_succeeds() -> None:

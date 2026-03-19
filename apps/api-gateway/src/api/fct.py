@@ -17,7 +17,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
@@ -30,24 +29,26 @@ router = APIRouter(
 
 # ── Pydantic Schemas ───────────────────────────────────────────────────────────
 
+
 class TaxEstimateResponse(BaseModel):
-    store_id:       str
-    period:         str
-    taxpayer_type:  str
-    total_tax:      int
+    store_id: str
+    period: str
+    taxpayer_type: str
+    total_tax: int
     effective_rate: float
-    vat:            dict
-    cit:            dict
-    revenue:        dict
-    disclaimer:     str
+    vat: dict
+    cit: dict
+    revenue: dict
+    disclaimer: str
 
 
 class CashFlowRequest(BaseModel):
-    days:             int = Field(30, ge=7, le=90,  description="预测天数（7-90）")
-    starting_balance: int = Field(0,  ge=0,         description="当前账面余额（分）")
+    days: int = Field(30, ge=7, le=90, description="预测天数（7-90）")
+    starting_balance: int = Field(0, ge=0, description="当前账面余额（分）")
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/{store_id}/dashboard",
@@ -55,8 +56,8 @@ class CashFlowRequest(BaseModel):
 )
 async def get_fct_dashboard(
     store_id: str,
-    db:   AsyncSession = Depends(get_db),
-    _:    User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     FCT 综合仪表盘（快照视图）：
@@ -81,10 +82,10 @@ async def get_fct_dashboard(
 )
 async def get_monthly_reconciliation(
     store_id: str,
-    year:     int,
-    month:    int,
-    db:   AsyncSession = Depends(get_db),
-    _:    User         = Depends(get_current_user),
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     月度业财对账汇总报告：
@@ -112,12 +113,12 @@ async def get_monthly_reconciliation(
     summary="月度税务测算",
 )
 async def estimate_tax(
-    store_id:      str,
-    year:          int,
-    month:         int,
+    store_id: str,
+    year: int,
+    month: int,
     taxpayer_type: str = Query("general", description="纳税人类型：general / small / micro"),
-    db:   AsyncSession = Depends(get_db),
-    _:    User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     月度税务测算（基于历史数据估算，仅供参考）：
@@ -146,8 +147,7 @@ async def estimate_tax(
         )
 
     svc = FCTService(db)
-    return await svc.estimate_monthly_tax(store_id, year, month,
-                                           taxpayer_type=taxpayer_type, save=False)
+    return await svc.estimate_monthly_tax(store_id, year, month, taxpayer_type=taxpayer_type, save=False)
 
 
 @router.post(
@@ -156,26 +156,30 @@ async def estimate_tax(
     status_code=status.HTTP_201_CREATED,
 )
 async def save_tax_record(
-    store_id:      str,
-    year:          int,
-    month:         int,
+    store_id: str,
+    year: int,
+    month: int,
     taxpayer_type: str = Query("general", description="纳税人类型"),
-    db:   AsyncSession = Depends(get_db),
-    _:    User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     执行月度税务测算并将结果持久化到 `fct_tax_records` 表。
 
     通常在月末由财务人员手动确认后触发，或由 Celery 月度定时任务自动调用。
     """
-    svc    = FCTService(db)
+    svc = FCTService(db)
     result = await svc.estimate_monthly_tax(
-        store_id, year, month, taxpayer_type=taxpayer_type, save=True,
+        store_id,
+        year,
+        month,
+        taxpayer_type=taxpayer_type,
+        save=True,
     )
     await db.commit()
     return {
-        "message":       f"{year}-{month:02d} 税务测算已保存",
-        "total_tax":     result["total_tax"],
+        "message": f"{year}-{month:02d} 税务测算已保存",
+        "total_tax": result["total_tax"],
         "effective_rate": result["effective_rate"],
     }
 
@@ -185,11 +189,11 @@ async def save_tax_record(
     summary="资金流预测",
 )
 async def forecast_cash_flow(
-    store_id:         str,
-    days:             int = Query(30, ge=7, le=90,  description="预测天数（7-90）"),
-    starting_balance: int = Query(0,  ge=0,          description="当前账面余额（分）"),
-    db:   AsyncSession = Depends(get_db),
-    _:    User         = Depends(get_current_user),
+    store_id: str,
+    days: int = Query(30, ge=7, le=90, description="预测天数（7-90）"),
+    starting_balance: int = Query(0, ge=0, description="当前账面余额（分）"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     未来 N 天资金流预测：
@@ -213,10 +217,10 @@ async def forecast_cash_flow(
 )
 async def get_budget_execution(
     store_id: str,
-    year:     int,
-    month:    int,
-    db:   AsyncSession = Depends(get_db),
-    _:    User         = Depends(get_current_user),
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     月度预算执行率分析（按科目）：

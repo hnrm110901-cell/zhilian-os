@@ -1,11 +1,10 @@
 """支付对账模型 — 支付流水/对账批次/差异记录"""
-import uuid
+
 import enum
-from datetime import datetime, date
-from sqlalchemy import (
-    Column, String, Integer, DateTime, Date, Text, Boolean,
-    ForeignKey, Float,
-)
+import uuid
+from datetime import date, datetime
+
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -52,10 +51,7 @@ class PaymentRecord(Base, TimestampMixin):
     import_batch_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     def __repr__(self):
-        return (
-            f"<PaymentRecord(trade_no='{self.trade_no}', "
-            f"channel='{self.channel}', amount={self.amount_fen})>"
-        )
+        return f"<PaymentRecord(trade_no='{self.trade_no}', " f"channel='{self.channel}', amount={self.amount_fen})>"
 
 
 class ReconciliationBatch(Base, TimestampMixin):
@@ -88,10 +84,7 @@ class ReconciliationBatch(Base, TimestampMixin):
     error_message = Column(Text, nullable=True)
 
     def __repr__(self):
-        return (
-            f"<ReconciliationBatch(channel='{self.channel}', "
-            f"date='{self.reconcile_date}', status='{self.status}')>"
-        )
+        return f"<ReconciliationBatch(channel='{self.channel}', " f"date='{self.reconcile_date}', status='{self.status}')>"
 
 
 class ReconciliationDiff(Base, TimestampMixin):
@@ -118,7 +111,4 @@ class ReconciliationDiff(Base, TimestampMixin):
     resolved_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return (
-            f"<ReconciliationDiff(type='{self.diff_type}', "
-            f"trade_no='{self.trade_no}', diff={self.diff_amount_fen})>"
-        )
+        return f"<ReconciliationDiff(type='{self.diff_type}', " f"trade_no='{self.trade_no}', diff={self.diff_amount_fen})>"

@@ -2,14 +2,15 @@
 增量备份 API
 提供全量/增量备份任务的触发、查询、下载和删除接口
 """
+
 import os
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_role
 from src.models.user import User, UserRole
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/api/v1/backups", tags=["backups"])
 
 
 class BackupCreateRequest(BaseModel):
-    backup_type: str = "full"          # full / incremental
+    backup_type: str = "full"  # full / incremental
     since_timestamp: Optional[str] = None  # ISO 8601，增量备份起始时间
     tables: List[str] = Field(default_factory=list)  # 空列表 = 全部表
 
@@ -47,6 +48,7 @@ async def create_backup(
         raise HTTPException(status_code=400, detail="增量备份必须提供 since_timestamp")
 
     import uuid
+
     job_id = str(uuid.uuid4())
     tables_json = req.tables or []
 
@@ -66,6 +68,7 @@ async def create_backup(
 
     try:
         from src.core.celery_tasks import run_backup
+
         task = run_backup.delay(job_id)
         await db.execute(
             text("UPDATE backup_jobs SET celery_task_id=:tid WHERE id=:id"),
@@ -94,17 +97,11 @@ async def list_backups(
     """查询备份任务列表"""
     if status:
         count_sql = text("SELECT COUNT(*) FROM backup_jobs WHERE status = :status")
-        sql = text(
-            "SELECT * FROM backup_jobs WHERE status = :status"
-            " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
-        )
+        sql = text("SELECT * FROM backup_jobs WHERE status = :status" " ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
         params: dict = {"status": status, "limit": limit, "offset": offset}
     else:
         count_sql = text("SELECT COUNT(*) FROM backup_jobs")
-        sql = text(
-            "SELECT * FROM backup_jobs"
-            " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
-        )
+        sql = text("SELECT * FROM backup_jobs" " ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
         params = {"limit": limit, "offset": offset}
 
     total = (await db.execute(count_sql, {k: v for k, v in params.items() if k in ("status",)})).scalar() or 0
@@ -183,4 +180,3 @@ async def delete_backup(
         os.remove(row["file_path"])
     await db.execute(text("DELETE FROM backup_jobs WHERE id = :id"), {"id": job_id})
     await db.commit()
-

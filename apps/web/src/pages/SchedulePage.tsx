@@ -35,7 +35,7 @@ const SHIFT_LABEL: Record<string, string> = {
 };
 
 const SchedulePage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -397,7 +397,7 @@ const SchedulePage: React.FC = () => {
           <Select value={storeId} onChange={v => { setStoreId(v); }} style={{ width: 160 }}>
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-            )) : <Option value="STORE001">STORE001</Option>}
+            ))}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={() => { loadEmployees(); if (activeTab === 'week') loadWeekView(); else if (activeTab === 'list') loadSchedules(); else loadStats(); }}>刷新</Button>
         </Space>

@@ -2,18 +2,20 @@
 Store Service
 门店管理服务
 """
-from typing import List, Optional, Dict
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
-import os
 
+import os
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.database import get_db_session
 from ..models.store import Store, StoreStatus
 from ..models.user import User
-from ..core.database import get_db_session
-from ..services.pos_service import pos_service
 from ..services.member_service import member_service
-import structlog
+from ..services.pos_service import pos_service
 
 logger = structlog.get_logger()
 
@@ -97,6 +99,7 @@ class StoreService:
         is_active: Optional[bool] = None,
         limit: int = 100,
         offset: int = 0,
+        brand_id: Optional[str] = None,
     ) -> List[Store]:
         """获取门店列表"""
         async with get_db_session() as session:
@@ -112,6 +115,8 @@ class StoreService:
                 conditions.append(Store.status == status.value)
             if is_active is not None:
                 conditions.append(Store.is_active == is_active)
+            if brand_id:
+                conditions.append(Store.brand_id == brand_id)
 
             if conditions:
                 stmt = stmt.where(and_(*conditions))
@@ -173,6 +178,7 @@ class StoreService:
         self,
         region: Optional[str] = None,
         status: Optional[StoreStatus] = None,
+        brand_id: Optional[str] = None,
     ) -> int:
         """获取门店数量"""
         async with get_db_session() as session:
@@ -183,6 +189,8 @@ class StoreService:
                 conditions.append(Store.region == region)
             if status:
                 conditions.append(Store.status == status.value)
+            if brand_id:
+                conditions.append(Store.brand_id == brand_id)
 
             if conditions:
                 stmt = stmt.where(and_(*conditions))
@@ -190,10 +198,13 @@ class StoreService:
             result = await session.execute(stmt)
             return result.scalar()
 
-    async def get_stores_by_region(self) -> Dict[str, List[Store]]:
+    async def get_stores_by_region(self, brand_id: Optional[str] = None) -> Dict[str, List[Store]]:
         """按区域分组获取门店"""
         async with get_db_session() as session:
-            stmt = select(Store).where(Store.is_active == True).order_by(Store.region, Store.name)
+            stmt = select(Store).where(Store.is_active == True)
+            if brand_id:
+                stmt = stmt.where(Store.brand_id == brand_id)
+            stmt = stmt.order_by(Store.region, Store.name)
             result = await session.execute(stmt)
             stores = result.scalars().all()
 
@@ -273,11 +284,13 @@ class StoreService:
         for store_id in store_ids:
             store = await self.get_store(store_id)
             if store:
-                comparison["stores"].append({
-                    "id": store.id,
-                    "name": store.name,
-                    "region": store.region,
-                })
+                comparison["stores"].append(
+                    {
+                        "id": store.id,
+                        "name": store.name,
+                        "region": store.region,
+                    }
+                )
 
                 # 获取门店统计数据
                 stats = await self.get_store_stats(store_id)
@@ -329,7 +342,9 @@ class StoreService:
 
         return regional_summary
 
-    async def get_performance_ranking(self, metric: str = "revenue", limit: int = int(os.getenv("STORE_RANKING_LIMIT", "10"))) -> List[Dict]:
+    async def get_performance_ranking(
+        self, metric: str = "revenue", limit: int = int(os.getenv("STORE_RANKING_LIMIT", "10"))
+    ) -> List[Dict]:
         """获取门店业绩排名"""
         stores = await self.get_stores(is_active=True, limit=int(os.getenv("STORE_RANKING_LIMIT", "1000")))
 
@@ -347,14 +362,16 @@ class StoreService:
             elif metric == "monthly_revenue":
                 performance_value = stats.get("monthly_revenue", 0)
 
-            store_performance.append({
-                "store_id": store.id,
-                "store_name": store.name,
-                "region": store.region,
-                "city": store.city,
-                "metric": metric,
-                "value": performance_value,
-            })
+            store_performance.append(
+                {
+                    "store_id": store.id,
+                    "store_name": store.name,
+                    "region": store.region,
+                    "city": store.city,
+                    "metric": metric,
+                    "value": performance_value,
+                }
+            )
 
         # 按业绩排序
         store_performance.sort(key=lambda x: x["value"], reverse=True)

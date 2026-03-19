@@ -6,6 +6,7 @@ import {
 import { CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, BulbOutlined } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
+import { useAuthStore } from '../stores/authStore';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -27,6 +28,8 @@ const resultColor: Record<string, string> = { approved: 'green', rejected: 'red'
 const resultLabel: Record<string, string> = { approved: '通过', rejected: '拒绝', warning: '警告' };
 
 const DecisionValidatorPage: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const defaultStoreId = user?.store_id || '';
   const [loading, setLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
   const [singleResult, setSingleResult] = useState<ValidationResult | null>(null);
@@ -75,9 +78,9 @@ const DecisionValidatorPage: React.FC = () => {
     setLoading(true);
     try {
       const payload = [
-        { store_id: 'STORE001', decision_type: 'pricing', ai_suggestion: { price_change: 0.1 } },
-        { store_id: 'STORE001', decision_type: 'staffing', ai_suggestion: { headcount_change: -2 } },
-        { store_id: 'STORE002', decision_type: 'inventory', ai_suggestion: { reorder_qty: 500 } },
+        { store_id: defaultStoreId, decision_type: 'pricing', ai_suggestion: { price_change: 0.1 } },
+        { store_id: defaultStoreId, decision_type: 'staffing', ai_suggestion: { headcount_change: -2 } },
+        { store_id: defaultStoreId, decision_type: 'inventory', ai_suggestion: { reorder_qty: 500 } },
       ];
       const res = await apiClient.post('/api/v1/validator/validate/batch', payload);
       setBatchSummary(res.summary);
@@ -134,11 +137,9 @@ const DecisionValidatorPage: React.FC = () => {
                   <Row gutter={24}>
                     <Col span={12}>
                       <Form form={singleForm} layout="vertical" onFinish={handleSingleValidate}>
-                        <Form.Item name="store_id" label="门店ID" initialValue="STORE001" rules={[{ required: true }]}>
+                        <Form.Item name="store_id" label="门店ID" initialValue={defaultStoreId} rules={[{ required: true }]}>
                           <Select placeholder="选择门店">
-                            {stores.length > 0
-                              ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
-                              : <Option value="STORE001">STORE001</Option>}
+                            {stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)}
                           </Select>
                         </Form.Item>
                         <Form.Item name="decision_type" label="决策类型" rules={[{ required: true }]}>
@@ -223,11 +224,9 @@ const DecisionValidatorPage: React.FC = () => {
                   <Row gutter={24}>
                     <Col span={12}>
                       <Form form={anomalyForm} layout="vertical" onFinish={handleAnomalyDetect}>
-                        <Form.Item name="store_id" label="门店ID" initialValue="STORE001" rules={[{ required: true }]}>
+                        <Form.Item name="store_id" label="门店ID" initialValue={defaultStoreId} rules={[{ required: true }]}>
                           <Select placeholder="选择门店">
-                            {stores.length > 0
-                              ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
-                              : <Option value="STORE001">STORE001</Option>}
+                            {stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)}
                           </Select>
                         </Form.Item>
                         <Form.Item name="metric_name" label="指标名称" rules={[{ required: true }]}>

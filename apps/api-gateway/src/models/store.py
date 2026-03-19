@@ -1,17 +1,20 @@
 """
 Store Model
 """
-from sqlalchemy import Column, String, Boolean, JSON, Integer, Float, Numeric, ForeignKey
+
+import enum
+import uuid
+
+from sqlalchemy import JSON, Boolean, Column, Float, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
-import enum
 
 from .base import Base, TimestampMixin
 
 
 class StoreStatus(str, enum.Enum):
     """门店状态"""
+
     ACTIVE = "active"  # 营业中
     INACTIVE = "inactive"  # 暂停营业
     RENOVATING = "renovating"  # 装修中
@@ -41,11 +44,6 @@ class Store(Base, TimestampMixin):
 
     # 品牌归属（多品牌隔离）
     brand_id = Column(String(50), index=True)  # 品牌ID，null 表示未分配品牌
-
-    # 组织层级挂载点
-    org_node_id    = Column(String(64), ForeignKey("org_nodes.id"), nullable=True, index=True)
-    store_type     = Column(String(32), nullable=True)   # StoreType 枚举值
-    operation_mode = Column(String(32), nullable=True)   # OperationMode 枚举值
 
     # 管理信息
     manager_id = Column(UUID(as_uuid=True))  # 店长ID
@@ -88,9 +86,6 @@ class Store(Base, TimestampMixin):
             "latitude": self.latitude,
             "longitude": self.longitude,
             "brand_id": self.brand_id,
-            "org_node_id": self.org_node_id,
-            "store_type": self.store_type,
-            "operation_mode": self.operation_mode,
             "manager_id": str(self.manager_id) if self.manager_id else None,
             "region": self.region,
             "status": self.status,

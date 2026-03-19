@@ -22,9 +22,9 @@ IClock / SystemClock / MockClock
 """
 
 import abc
-from datetime import datetime, date, timezone, timedelta
-from typing import Optional
 import os
+from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 
 # 上海时区偏移（UTC+8），不依赖 pytz/zoneinfo 保持零额外依赖
 _SHANGHAI_OFFSET = timedelta(hours=int(os.getenv("BUSINESS_TZ_OFFSET_HOURS", "8")))
@@ -105,6 +105,7 @@ def set_clock(clock: Optional[IClock]) -> None:
 # ---------------------------------------------------------------------------
 # 便捷函数（直接替换裸调用）
 # ---------------------------------------------------------------------------
+
 
 def now_utc() -> datetime:
     """当前 UTC 时间（带时区）"""

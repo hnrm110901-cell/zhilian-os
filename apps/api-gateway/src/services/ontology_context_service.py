@@ -1,6 +1,7 @@
 """
 图谱上下文服务：为决策校验与 Agent 提供从图谱拉取的上下文（BOM、库存快照、损耗摘要）
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -54,7 +55,14 @@ async def get_ontology_facts_for_decision(
         dish_id = d.get("dish_id", "")
         rows = repo.get_dish_bom_ingredients(dish_id)
         if rows:
-            bom_summary.append({"dish_id": dish_id, "name": d.get("name"), "ingredients": [r.get("ing_id") for r in rows], "qty_per_portion": [r.get("qty") for r in rows]})
+            bom_summary.append(
+                {
+                    "dish_id": dish_id,
+                    "name": d.get("name"),
+                    "ingredients": [r.get("ing_id") for r in rows],
+                    "qty_per_portion": [r.get("qty") for r in rows],
+                }
+            )
     out["bom_summary"] = bom_summary[:20]
 
     # 近期损耗推理 TOP3（需同步调用 waste_reasoning；此处仅占位，由调用方可选注入）

@@ -2,33 +2,29 @@
 硬件集成API - 树莓派5 + Shokz设备
 边缘计算与语音交互接口
 """
-from types import SimpleNamespace
-import secrets
-import os
-from fastapi import APIRouter, Depends, HTTPException, Header, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List
-from pydantic import BaseModel
 
+import os
+import secrets
+from types import SimpleNamespace
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
-from src.core.dependencies import get_db, get_current_user
-from src.services.raspberry_pi_edge_service import (
-    get_raspberry_pi_edge_service,
-    RaspberryPiEdgeService,
-    NetworkMode,
-    EdgeNodeInfo
-)
-from src.services.shokz_device_service import (
-    get_shokz_device_service,
-    ShokzDeviceService,
-    ShokzDeviceModel,
-    VoiceCommand
-)
-from src.models.user import User
+from src.core.dependencies import get_current_user, get_db
 from src.models.audit_log import AuditAction, ResourceType
+from src.models.user import User
 from src.services.audit_log_service import audit_log_service
 from src.services.edge_bootstrap_token_service import get_edge_bootstrap_token_service
+from src.services.raspberry_pi_edge_service import (
+    EdgeNodeInfo,
+    NetworkMode,
+    RaspberryPiEdgeService,
+    get_raspberry_pi_edge_service,
+)
+from src.services.shokz_device_service import ShokzDeviceModel, ShokzDeviceService, VoiceCommand, get_shokz_device_service
 
 router = APIRouter(prefix="/api/v1/hardware")
 edge_security = HTTPBearer(auto_error=False)
@@ -104,11 +100,7 @@ def _build_commissioning_summary(*, nodes: list[dict], devices: list[dict]) -> d
     online_nodes = [node for node in nodes if node.get("status") == "online"]
     queue_backlog_nodes = [node for node in nodes if (node.get("pending_status_queue") or 0) > 0]
 
-    target_macs = [
-        mac.strip().upper()
-        for mac in os.getenv("SHOKZ_TARGET_MACS", "").split(",")
-        if mac.strip()
-    ]
+    target_macs = [mac.strip().upper() for mac in os.getenv("SHOKZ_TARGET_MACS", "").split(",") if mac.strip()]
     registered_macs = {str(device.get("mac_address", "")).upper() for device in devices if device.get("mac_address")}
     missing_target_macs = [mac for mac in target_macs if mac not in registered_macs]
 
@@ -235,13 +227,10 @@ async def get_edge_node_or_user(
 
 # ==================== 树莓派5边缘节点 ====================
 
+
 @router.post("/edge-node/register")
 async def register_edge_node(
-    store_id: str,
-    device_name: str,
-    ip_address: str,
-    mac_address: str,
-    current_user=Depends(get_edge_bootstrap_or_user)
+    store_id: str, device_name: str, ip_address: str, mac_address: str, current_user=Depends(get_edge_bootstrap_or_user)
 ):
     """
     注册边缘节点
@@ -250,10 +239,7 @@ async def register_edge_node(
     """
     service = get_raspberry_pi_edge_service()
     node = await service.register_edge_node(
-        store_id=store_id,
-        device_name=device_name,
-        ip_address=ip_address,
-        mac_address=mac_address
+        store_id=store_id, device_name=device_name, ip_address=ip_address, mac_address=mac_address
     )
     device_secret = service.get_or_create_device_secret(node.node_id)
     await _safe_audit_log(
@@ -270,12 +256,7 @@ async def register_edge_node(
         },
     )
 
-    return {
-        "success": True,
-        "node": node.model_dump(),
-        "device_secret": device_secret,
-        "message": "边缘节点注册成功"
-    }
+    return {"success": True, "node": node.model_dump(), "device_secret": device_secret, "message": "边缘节点注册成功"}
 
 
 @router.post("/edge-node/{node_id}/status")
@@ -288,7 +269,7 @@ async def update_node_status(
     uptime_seconds: int,
     pending_status_queue: int = 0,
     last_queue_error: Optional[str] = None,
-    current_user=Depends(get_edge_node_or_user)
+    current_user=Depends(get_edge_node_or_user),
 ):
     """
     更新节点状态
@@ -307,18 +288,11 @@ async def update_node_status(
         last_queue_error=last_queue_error,
     )
 
-    return {
-        "success": True,
-        "node": node.model_dump()
-    }
+    return {"success": True, "node": node.model_dump()}
 
 
 @router.post("/edge-node/{node_id}/network-mode")
-async def switch_network_mode(
-    node_id: str,
-    mode: NetworkMode,
-    current_user=Depends(get_edge_node_or_user)
-):
+async def switch_network_mode(node_id: str, mode: NetworkMode, current_user=Depends(get_edge_node_or_user)):
     """
     切换网络模式
 
@@ -329,20 +303,11 @@ async def switch_network_mode(
     service = get_raspberry_pi_edge_service()
     node = await service.switch_network_mode(node_id=node_id, mode=mode)
 
-    return {
-        "success": True,
-        "node": node.model_dump(),
-        "message": f"已切换到{mode}模式"
-    }
+    return {"success": True, "node": node.model_dump(), "message": f"已切换到{mode}模式"}
 
 
 @router.post("/edge-node/{node_id}/inference")
-async def local_inference(
-    node_id: str,
-    model_type: str,
-    input_data: dict,
-    current_user: User = Depends(get_current_user)
-):
+async def local_inference(node_id: str, model_type: str, input_data: dict, current_user: User = Depends(get_current_user)):
     """
     本地AI推理
 
@@ -355,23 +320,13 @@ async def local_inference(
     - decision: 决策生成
     """
     service = get_raspberry_pi_edge_service()
-    result = await service.local_inference(
-        node_id=node_id,
-        model_type=model_type,
-        input_data=input_data
-    )
+    result = await service.local_inference(node_id=node_id, model_type=model_type, input_data=input_data)
 
-    return {
-        "success": True,
-        "result": result
-    }
+    return {"success": True, "result": result}
 
 
 @router.post("/edge-node/{node_id}/sync")
-async def sync_with_cloud(
-    node_id: str,
-    current_user=Depends(get_edge_node_or_user)
-):
+async def sync_with_cloud(node_id: str, current_user=Depends(get_edge_node_or_user)):
     """
     与云端同步
 
@@ -382,10 +337,7 @@ async def sync_with_cloud(
     service = get_raspberry_pi_edge_service()
     result = await service.sync_with_cloud(node_id=node_id)
 
-    return {
-        "success": True,
-        "sync_result": result
-    }
+    return {"success": True, "sync_result": result}
 
 
 @router.get("/edge-node/{node_id}/commands")
@@ -427,10 +379,7 @@ async def acknowledge_edge_node_command(
 
 
 @router.post("/edge-node/{node_id}/rotate-secret")
-async def rotate_edge_node_secret(
-    node_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def rotate_edge_node_secret(node_id: str, current_user: User = Depends(get_current_user)):
     """轮换边缘节点 device_secret。"""
     service = get_raspberry_pi_edge_service()
     status_before = await service.get_credential_status(node_id)
@@ -445,19 +394,11 @@ async def rotate_edge_node_secret(
         old_value=status_before,
         new_value={**status_after, "device_secret_rotated": True},
     )
-    return {
-        "success": True,
-        "node_id": node_id,
-        "device_secret": new_secret,
-        "message": "device_secret 已轮换"
-    }
+    return {"success": True, "node_id": node_id, "device_secret": new_secret, "message": "device_secret 已轮换"}
 
 
 @router.post("/edge-node/{node_id}/revoke-secret")
-async def revoke_edge_node_secret(
-    node_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def revoke_edge_node_secret(node_id: str, current_user: User = Depends(get_current_user)):
     """吊销边缘节点 device_secret。"""
     service = get_raspberry_pi_edge_service()
     status_before = await service.get_credential_status(node_id)
@@ -472,18 +413,11 @@ async def revoke_edge_node_secret(
         old_value=status_before,
         new_value=status_after,
     )
-    return {
-        "success": True,
-        "node_id": node_id,
-        "message": "device_secret 已吊销"
-    }
+    return {"success": True, "node_id": node_id, "message": "device_secret 已吊销"}
 
 
 @router.get("/edge-node/{node_id}/credential-status")
-async def get_edge_node_credential_status(
-    node_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def get_edge_node_credential_status(node_id: str, current_user: User = Depends(get_current_user)):
     """获取边缘节点凭证状态，用于运维排查。"""
     service = get_raspberry_pi_edge_service()
     status_payload = await service.get_credential_status(node_id=node_id)
@@ -495,10 +429,7 @@ async def get_edge_node_credential_status(
 
 
 @router.get("/edge-node/{node_id}/recovery-guide")
-async def get_edge_node_recovery_guide(
-    node_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def get_edge_node_recovery_guide(node_id: str, current_user: User = Depends(get_current_user)):
     """获取边缘节点重注册/恢复指引。"""
     service = get_raspberry_pi_edge_service()
     node = await service.get_node_info(node_id=node_id)
@@ -569,10 +500,7 @@ async def get_edge_node_audit_logs(
 
 
 @router.get("/edge-node/{node_id}")
-async def get_edge_node_info(
-    node_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def get_edge_node_info(node_id: str, current_user: User = Depends(get_current_user)):
     """获取边缘节点信息"""
     service = get_raspberry_pi_edge_service()
     node = await service.get_node_info(node_id=node_id)
@@ -585,10 +513,7 @@ async def get_edge_node_info(
 
 
 @router.get("/edge-node/store/{store_id}")
-async def list_store_edge_nodes(
-    store_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def list_store_edge_nodes(store_id: str, current_user: User = Depends(get_current_user)):
     """列出门店的所有边缘节点"""
     service = get_raspberry_pi_edge_service()
     nodes = await service.list_store_nodes(store_id=store_id)
@@ -603,30 +528,20 @@ async def list_store_edge_nodes(
         payload["audit_summary"] = audit_summary
         enriched_nodes.append(payload)
 
-    return {
-        "store_id": store_id,
-        "total": len(enriched_nodes),
-        "nodes": enriched_nodes
-    }
+    return {"store_id": store_id, "total": len(enriched_nodes), "nodes": enriched_nodes}
 
 
 @router.get("/edge-node/specs")
-async def get_hardware_specs(
-    current_user: User = Depends(get_current_user)
-):
+async def get_hardware_specs(current_user: User = Depends(get_current_user)):
     """获取硬件规格"""
     service = get_raspberry_pi_edge_service()
     specs = await service.get_hardware_specs()
 
-    return {
-        "specs": specs
-    }
+    return {"specs": specs}
 
 
 @router.get("/edge-node/deployment-cost")
-async def get_edge_deployment_cost(
-    current_user: User = Depends(get_current_user)
-):
+async def get_edge_deployment_cost(current_user: User = Depends(get_current_user)):
     """
     获取部署成本
 
@@ -640,12 +555,13 @@ async def get_edge_deployment_cost(
         "summary": {
             "total_cost_per_store": cost["total_cost_per_store"],
             "deployment_time_hours": cost["deployment_time_hours"],
-            "roi_months": 2  # 2个月回本
-        }
+            "roi_months": 2,  # 2个月回本
+        },
     }
 
 
 # ==================== Shokz设备 ====================
+
 
 @router.post("/shokz/register")
 async def register_shokz_device(
@@ -656,7 +572,7 @@ async def register_shokz_device(
     user_id: str,
     user_role: str,
     edge_node_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     注册Shokz设备
@@ -671,77 +587,46 @@ async def register_shokz_device(
         store_id=store_id,
         user_id=user_id,
         user_role=user_role,
-        edge_node_id=edge_node_id
+        edge_node_id=edge_node_id,
     )
 
-    return {
-        "success": True,
-        "device": device.model_dump(),
-        "message": "Shokz设备注册成功"
-    }
+    return {"success": True, "device": device.model_dump(), "message": "Shokz设备注册成功"}
 
 
 @router.post("/shokz/{device_id}/connect")
-async def connect_shokz_device(
-    device_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def connect_shokz_device(device_id: str, current_user: User = Depends(get_current_user)):
     """连接Shokz设备"""
     service = get_shokz_device_service()
     device = await service.connect_device(device_id=device_id)
 
-    return {
-        "success": True,
-        "device": device.model_dump(),
-        "message": "设备已连接"
-    }
+    return {"success": True, "device": device.model_dump(), "message": "设备已连接"}
 
 
 @router.post("/shokz/{device_id}/disconnect")
-async def disconnect_shokz_device(
-    device_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def disconnect_shokz_device(device_id: str, current_user: User = Depends(get_current_user)):
     """断开Shokz设备连接"""
     service = get_shokz_device_service()
     device = await service.disconnect_device(device_id=device_id)
 
-    return {
-        "success": True,
-        "device": device.model_dump(),
-        "message": "设备已断开"
-    }
+    return {"success": True, "device": device.model_dump(), "message": "设备已断开"}
 
 
 @router.post("/shokz/{device_id}/voice-input")
-async def shokz_voice_input(
-    device_id: str,
-    audio_data: str,
-    current_user: User = Depends(get_current_user)
-):
+async def shokz_voice_input(device_id: str, audio_data: str, current_user: User = Depends(get_current_user)):
     """
     语音输入
 
     店长通过Shokz耳机说话，系统识别并处理
     """
     service = get_shokz_device_service()
-    interaction = await service.voice_input(
-        device_id=device_id,
-        audio_data=audio_data
-    )
+    interaction = await service.voice_input(device_id=device_id, audio_data=audio_data)
 
-    return {
-        "success": True,
-        "interaction": interaction.model_dump()
-    }
+    return {"success": True, "interaction": interaction.model_dump()}
 
 
 @router.post("/shokz/{device_id}/voice-output")
 async def shokz_voice_output(
-    device_id: str,
-    text: str,
-    priority: str = "normal",
-    current_user: User = Depends(get_current_user)
+    device_id: str, text: str, priority: str = "normal", current_user: User = Depends(get_current_user)
 ):
     """
     语音输出
@@ -749,16 +634,9 @@ async def shokz_voice_output(
     系统主动推送语音通知到Shokz耳机
     """
     service = get_shokz_device_service()
-    result = await service.voice_output(
-        device_id=device_id,
-        text=text,
-        priority=priority
-    )
+    result = await service.voice_output(device_id=device_id, text=text, priority=priority)
 
-    return {
-        "success": True,
-        "result": result
-    }
+    return {"success": True, "result": result}
 
 
 @router.post("/shokz/alert")
@@ -767,7 +645,7 @@ async def send_shokz_alert(
     alert_type: VoiceCommand,
     message: str,
     target_roles: Optional[List[str]] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     发送异常驱动通知
@@ -778,48 +656,27 @@ async def send_shokz_alert(
     - 异常预警："3号桌等待超过30分钟，需要安抚"
     """
     service = get_shokz_device_service()
-    results = await service.send_alert(
-        store_id=store_id,
-        alert_type=alert_type,
-        message=message,
-        target_roles=target_roles
-    )
+    results = await service.send_alert(store_id=store_id, alert_type=alert_type, message=message, target_roles=target_roles)
 
-    return {
-        "success": True,
-        "devices_notified": len(results),
-        "results": results
-    }
+    return {"success": True, "devices_notified": len(results), "results": results}
 
 
 @router.get("/shokz/{device_id}")
-async def get_shokz_device_info(
-    device_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def get_shokz_device_info(device_id: str, current_user: User = Depends(get_current_user)):
     """获取Shokz设备信息"""
     service = get_shokz_device_service()
     device = await service.get_device_info(device_id=device_id)
 
-    return {
-        "device": device.model_dump()
-    }
+    return {"device": device.model_dump()}
 
 
 @router.get("/shokz/store/{store_id}")
-async def list_store_shokz_devices(
-    store_id: str,
-    current_user: User = Depends(get_current_user)
-):
+async def list_store_shokz_devices(store_id: str, current_user: User = Depends(get_current_user)):
     """列出门店的所有Shokz设备"""
     service = get_shokz_device_service()
     devices = await service.list_store_devices(store_id=store_id)
 
-    return {
-        "store_id": store_id,
-        "total": len(devices),
-        "devices": [device.model_dump() for device in devices]
-    }
+    return {"store_id": store_id, "total": len(devices), "devices": [device.model_dump() for device in devices]}
 
 
 @router.get("/shokz/store/{store_id}/commissioning-diagnostic")
@@ -854,43 +711,25 @@ async def get_store_shokz_commissioning_diagnostic(
 
 
 @router.get("/shokz/{device_id}/history")
-async def get_shokz_interaction_history(
-    device_id: str,
-    limit: int = 100,
-    current_user: User = Depends(get_current_user)
-):
+async def get_shokz_interaction_history(device_id: str, limit: int = 100, current_user: User = Depends(get_current_user)):
     """获取语音交互历史"""
     service = get_shokz_device_service()
-    interactions = await service.get_interaction_history(
-        device_id=device_id,
-        limit=limit
-    )
+    interactions = await service.get_interaction_history(device_id=device_id, limit=limit)
 
-    return {
-        "device_id": device_id,
-        "total": len(interactions),
-        "interactions": [i.model_dump() for i in interactions]
-    }
+    return {"device_id": device_id, "total": len(interactions), "interactions": [i.model_dump() for i in interactions]}
 
 
 @router.get("/shokz/specs/{device_model}")
-async def get_shokz_device_specs(
-    device_model: ShokzDeviceModel,
-    current_user: User = Depends(get_current_user)
-):
+async def get_shokz_device_specs(device_model: ShokzDeviceModel, current_user: User = Depends(get_current_user)):
     """获取Shokz设备规格"""
     service = get_shokz_device_service()
     specs = await service.get_device_specs(device_model=device_model)
 
-    return {
-        "specs": specs
-    }
+    return {"specs": specs}
 
 
 @router.get("/shokz/recommended-setup")
-async def get_shokz_recommended_setup(
-    current_user: User = Depends(get_current_user)
-):
+async def get_shokz_recommended_setup(current_user: User = Depends(get_current_user)):
     """
     获取推荐配置
 
@@ -902,14 +741,12 @@ async def get_shokz_recommended_setup(
     return {
         "recommended_setup": setup,
         "total_devices": sum(config["quantity"] for config in setup.values()),
-        "total_cost": 2400.0  # 2个OpenComm2 UC
+        "total_cost": 2400.0,  # 2个OpenComm2 UC
     }
 
 
 @router.get("/shokz/deployment-cost")
-async def get_shokz_deployment_cost(
-    current_user: User = Depends(get_current_user)
-):
+async def get_shokz_deployment_cost(current_user: User = Depends(get_current_user)):
     """
     获取部署成本
 
@@ -923,17 +760,16 @@ async def get_shokz_deployment_cost(
         "summary": {
             "total_cost_per_store": cost["total_cost_per_store"],
             "deployment_time_hours": cost["deployment_time_hours"],
-            "devices_per_store": 2  # 店长 + 副店长
-        }
+            "devices_per_store": 2,  # 店长 + 副店长
+        },
     }
 
 
 # ==================== 综合部署成本 ====================
 
+
 @router.get("/deployment/total-cost")
-async def get_total_deployment_cost(
-    current_user: User = Depends(get_current_user)
-):
+async def get_total_deployment_cost(current_user: User = Depends(get_current_user)):
     """
     获取总部署成本
 
@@ -952,10 +788,7 @@ async def get_total_deployment_cost(
     total_cost = total_hardware + total_implementation
 
     return {
-        "breakdown": {
-            "raspberry_pi_5": edge_cost,
-            "shokz_devices": shokz_cost
-        },
+        "breakdown": {"raspberry_pi_5": edge_cost, "shokz_devices": shokz_cost},
         "summary": {
             "total_hardware_cost": total_hardware,
             "total_implementation_cost": total_implementation,
@@ -964,7 +797,7 @@ async def get_total_deployment_cost(
             "cac": total_cost + 5000,  # 硬件 + 销售成本
             "ltv": 300000,  # 3年LTV（¥10万/年 × 3年）
             "ltv_cac_ratio": 300000 / (total_cost + 5000),  # 应该 > 3
-            "roi_months": 2  # 客户2个月回本
+            "roi_months": 2,  # 客户2个月回本
         },
         "investor_metrics": {
             "lightweight_deployment": True,
@@ -972,6 +805,6 @@ async def get_total_deployment_cost(
             "remote_setup": True,
             "low_cac": True,
             "high_ltv_cac": True,
-            "fast_roi": True
-        }
+            "fast_roi": True,
+        },
     }

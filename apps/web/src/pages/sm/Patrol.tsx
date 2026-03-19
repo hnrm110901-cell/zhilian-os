@@ -49,7 +49,7 @@ export default function Patrol() {
   const [filter, setFilter] = useState<FilterKey>('all');
 
   useEffect(() => {
-    const storeId = localStorage.getItem('store_id') || 'STORE001';
+    const storeId = localStorage.getItem('store_id') || '';
     apiClient.get(`/api/v1/bff/sm/${storeId}?section=patrol`)
       .then((data: any) => setItems(data?.items ?? []))
       .catch(() => setItems([]))

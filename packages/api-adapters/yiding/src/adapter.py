@@ -1,12 +1,12 @@
 """
 易订适配器 - YiDing Adapter
 
-实现智链OS统一接口,对接易订预订系统
+基于真实易订开放API（https://open.zhidianfan.com/yidingopen/）
+实现预订数据读取、会员查询、订单列表等功能
 """
 
-import os
 import structlog
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from .client import YiDingClient, YiDingAPIError
 from .mapper import YiDingMapper
@@ -15,12 +15,8 @@ from .types import (
     YiDingConfig,
     UnifiedReservation,
     UnifiedCustomer,
-    UnifiedTable,
     ReservationStats,
     CreateReservationDTO,
-    UpdateReservationDTO,
-    CreateCustomerDTO,
-    UpdateCustomerDTO
 )
 
 logger = structlog.get_logger()
@@ -30,387 +26,404 @@ class YiDingAdapter:
     """
     易订适配器
 
-    实现智链OS统一接口,提供:
-    - 预订管理
-    - 客户管理
-    - 桌台管理
-    - 统计分析
+    对接易订预订系统真实API，提供:
+    - 预订订单查询（轮询/列表/V2列表）
+    - 预订订单确认/更新
+    - 会员信息查询
+    - 会员列表查询
+    - 桌位预订状态检查
+    - 数据同步（桌位/菜品/账单/客史）
     """
 
     def __init__(self, config: YiDingConfig):
-        """
-        初始化易订适配器
-
-        Args:
-            config: 易订配置
-        """
         self.config = config
         self.client = YiDingClient(config)
         self.mapper = YiDingMapper()
-        self.cache = YiDingCache(ttl=config.get("cache_ttl", int(os.getenv("YIDING_CACHE_TTL", "300"))))
-
+        self.cache = YiDingCache(
+            ttl=config.get("cache_ttl", 300)
+        )
+        self.hotel_id = config.get("hotel_id")
         self.logger = logger.bind(adapter="yiding")
 
     async def close(self):
         """关闭适配器"""
         await self.client.close()
 
-    # ============================================
-    # 系统信息 System Info
-    # ============================================
-
     def get_system_name(self) -> str:
-        """获取系统名称"""
         return "yiding"
 
     async def health_check(self) -> bool:
-        """
-        健康检查
-
-        Returns:
-            是否健康
-        """
+        """通过获取token验证连通性"""
         try:
             return await self.client.ping()
         except Exception as e:
             self.logger.error("health_check_failed", error=str(e))
             return False
 
+    @property
+    def business_name(self) -> Optional[str]:
+        """获取认证后的商户名称"""
+        return self.client._business_name
+
     # ============================================
-    # 预订管理 Reservation Management
+    # 2.1 获取线上预订订单（轮询）
     # ============================================
 
-    async def create_reservation(
-        self,
-        data: CreateReservationDTO
-    ) -> UnifiedReservation:
+    async def get_pending_orders(self) -> List[UnifiedReservation]:
         """
-        创建预订
+        获取待处理的线上预订订单
 
-        Args:
-            data: 创建预订数据
+        GET /resv/orders?access_token=xxx
 
-        Returns:
-            统一格式预订
-
-        Raises:
-            YiDingAPIError: API调用失败
+        返回后需调用 confirm_orders() 确认已收到
         """
-        self.logger.info("creating_reservation", data=data)
+        response = await self.client.get("resv/orders")
+        data_list = response.get("data", [])
+        request_id = response.get("requestId")
 
-        try:
-            # 1. 转换为易订格式
-            yiding_data = self.mapper.to_yiding_reservation(data)
-
-            # 2. 调用易订API
-            response = await self.client.post("/api/reservations", json=yiding_data)
-
-            # 3. 转换为统一格式
-            unified = self.mapper.to_unified_reservation(response["data"])
-
-            # 4. 清除相关缓存
-            await self.cache.invalidate_reservations(
-                data["store_id"],
-                data["reservation_date"]
-            )
-
-            self.logger.info(
-                "reservation_created",
-                reservation_id=unified["id"],
-                external_id=unified["external_id"]
-            )
-
-            return unified
-
-        except YiDingAPIError as e:
-            self.logger.error("create_reservation_failed", error=str(e))
-            raise
-        except Exception as e:
-            self.logger.error("create_reservation_error", error=str(e))
-            raise YiDingAPIError(f"创建预订失败: {str(e)}")
-
-    async def get_reservation(self, reservation_id: str) -> UnifiedReservation:
-        """
-        查询预订详情
-
-        Args:
-            reservation_id: 预订ID
-
-        Returns:
-            统一格式预订
-        """
-        # 1. 尝试从缓存读取
-        cached = await self.cache.get_reservation(reservation_id)
-        if cached:
-            self.logger.debug("reservation_cache_hit", reservation_id=reservation_id)
-            return cached
-
-        # 2. 调用易订API
-        response = await self.client.get(f"/api/reservations/{reservation_id}")
-
-        # 3. 转换并缓存
-        unified = self.mapper.to_unified_reservation(response["data"])
-        await self.cache.set_reservation(reservation_id, unified)
-
-        return unified
-
-    async def update_reservation(
-        self,
-        reservation_id: str,
-        data: UpdateReservationDTO
-    ) -> UnifiedReservation:
-        """
-        更新预订
-
-        Args:
-            reservation_id: 预订ID
-            data: 更新数据
-
-        Returns:
-            更新后的预订
-        """
-        self.logger.info("updating_reservation", reservation_id=reservation_id)
-
-        # 1. 转换为易订格式
-        yiding_data = self.mapper.to_yiding_reservation_update(data)
-
-        # 2. 调用易订API
-        response = await self.client.put(
-            f"/api/reservations/{reservation_id}",
-            json=yiding_data
+        reservations = self.mapper.to_unified_reservations(
+            data_list, store_id=self.hotel_id
         )
 
-        # 3. 转换并清除缓存
-        unified = self.mapper.to_unified_reservation(response["data"])
-        await self.cache.invalidate_reservation(reservation_id)
-
-        return unified
-
-    async def cancel_reservation(
-        self,
-        reservation_id: str,
-        reason: Optional[str] = None
-    ) -> None:
-        """
-        取消预订
-
-        Args:
-            reservation_id: 预订ID
-            reason: 取消原因
-        """
-        self.logger.info("cancelling_reservation", reservation_id=reservation_id)
-
-        await self.client.delete(
-            f"/api/reservations/{reservation_id}",
-            json={"reason": reason} if reason else None
+        self.logger.info(
+            "pending_orders_fetched",
+            count=len(reservations),
+            request_id=request_id
         )
 
-        await self.cache.invalidate_reservation(reservation_id)
+        return reservations
 
-    async def get_reservations(
+    # ============================================
+    # 2.2 确认线上预订订单
+    # ============================================
+
+    async def confirm_orders(
         self,
-        store_id: str,
-        date: str
-    ) -> List[UnifiedReservation]:
+        orders: List[Dict[str, Any]],
+        request_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
-        获取预订列表
+        确认已收到订单
+
+        PUT /resv/orders
+        确认后下次轮询不再返回这些订单
 
         Args:
-            store_id: 门店ID
-            date: 日期 (YYYY-MM-DD)
+            orders: [{"resv_order": "xxx", "status": 1, "order_type": 1}]
+            request_id: 2.1接口返回的requestId
+        """
+        body: Dict[str, Any] = {"orders": orders}
+        if request_id:
+            body["requestId"] = request_id
+
+        return await self.client.put("resv/orders", json=body)
+
+    # ============================================
+    # 2.3 检查桌位当前预订状态
+    # ============================================
+
+    async def check_table_status(
+        self,
+        table_code: str,
+        meal_type_code: str,
+        resv_date: str,
+    ) -> bool:
+        """
+        检查桌位是否已被预订
+
+        GET /resv/resvable?table_code=xxx&meal_type_code=xxx&resv_date=xxx
 
         Returns:
-            预订列表
+            True=已被预订, False=未被预订
         """
-        # 1. 尝试从缓存读取
-        cached = await self.cache.get_reservations(store_id, date)
-        if cached:
-            self.logger.debug("reservations_cache_hit", store_id=store_id, date=date)
-            return cached
-
-        # 2. 调用易订API
         response = await self.client.get(
-            "/api/reservations/list",
+            "resv/resvable",
             params={
-                "store_id": store_id,
-                "date": date,
-                "page_size": int(os.getenv("YIDING_PAGE_SIZE", "1000"))
+                "table_code": table_code,
+                "meal_type_code": meal_type_code,
+                "resv_date": resv_date,
             }
         )
-
-        # 3. 转换并缓存
-        unified_list = [
-            self.mapper.to_unified_reservation(item)
-            for item in response["data"]["items"]
-        ]
-
-        await self.cache.set_reservations(store_id, date, unified_list)
-
-        return unified_list
+        data = response.get("data", {})
+        return int(data.get("status", 0)) == 1
 
     # ============================================
-    # 客户管理 Customer Management
+    # 2.4 线下预订订单更新
     # ============================================
 
-    async def get_customer_by_phone(
+    async def update_order(
         self,
-        phone: str
+        data: CreateReservationDTO,
+    ) -> Dict[str, Any]:
+        """
+        新建/更新线下预订
+
+        PUT /resv/hh_orders
+
+        注意：新建时不传resv_order，由易订返回订单号
+        """
+        return await self.client.put("resv/hh_orders", json=dict(data))
+
+    # ============================================
+    # 4.1 获取会员信息
+    # ============================================
+
+    async def get_member_info(
+        self,
+        vip_phone: str,
+        hotel_id: Optional[str] = None,
     ) -> Optional[UnifiedCustomer]:
         """
-        根据手机号查询客户
+        根据手机号查询会员信息
 
-        Args:
-            phone: 手机号
+        GET /resv/user_info?vip_phone=xxx&hotel_id=xxx
 
         Returns:
-            客户信息,不存在返回None
+            会员信息，不存在返回None
         """
+        params: Dict[str, str] = {"vip_phone": vip_phone}
+        if hotel_id or self.hotel_id:
+            params["hotel_id"] = hotel_id or self.hotel_id
+
         try:
-            response = await self.client.get(f"/api/customers/phone/{phone}")
-
-            if not response.get("data"):
+            response = await self.client.get("resv/user_info", params=params)
+            data = response.get("data")
+            if not data:
                 return None
-
-            return self.mapper.to_unified_customer(response["data"])
-
+            return self.mapper.to_unified_customer(data)
         except YiDingAPIError as e:
-            if e.status_code == 404:
+            if e.error_code == 1:
                 return None
             raise
 
-    async def get_customer_by_id(self, customer_id: str) -> UnifiedCustomer:
-        """
-        根据ID查询客户
+    # ============================================
+    # 5.1 获取会员列表
+    # ============================================
 
-        Args:
-            customer_id: 客户ID
-
-        Returns:
-            客户信息
-        """
-        response = await self.client.get(f"/api/customers/{customer_id}")
-        return self.mapper.to_unified_customer(response["data"])
-
-    async def create_customer(self, data: CreateCustomerDTO) -> UnifiedCustomer:
-        """
-        创建客户
-
-        Args:
-            data: 客户数据
-
-        Returns:
-            创建的客户
-        """
-        response = await self.client.post("/api/customers", json=data)
-        return self.mapper.to_unified_customer(response["data"])
-
-    async def update_customer(
+    async def get_member_list(
         self,
-        customer_id: str,
-        data: UpdateCustomerDTO
-    ) -> UnifiedCustomer:
+        start_date: str,
+        end_date: str,
+        hotel_id: Optional[str] = None,
+    ) -> List[UnifiedCustomer]:
         """
-        更新客户
+        获取时间范围内的会员列表
+
+        GET /resv/user/list?start_date=xxx&end_date=xxx&hotel_id=xxx
 
         Args:
-            customer_id: 客户ID
-            data: 更新数据
-
-        Returns:
-            更新后的客户
+            start_date: 格式 yyyy-mm-dd 或 yyyy-mm-dd hh:mm:ss
+            end_date: 格式 yyyy-mm-dd 或 yyyy-mm-dd hh:mm:ss
         """
-        response = await self.client.put(
-            f"/api/customers/{customer_id}",
-            json=data
+        params: Dict[str, str] = {
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+        if hotel_id or self.hotel_id:
+            params["hotel_id"] = hotel_id or self.hotel_id
+
+        response = await self.client.get("resv/user/list", params=params)
+        data_list = response.get("data", [])
+
+        customers = self.mapper.to_unified_customers(data_list)
+
+        self.logger.info(
+            "member_list_fetched",
+            count=len(customers),
+            start_date=start_date,
+            end_date=end_date,
         )
-        return self.mapper.to_unified_customer(response["data"])
+
+        return customers
 
     # ============================================
-    # 桌台管理 Table Management
+    # 5.2 订单列表
     # ============================================
 
-    async def get_available_tables(
+    async def get_order_list(
         self,
-        store_id: str,
-        date: str,
-        time: str,
-        party_size: int
-    ) -> List[UnifiedTable]:
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        hotel_id: Optional[str] = None,
+    ) -> List[UnifiedReservation]:
         """
-        查询可用桌台
+        获取预订订单列表
 
-        Args:
-            store_id: 门店ID
-            date: 日期
-            time: 时间
-            party_size: 人数
+        GET /resv/orders/list?start_date=xxx&end_date=xxx&hotel_id=xxx
 
-        Returns:
-            可用桌台列表
+        不传日期则默认查当天
+        """
+        params: Dict[str, str] = {}
+        if start_date:
+            params["start_date"] = start_date
+        if end_date:
+            params["end_date"] = end_date
+        if hotel_id or self.hotel_id:
+            params["hotel_id"] = hotel_id or self.hotel_id
+
+        response = await self.client.get("resv/orders/list", params=params)
+        data_list = response.get("data", [])
+
+        reservations = self.mapper.to_unified_reservations(
+            data_list, store_id=self.hotel_id
+        )
+
+        self.logger.info(
+            "order_list_fetched",
+            count=len(reservations),
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return reservations
+
+    # ============================================
+    # 5.3 订单列表V2（更多字段）
+    # ============================================
+
+    async def get_order_list_v2(
+        self,
+        start_date: str,
+        end_date: str,
+    ) -> List[UnifiedReservation]:
+        """
+        获取预订订单列表V2
+
+        GET /resv/orders/list/V2?start_date=xxx&end_date=xxx
+
+        V2特点：
+        - start_date/end_date必传，跨度不超过1个月
+        - 返回更多字段：sourceName, resvOrderTypeName, billNo, inTableTime
         """
         response = await self.client.get(
-            "/api/tables/available",
+            "resv/orders/list/V2",
             params={
-                "store_id": store_id,
-                "date": date,
-                "time": time,
-                "party_size": party_size
+                "start_date": start_date,
+                "end_date": end_date,
             }
         )
+        data_list = response.get("data", [])
 
-        return [
-            self.mapper.to_unified_table(item)
-            for item in response["data"]
-        ]
-
-    async def get_table_status(self, store_id: str) -> List[UnifiedTable]:
-        """
-        获取桌台状态
-
-        Args:
-            store_id: 门店ID
-
-        Returns:
-            桌台状态列表
-        """
-        response = await self.client.get(
-            "/api/tables/status",
-            params={"store_id": store_id}
+        reservations = self.mapper.to_unified_reservations(
+            data_list, store_id=self.hotel_id
         )
 
-        return [
-            self.mapper.to_unified_table(item)
-            for item in response["data"]
-        ]
+        self.logger.info(
+            "order_list_v2_fetched",
+            count=len(reservations),
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return reservations
 
     # ============================================
-    # 统计分析 Statistics & Analytics
+    # 统计分析
     # ============================================
 
     async def get_reservation_stats(
         self,
-        store_id: str,
         start_date: str,
-        end_date: str
+        end_date: str,
+        hotel_id: Optional[str] = None,
     ) -> ReservationStats:
         """
-        获取预订统计
+        获取预订统计（基于订单列表V2计算）
 
-        Args:
-            store_id: 门店ID
-            start_date: 开始日期
-            end_date: 结束日期
-
-        Returns:
-            预订统计
+        先拉取订单列表，再汇总计算统计指标
         """
-        response = await self.client.get(
-            "/api/stats/reservations",
-            params={
-                "store_id": store_id,
-                "start_date": start_date,
-                "end_date": end_date
-            }
+        reservations = await self.get_order_list_v2(start_date, end_date)
+
+        return self.mapper.compute_reservation_stats(
+            reservations,
+            store_id=hotel_id or self.hotel_id or "",
+            start_date=start_date,
+            end_date=end_date,
         )
 
-        return self.mapper.to_reservation_stats(response["data"])
+    # ============================================
+    # 数据同步（推送方向：POS → 易订）
+    # ============================================
+
+    async def sync_tables(
+        self,
+        areas: List[Dict[str, Any]],
+        tables: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        桌位同步 POST /sync/tables
+
+        Args:
+            areas: [{"area_code": "1", "area_name": "大厅", "sort_id": 1}]
+            tables: [{"area_code": "1", "table_code": "3", "table_name": "101",
+                      "max_people_num": "10", "status": "1", "sort_id": 1}]
+        """
+        return await self.client.post(
+            "sync/tables",
+            json={"areas": areas, "tables": tables}
+        )
+
+    async def sync_dishes(
+        self,
+        dls: List[Dict[str, Any]],
+        xls: List[Dict[str, Any]],
+        cms: List[Dict[str, Any]],
+        remarks: Optional[List[str]] = None,
+        making_method: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict[str, Any]:
+        """
+        菜品同步 POST /sync/dishes
+
+        Args:
+            dls: 大类列表 [{"dlbh": "1", "dlmc": "热菜", "status": "1"}]
+            xls: 小类列表 [{"dlbh": "1", "xlbh": "001", "xlmc": "海鲜"}]
+            cms: 菜品列表 [{"xlbh": "001", "cmbh": "001", "cmmc": "剁椒鱼头",
+                           "cmje": 100, "dwmc": "份", "pycode": "djyt"}]
+            remarks: 备注列表 ["重辣", "少辣"]
+            making_method: 做法列表 [{"cmbh": "001", "method_name": "清蒸"}]
+        """
+        body: Dict[str, Any] = {"dls": dls, "xls": xls, "cms": cms}
+        if remarks:
+            body["remarks"] = remarks
+        if making_method:
+            body["making_method"] = making_method
+
+        return await self.client.post("sync/dishes", json=body)
+
+    async def sync_bills(
+        self,
+        bills: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        账单数据同步 POST /sync/bills
+
+        Args:
+            bills: 账单列表，每个包含:
+                area_code, table_code, bbbc(班次), zdbh(账单编号),
+                sjje(实结金额), phone, bbrq(结账日期),
+                mx: [{zdbh, cmbh, cmsl, cmmc, sjje, wdbz}]
+        """
+        return await self.client.post("sync/bills", json={"bills": bills})
+
+    async def sync_vips(
+        self,
+        vips: List[Dict[str, Any]],
+        classes: Optional[List[Dict[str, str]]] = None,
+        hotel_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        客史数据同步 POST /sync/vips
+
+        Args:
+            vips: 客户列表 [{"vip_name": "张三", "vip_phone": "158xxx",
+                            "vip_company": "xxx", "vip_sex": "男"}]
+            classes: 客户类型 [{"vip_class_name": "活跃用户", "remark": "..."}]
+            hotel_id: 门店ID（多店时使用）
+        """
+        body: Dict[str, Any] = {"vips": vips}
+        if classes:
+            body["classes"] = classes
+        if hotel_id or self.hotel_id:
+            body["hotel_id"] = hotel_id or self.hotel_id
+
+        return await self.client.post("sync/vips", json=body)

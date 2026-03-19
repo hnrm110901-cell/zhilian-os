@@ -1,17 +1,20 @@
 """
 Notification Model
 """
-from sqlalchemy import Column, String, Boolean, Text, JSON, ForeignKey, Integer, Time
+
+import enum
+import uuid
+
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
-import enum
 
 from .base import Base, TimestampMixin
 
 
 class NotificationType(str, enum.Enum):
     """通知类型"""
+
     INFO = "info"  # 信息通知
     WARNING = "warning"  # 警告
     ERROR = "error"  # 错误
@@ -21,6 +24,7 @@ class NotificationType(str, enum.Enum):
 
 class NotificationPriority(str, enum.Enum):
     """通知优先级"""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -97,7 +101,7 @@ class NotificationPreference(Base, TimestampMixin):
 
     # 免打扰时段（HH:MM 格式字符串，存储为 String 以兼容各数据库）
     quiet_hours_start = Column(String(5), nullable=True)  # e.g. "22:00"
-    quiet_hours_end = Column(String(5), nullable=True)    # e.g. "08:00"
+    quiet_hours_end = Column(String(5), nullable=True)  # e.g. "08:00"
 
     # 关系
     user = relationship("User")

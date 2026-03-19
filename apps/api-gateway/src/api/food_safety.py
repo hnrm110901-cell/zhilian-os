@@ -2,11 +2,12 @@
 食品安全追溯 API — /api/v1/food-safety
 提供食材溯源记录和安全检查记录的 CRUD 接口。
 """
+
+from datetime import date
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -20,6 +21,7 @@ svc = FoodSafetyService()
 
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
+
 
 class TraceRecordCreate(BaseModel):
     brand_id: str
@@ -62,6 +64,7 @@ class InspectionCreate(BaseModel):
 
 
 # ── 序列化辅助 ────────────────────────────────────────────────────────────────
+
 
 def _serialize_trace(r) -> Dict[str, Any]:
     return {
@@ -108,6 +111,7 @@ def _serialize_inspection(r) -> Dict[str, Any]:
 
 # ── 溯源记录端点 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/traces")
 async def create_trace_record(
     body: TraceRecordCreate,
@@ -133,7 +137,13 @@ async def list_trace_records(
 ):
     """分页查询溯源记录"""
     records, total = await svc.list_trace_records(
-        db, brand_id, store_id, page, page_size, status, ingredient_name,
+        db,
+        brand_id,
+        store_id,
+        page,
+        page_size,
+        status,
+        ingredient_name,
     )
     return {
         "items": [_serialize_trace(r) for r in records],
@@ -185,6 +195,7 @@ async def update_trace_status(
 
 # ── 安全检查端点 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/inspections")
 async def create_inspection(
     body: InspectionCreate,
@@ -209,7 +220,12 @@ async def list_inspections(
 ):
     """分页查询检查记录"""
     records, total = await svc.list_inspections(
-        db, brand_id, store_id, page, page_size, inspection_type,
+        db,
+        brand_id,
+        store_id,
+        page,
+        page_size,
+        inspection_type,
     )
     return {
         "items": [_serialize_inspection(r) for r in records],
@@ -233,6 +249,7 @@ async def get_inspection(
 
 
 # ── 统计端点 ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats")
 async def get_food_safety_stats(

@@ -2,6 +2,7 @@
 感知层半自动导入（L1）：Excel/CSV → 语义标准化 → 写入本体图谱
 标准化列名与单位、时间戳(UTC+8)统一，供后续推理层消费。
 """
+
 from __future__ import annotations
 
 import io
@@ -11,8 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import structlog
-
-from src.ontology import get_ontology_repository, NodeLabel
+from src.ontology import NodeLabel, get_ontology_repository
 
 logger = structlog.get_logger()
 

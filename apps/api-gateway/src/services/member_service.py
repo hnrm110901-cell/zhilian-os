@@ -1,12 +1,14 @@
 """
 Member Service
-奥琦韦会员系统服务层
+微生活会员系统服务层（奥琦玮旗下）
 """
-from typing import Dict, Any, Optional, List
-from datetime import datetime
-import structlog
-import sys
+
 import os
+import sys
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 # 添加packages路径到sys.path
 packages_path = os.path.join(os.path.dirname(__file__), "../../../../packages")
@@ -14,6 +16,7 @@ sys.path.insert(0, os.path.abspath(packages_path))
 
 try:
     from api_adapters.aoqiwei.src.adapter import AoqiweiAdapter
+
     AOQIWEI_AVAILABLE = True
 except ImportError:
     logger = structlog.get_logger()
@@ -104,9 +107,7 @@ class MemberService:
         logger.info("新增会员", mobile=mobile, name=name)
         return member
 
-    async def update_member(
-        self, card_no: str, update_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def update_member(self, card_no: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         修改会员信息
 
@@ -297,9 +298,7 @@ class MemberService:
         logger.info("查询储值记录", card_no=card_no)
         return balance
 
-    async def coupon_list(
-        self, card_no: str, store_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def coupon_list(self, card_no: str, store_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         查询可用优惠券
 
@@ -315,9 +314,7 @@ class MemberService:
         logger.info("查询优惠券", card_no=card_no, count=len(coupons))
         return coupons
 
-    async def coupon_use(
-        self, code: str, store_id: str, cashier: str, amount: int
-    ) -> Dict[str, Any]:
+    async def coupon_use(self, code: str, store_id: str, cashier: str, amount: int) -> Dict[str, Any]:
         """
         券码核销
 

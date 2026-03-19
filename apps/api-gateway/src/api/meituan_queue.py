@@ -2,15 +2,17 @@
 美团等位集成API
 Meituan Queue Integration API
 """
-import os
-from fastapi import APIRouter, Depends, HTTPException, Body, Request
-from typing import Optional, Dict, Any
-import structlog
 
-from ..services.meituan_queue_integration import meituan_queue_integration
-from ..services.meituan_queue_service import meituan_queue_service
+import os
+from typing import Any, Dict, Optional
+
+import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
+
 from ..core.dependencies import get_current_user
 from ..models.user import User
+from ..services.meituan_queue_integration import meituan_queue_integration
+from ..services.meituan_queue_service import meituan_queue_service
 
 router = APIRouter(prefix="/api/v1/meituan/queue", tags=["Meituan Queue"])
 logger = structlog.get_logger()
@@ -136,15 +138,14 @@ async def sync_queue_status(
     }
     """
     try:
-        from ..models.queue import Queue
-        from ..core.database import get_session
         from sqlalchemy import select
+
+        from ..core.database import get_session
+        from ..models.queue import Queue
 
         # 获取排队记录
         async with get_session() as session:
-            result = await session.execute(
-                select(Queue).where(Queue.queue_id == queue_id)
-            )
+            result = await session.execute(select(Queue).where(Queue.queue_id == queue_id))
             queue = result.scalar_one_or_none()
 
             if not queue:
@@ -181,7 +182,7 @@ async def sync_waiting_info(
     自动获取当前门店的等位信息并同步到美团
     """
     try:
-        from ..services.queue_service import queue_service, QueueStatus
+        from ..services.queue_service import QueueStatus, queue_service
 
         # 获取当前等待的排队列表
         queues = await queue_service.get_queue_list(
@@ -194,11 +195,13 @@ async def sync_waiting_info(
         order_wait_list = []
         table_type_counts: Dict[str, int] = {}
         for queue in queues:
-            order_wait_list.append({
-                "orderViewId": queue["queue_id"],
-                "orderId": queue["queue_id"],
-                "index": len(order_wait_list) + 1,
-            })
+            order_wait_list.append(
+                {
+                    "orderViewId": queue["queue_id"],
+                    "orderId": queue["queue_id"],
+                    "index": len(order_wait_list) + 1,
+                }
+            )
             t = queue.get("table_type") or "default"
             table_type_counts[t] = table_type_counts.get(t, 0) + 1
 

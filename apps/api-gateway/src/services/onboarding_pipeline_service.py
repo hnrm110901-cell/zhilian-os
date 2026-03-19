@@ -11,14 +11,15 @@ Onboarding Pipeline Service
 Entry point: OnboardingPipelineService.run(store_id, db)
 Celery wrapper: run_onboarding_pipeline task (tasks/onboarding_tasks.py)
 """
+
 from __future__ import annotations
 
 import json
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, func, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.onboarding import OnboardingRawData, OnboardingTask
@@ -62,9 +63,7 @@ class OnboardingPipelineService:
 
     async def _stage_data_cleaning(self) -> Dict[str, Any]:
         """Validate raw rows, mark invalid ones, return count summary."""
-        rows_res = await self.db.execute(
-            select(OnboardingRawData).where(OnboardingRawData.store_id == self.store_id)
-        )
+        rows_res = await self.db.execute(select(OnboardingRawData).where(OnboardingRawData.store_id == self.store_id))
         rows = rows_res.scalars().all()
 
         valid_count, invalid_count = 0, 0
@@ -125,21 +124,15 @@ class OnboardingPipelineService:
             profits = [float(r.get("利润", 0) or 0) for r in d04_rows]
 
             avg_revenue = sum(revenues) / len(revenues) if revenues else 0
-            avg_food_cost_pct = (
-                (sum(food_costs) / sum(revenues) * 100) if sum(revenues) > 0 else 0
-            )
-            avg_labor_cost_pct = (
-                (sum(labor_costs) / sum(revenues) * 100) if sum(revenues) > 0 else 0
-            )
-            avg_profit_pct = (
-                (sum(profits) / sum(revenues) * 100) if sum(revenues) > 0 else 0
-            )
+            avg_food_cost_pct = (sum(food_costs) / sum(revenues) * 100) if sum(revenues) > 0 else 0
+            avg_labor_cost_pct = (sum(labor_costs) / sum(revenues) * 100) if sum(revenues) > 0 else 0
+            avg_profit_pct = (sum(profits) / sum(revenues) * 100) if sum(revenues) > 0 else 0
             kpis["financial"] = {
-                "avg_monthly_revenue_yuan":  round(avg_revenue, 2),
-                "avg_food_cost_pct":         round(avg_food_cost_pct, 2),
-                "avg_labor_cost_pct":        round(avg_labor_cost_pct, 2),
-                "avg_profit_pct":            round(avg_profit_pct, 2),
-                "months_of_data":            len(revenues),
+                "avg_monthly_revenue_yuan": round(avg_revenue, 2),
+                "avg_food_cost_pct": round(avg_food_cost_pct, 2),
+                "avg_labor_cost_pct": round(avg_labor_cost_pct, 2),
+                "avg_profit_pct": round(avg_profit_pct, 2),
+                "months_of_data": len(revenues),
             }
 
         # Menu KPIs from D01
@@ -147,14 +140,10 @@ class OnboardingPipelineService:
         if d01_rows:
             prices = [float(r.get("售价", 0) or 0) for r in d01_rows]
             costs = [float(r.get("成本价", 0) or 0) for r in d01_rows]
-            valid_margins = [
-                (p - c) / p * 100
-                for p, c in zip(prices, costs)
-                if p > 0 and c > 0
-            ]
+            valid_margins = [(p - c) / p * 100 for p, c in zip(prices, costs) if p > 0 and c > 0]
             kpis["menu"] = {
-                "total_sku_count":     len(d01_rows),
-                "avg_price_yuan":      round(sum(prices) / len(prices), 2) if prices else 0,
+                "total_sku_count": len(d01_rows),
+                "avg_price_yuan": round(sum(prices) / len(prices), 2) if prices else 0,
                 "avg_gross_margin_pct": round(sum(valid_margins) / len(valid_margins), 2) if valid_margins else None,
             }
 
@@ -172,8 +161,9 @@ class OnboardingPipelineService:
         if d03_rows:
             kpis["stores"] = {
                 "store_count": len(d03_rows),
-                "stores":      [{"name": r.get("门店名", ""), "area": r.get("面积", ""),
-                                  "tables": r.get("桌台数", "")} for r in d03_rows],
+                "stores": [
+                    {"name": r.get("门店名", ""), "area": r.get("面积", ""), "tables": r.get("桌台数", "")} for r in d03_rows
+                ],
             }
 
         self._kpis = kpis
@@ -185,6 +175,7 @@ class OnboardingPipelineService:
         """Compare enterprise KPIs against industry baseline."""
         try:
             from ..services.baseline_data_service import BaselineDataService
+
             baseline = await BaselineDataService.get_industry_baseline()
         except Exception:
             baseline = {
@@ -201,27 +192,25 @@ class OnboardingPipelineService:
         if fin:
             comparison["food_cost"] = {
                 "enterprise": fin.get("avg_food_cost_pct"),
-                "baseline":   baseline.get("avg_food_cost_pct"),
-                "delta":      round((fin.get("avg_food_cost_pct", 0) or 0) - (baseline.get("avg_food_cost_pct") or 35.0), 2),
+                "baseline": baseline.get("avg_food_cost_pct"),
+                "delta": round((fin.get("avg_food_cost_pct", 0) or 0) - (baseline.get("avg_food_cost_pct") or 35.0), 2),
                 "health_score": self._score_lower_is_better(
                     fin.get("avg_food_cost_pct"), baseline.get("avg_food_cost_pct", 35.0)
                 ),
             }
             comparison["profit_margin"] = {
                 "enterprise": fin.get("avg_profit_pct"),
-                "baseline":   baseline.get("avg_profit_pct"),
-                "delta":      round((fin.get("avg_profit_pct", 0) or 0) - (baseline.get("avg_profit_pct") or 8.0), 2),
-                "health_score": self._score_higher_is_better(
-                    fin.get("avg_profit_pct"), baseline.get("avg_profit_pct", 8.0)
-                ),
+                "baseline": baseline.get("avg_profit_pct"),
+                "delta": round((fin.get("avg_profit_pct", 0) or 0) - (baseline.get("avg_profit_pct") or 8.0), 2),
+                "health_score": self._score_higher_is_better(fin.get("avg_profit_pct"), baseline.get("avg_profit_pct", 8.0)),
             }
 
         menu = self._kpis.get("menu", {})
         if menu and menu.get("avg_gross_margin_pct"):
             comparison["gross_margin"] = {
                 "enterprise": menu.get("avg_gross_margin_pct"),
-                "baseline":   baseline.get("avg_gross_margin_pct"),
-                "delta":      round((menu.get("avg_gross_margin_pct") or 0) - (baseline.get("avg_gross_margin_pct") or 65.0), 2),
+                "baseline": baseline.get("avg_gross_margin_pct"),
+                "delta": round((menu.get("avg_gross_margin_pct") or 0) - (baseline.get("avg_gross_margin_pct") or 65.0), 2),
                 "health_score": self._score_higher_is_better(
                     menu.get("avg_gross_margin_pct"), baseline.get("avg_gross_margin_pct", 65.0)
                 ),
@@ -274,6 +263,7 @@ class OnboardingPipelineService:
         """
         try:
             from ..services.vector_db_service import VectorDBService
+
             vdb = VectorDBService()
             collection = f"enterprise_{self.store_id}"
             embedded_count = 0
@@ -281,8 +271,9 @@ class OnboardingPipelineService:
             # Embed dish names (D01)
             d01_rows = await self._get_valid_rows("D01")
             if d01_rows:
-                texts = [f"菜品: {r.get('菜名', '')} 分类: {r.get('分类', '')} 售价: {r.get('售价', '')}"
-                         for r in d01_rows[:500]]
+                texts = [
+                    f"菜品: {r.get('菜名', '')} 分类: {r.get('分类', '')} 售价: {r.get('售价', '')}" for r in d01_rows[:500]
+                ]
                 await vdb.upsert_texts(collection=collection, texts=texts, category="dish")
                 embedded_count += len(texts)
 
@@ -304,6 +295,7 @@ class OnboardingPipelineService:
         """Use Claude to generate a 500-word brand knowledge summary."""
         try:
             from anthropic import AsyncAnthropic
+
             client = AsyncAnthropic()
 
             kpi_json = json.dumps(self._kpis, ensure_ascii=False, indent=2)
@@ -335,6 +327,7 @@ class OnboardingPipelineService:
             # Store summary in Qdrant if available
             try:
                 from ..services.vector_db_service import VectorDBService
+
                 vdb = VectorDBService()
                 await vdb.upsert_texts(
                     collection=f"enterprise_{self.store_id}",

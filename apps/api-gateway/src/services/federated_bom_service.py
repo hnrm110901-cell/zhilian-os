@@ -13,36 +13,39 @@ Federated BOM (Bill of Materials) Learning Service
 - 节假日vs平日食材消耗模式
 """
 
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
-from pydantic import BaseModel
-import numpy as np
 import logging
 import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
 class IngredientLossPattern(BaseModel):
     """食材损耗模式"""
+
     ingredient_id: str
     ingredient_name: str
-    season: str                    # spring/summer/autumn/winter
-    region: str                    # 区域
-    average_loss_rate: float       # 平均损耗率
-    std_loss_rate: float           # 损耗率标准差
-    peak_loss_days: List[int]      # 高损耗日期
+    season: str  # spring/summer/autumn/winter
+    region: str  # 区域
+    average_loss_rate: float  # 平均损耗率
+    std_loss_rate: float  # 损耗率标准差
+    peak_loss_days: List[int]  # 高损耗日期
     optimal_order_quantity: float  # 最优订货量
-    confidence: float              # 置信度
+    confidence: float  # 置信度
 
 
 class BOMModelUpdate(BaseModel):
     """BOM模型更新"""
+
     store_id: str
     ingredient_id: str
     local_loss_rate: float
     local_samples: int
-    model_gradients: List[float]   # 模型梯度（用于联邦聚合）
+    model_gradients: List[float]  # 模型梯度（用于联邦聚合）
     timestamp: datetime
 
 
@@ -50,16 +53,11 @@ class FederatedBOMService:
     """动态BOM联邦学习服务"""
 
     def __init__(self):
-        self.global_models = {}        # 全局模型
-        self.local_models = {}         # 本地模型
-        self.loss_patterns = {}        # 损耗模式库
+        self.global_models = {}  # 全局模型
+        self.local_models = {}  # 本地模型
+        self.loss_patterns = {}  # 损耗模式库
 
-    async def train_local_model(
-        self,
-        store_id: str,
-        ingredient_id: str,
-        historical_data: List[Dict]
-    ) -> BOMModelUpdate:
+    async def train_local_model(self, store_id: str, ingredient_id: str, historical_data: List[Dict]) -> BOMModelUpdate:
         """
         训练本地模型
 
@@ -71,10 +69,7 @@ class FederatedBOMService:
         Returns:
             模型更新（包含梯度）
         """
-        logger.info(
-            f"Training local BOM model for store {store_id}, "
-            f"ingredient {ingredient_id}"
-        )
+        logger.info(f"Training local BOM model for store {store_id}, " f"ingredient {ingredient_id}")
 
         # 提取特征
         features = self._extract_features(historical_data)
@@ -91,13 +86,10 @@ class FederatedBOMService:
             local_loss_rate=local_loss_rate,
             local_samples=len(historical_data),
             model_gradients=model_gradients,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
-    def _extract_features(
-        self,
-        historical_data: List[Dict]
-    ) -> np.ndarray:
+    def _extract_features(self, historical_data: List[Dict]) -> np.ndarray:
         """提取特征"""
         features = []
 
@@ -127,36 +119,20 @@ class FederatedBOMService:
         else:
             return 3  # 冬季
 
-    def _calculate_loss_rate(
-        self,
-        historical_data: List[Dict]
-    ) -> float:
+    def _calculate_loss_rate(self, historical_data: List[Dict]) -> float:
         """计算损耗率"""
-        total_purchase = sum(
-            record.get("purchase_quantity", 0)
-            for record in historical_data
-        )
-        total_loss = sum(
-            record.get("loss_quantity", 0)
-            for record in historical_data
-        )
+        total_purchase = sum(record.get("purchase_quantity", 0) for record in historical_data)
+        total_loss = sum(record.get("loss_quantity", 0) for record in historical_data)
 
         if total_purchase == 0:
             return 0.0
 
         return total_loss / total_purchase
 
-    def _train_linear_model(
-        self,
-        features: np.ndarray,
-        historical_data: List[Dict]
-    ) -> List[float]:
+    def _train_linear_model(self, features: np.ndarray, historical_data: List[Dict]) -> List[float]:
         """训练线性模型（简化版）"""
         # 目标：预测损耗量
-        targets = np.array([
-            record.get("loss_quantity", 0)
-            for record in historical_data
-        ])
+        targets = np.array([record.get("loss_quantity", 0) for record in historical_data])
 
         # 简化的梯度下降（超参数支持环境变量覆盖）
         n_features = features.shape[1]
@@ -183,10 +159,7 @@ class FederatedBOMService:
         # 返回梯度（用于联邦聚合）；clip inf/nan that can arise from zero-target records
         return np.nan_to_num(gradients, nan=0.0, posinf=0.0, neginf=0.0).tolist()
 
-    async def federated_aggregate(
-        self,
-        updates: List[BOMModelUpdate]
-    ) -> Dict[str, Any]:
+    async def federated_aggregate(self, updates: List[BOMModelUpdate]) -> Dict[str, Any]:
         """
         联邦聚合
 
@@ -201,10 +174,7 @@ class FederatedBOMService:
 
         ingredient_id = updates[0].ingredient_id
 
-        logger.info(
-            f"Federated aggregation for ingredient {ingredient_id}, "
-            f"{len(updates)} stores"
-        )
+        logger.info(f"Federated aggregation for ingredient {ingredient_id}, " f"{len(updates)} stores")
 
         # FedAvg算法：加权平均
         total_samples = sum(update.local_samples for update in updates)
@@ -214,15 +184,10 @@ class FederatedBOMService:
 
         for update in updates:
             weight = update.local_samples / total_samples
-            aggregated_gradients += (
-                np.array(update.model_gradients) * weight
-            )
+            aggregated_gradients += np.array(update.model_gradients) * weight
 
         # 聚合损耗率
-        aggregated_loss_rate = sum(
-            update.local_loss_rate * update.local_samples
-            for update in updates
-        ) / total_samples
+        aggregated_loss_rate = sum(update.local_loss_rate * update.local_samples for update in updates) / total_samples
 
         # 更新全局模型
         self.global_models[ingredient_id] = {
@@ -230,23 +195,15 @@ class FederatedBOMService:
             "loss_rate": aggregated_loss_rate,
             "num_stores": len(updates),
             "total_samples": total_samples,
-            "updated_at": datetime.now()
+            "updated_at": datetime.now(),
         }
 
-        logger.info(
-            f"Global model updated: loss_rate={aggregated_loss_rate:.4f}"
-        )
+        logger.info(f"Global model updated: loss_rate={aggregated_loss_rate:.4f}")
 
         return self.global_models[ingredient_id]
 
     async def predict_loss_rate(
-        self,
-        ingredient_id: str,
-        season: str,
-        region: str,
-        temperature: float,
-        humidity: float,
-        storage_days: int
+        self, ingredient_id: str, season: str, region: str, temperature: float, humidity: float, storage_days: int
     ) -> float:
         """
         预测损耗率
@@ -266,10 +223,7 @@ class FederatedBOMService:
         global_model = self.global_models.get(ingredient_id)
 
         if not global_model:
-            logger.warning(
-                f"No global model for ingredient {ingredient_id}, "
-                f"using default loss rate"
-            )
+            logger.warning(f"No global model for ingredient {ingredient_id}, " f"using default loss rate")
             return float(os.getenv("BOM_DEFAULT_LOSS_RATE", "0.05"))  # 默认5%损耗率
 
         # 构造特征向量
@@ -278,26 +232,27 @@ class FederatedBOMService:
         # 查询实际采购量
         purchase_quantity = int(os.getenv("BOM_DEFAULT_PURCHASE_QUANTITY", "100"))  # fallback
         try:
+            from sqlalchemy import select
             from src.core.database import get_db_session
             from src.models.inventory import InventoryItem
-            from sqlalchemy import select
+
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(InventoryItem.current_quantity).where(InventoryItem.id == ingredient_id)
-                )
+                result = await session.execute(select(InventoryItem.current_quantity).where(InventoryItem.id == ingredient_id))
                 qty = result.scalar_one_or_none()
                 if qty is not None:
                     purchase_quantity = float(qty)
         except Exception as e:
             logger.warning("federated_bom_inventory_fetch_failed", ingredient_id=ingredient_id, error=str(e))
-        features = np.array([
-            season_code.get(season, 0),
-            temperature,
-            humidity,
-            storage_days,
-            0,  # is_holiday
-            purchase_quantity,  # 从库存记录获取实际采购量
-        ])
+        features = np.array(
+            [
+                season_code.get(season, 0),
+                temperature,
+                humidity,
+                storage_days,
+                0,  # is_holiday
+                purchase_quantity,  # 从库存记录获取实际采购量
+            ]
+        )
 
         # 使用全局模型预测
         gradients = np.array(global_model["gradients"])
@@ -306,17 +261,11 @@ class FederatedBOMService:
         # 转换为损耗率
         predicted_loss_rate = max(0.0, min(1.0, predicted_loss / 100))
 
-        logger.info(
-            f"Predicted loss rate for {ingredient_id}: {predicted_loss_rate:.4f}"
-        )
+        logger.info(f"Predicted loss rate for {ingredient_id}: {predicted_loss_rate:.4f}")
 
         return predicted_loss_rate
 
-    async def discover_loss_patterns(
-        self,
-        ingredient_id: str,
-        region: str
-    ) -> IngredientLossPattern:
+    async def discover_loss_patterns(self, ingredient_id: str, region: str) -> IngredientLossPattern:
         """
         发现损耗模式
 
@@ -339,7 +288,7 @@ class FederatedBOMService:
                 region=region,
                 temperature=float(os.getenv("BOM_SEASONAL_DEFAULT_TEMP", "20.0")),
                 humidity=float(os.getenv("BOM_SEASONAL_DEFAULT_HUMIDITY", "60.0")),
-                storage_days=int(os.getenv("BOM_SEASONAL_DEFAULT_STORAGE_DAYS", "3"))
+                storage_days=int(os.getenv("BOM_SEASONAL_DEFAULT_STORAGE_DAYS", "3")),
             )
             seasonal_loss_rates[season] = loss_rate
 
@@ -373,15 +322,14 @@ class FederatedBOMService:
             std_loss_rate=np.std(list(seasonal_loss_rates.values())),
             peak_loss_days=peak_loss_days,
             optimal_order_quantity=optimal_order_quantity,
-            confidence=float(os.getenv("BOM_GLOBAL_MODEL_CONFIDENCE", "0.8")) if global_model else float(os.getenv("BOM_LOCAL_MODEL_CONFIDENCE", "0.3"))
+            confidence=(
+                float(os.getenv("BOM_GLOBAL_MODEL_CONFIDENCE", "0.8"))
+                if global_model
+                else float(os.getenv("BOM_LOCAL_MODEL_CONFIDENCE", "0.3"))
+            ),
         )
 
-    async def detect_anomaly(
-        self,
-        store_id: str,
-        ingredient_id: str,
-        current_loss_rate: float
-    ) -> Dict[str, Any]:
+    async def detect_anomaly(self, store_id: str, ingredient_id: str, current_loss_rate: float) -> Dict[str, Any]:
         """
         检测异常损耗
 
@@ -397,10 +345,7 @@ class FederatedBOMService:
         global_model = self.global_models.get(ingredient_id)
 
         if not global_model:
-            return {
-                "is_anomaly": False,
-                "reason": "No global model available"
-            }
+            return {"is_anomaly": False, "reason": "No global model available"}
 
         # 计算偏差
         global_loss_rate = global_model["loss_rate"]
@@ -424,17 +369,11 @@ class FederatedBOMService:
             "deviation": deviation,
             "threshold": threshold,
             "severity": "high" if deviation > threshold * 2 else "medium",
-            "recommendation": (
-                "检查食材存储条件和操作规范"
-                if is_anomaly else "损耗率正常"
-            )
+            "recommendation": ("检查食材存储条件和操作规范" if is_anomaly else "损耗率正常"),
         }
 
     async def sync_knowledge_across_regions(
-        self,
-        source_region: str,
-        target_region: str,
-        ingredient_id: str
+        self, source_region: str, target_region: str, ingredient_id: str
     ) -> Dict[str, Any]:
         """
         跨区域知识同步
@@ -449,15 +388,10 @@ class FederatedBOMService:
         Returns:
             同步结果
         """
-        logger.info(
-            f"Syncing knowledge from {source_region} to {target_region} "
-            f"for ingredient {ingredient_id}"
-        )
+        logger.info(f"Syncing knowledge from {source_region} to {target_region} " f"for ingredient {ingredient_id}")
 
         # 获取源区域的损耗模式
-        source_pattern = await self.discover_loss_patterns(
-            ingredient_id, source_region
-        )
+        source_pattern = await self.discover_loss_patterns(ingredient_id, source_region)
 
         # 应用到目标区域（带置信度衰减）
         target_pattern = source_pattern.copy()
@@ -474,9 +408,7 @@ class FederatedBOMService:
             "ingredient_id": ingredient_id,
             "synced_loss_rate": target_pattern.average_loss_rate,
             "confidence": target_pattern.confidence,
-            "recommendation": (
-                f"建议{target_region}参考{source_region}的食材管理经验"
-            )
+            "recommendation": (f"建议{target_region}参考{source_region}的食材管理经验"),
         }
 
     def get_model_statistics(self) -> Dict[str, Any]:
@@ -489,10 +421,10 @@ class FederatedBOMService:
                     "ingredient_id": ing_id,
                     "loss_rate": model["loss_rate"],
                     "num_stores": model["num_stores"],
-                    "updated_at": model["updated_at"].isoformat()
+                    "updated_at": model["updated_at"].isoformat(),
                 }
                 for ing_id, model in self.global_models.items()
-            ]
+            ],
         }
 
 

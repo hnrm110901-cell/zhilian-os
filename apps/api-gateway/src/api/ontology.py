@@ -13,10 +13,10 @@
 """
 
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/v1/ontology", tags=["ontology"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class WasteInferResult(BaseModel):
     event_id: str
@@ -58,6 +59,7 @@ class NaturalQueryOut(BaseModel):
 
 # ── 损耗推理 ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/waste/{event_id}/infer", response_model=WasteInferResult)
 async def infer_waste_root_cause(
     event_id: str,
@@ -75,6 +77,7 @@ async def infer_waste_root_cause(
     """
     try:
         from src.ontology.reasoning import WasteReasoningEngine
+
         engine = WasteReasoningEngine()
         result = engine.infer_root_cause(event_id)
     except Exception as e:
@@ -84,6 +87,7 @@ async def infer_waste_root_cause(
         raise HTTPException(status_code=404, detail=result.get("error", "推理失败"))
 
     import json
+
     evidence = result.get("evidence_chain", {})
     scores = result.get("scores", {})
     if isinstance(evidence, str):
@@ -114,6 +118,7 @@ async def explain_waste_event(
 ):
     """读取已推理的损耗事件证据链（XAI 可解释性输出）"""
     from src.agents.ontology_adapter import KnowledgeAwareAgent
+
     agent = KnowledgeAwareAgent("explain")
     result = agent.explain_reasoning(event_id)
     agent.close()
@@ -124,6 +129,7 @@ async def explain_waste_event(
 
 # ── 知识图谱摘要 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/store/{store_id}/summary", response_model=KnowledgeSummary)
 async def get_store_knowledge_summary(
     store_id: str,
@@ -131,6 +137,7 @@ async def get_store_knowledge_summary(
 ):
     """查询门店知识图谱本体节点数量摘要"""
     from src.agents.ontology_adapter import KnowledgeAwareAgent
+
     agent = KnowledgeAwareAgent("summary")
     summary = agent.get_store_knowledge_summary(store_id)
     agent.close()
@@ -139,6 +146,7 @@ async def get_store_knowledge_summary(
 
 # ── 菜品 BOM / 损耗历史 ───────────────────────────────────────────────────────
 
+
 @router.get("/dish/{dish_id}/bom")
 async def get_dish_bom_from_ontology(
     dish_id: str,
@@ -146,6 +154,7 @@ async def get_dish_bom_from_ontology(
 ):
     """从 Neo4j 本体层查询菜品当前激活 BOM（含食材清单）"""
     from src.agents.ontology_adapter import KnowledgeAwareAgent
+
     agent = KnowledgeAwareAgent("bom_query")
     bom = agent.get_dish_bom(f"DISH-{dish_id}")
     agent.close()
@@ -162,6 +171,7 @@ async def get_dish_waste_events(
 ):
     """从 Neo4j 查询菜品损耗事件历史"""
     from src.agents.ontology_adapter import KnowledgeAwareAgent
+
     agent = KnowledgeAwareAgent("waste_query")
     events = agent.get_waste_events(f"DISH-{dish_id}", limit=limit)
     agent.close()
@@ -169,6 +179,7 @@ async def get_dish_waste_events(
 
 
 # ── Excel BOM 批量导入 ────────────────────────────────────────────────────────
+
 
 @router.post("/import/bom/excel", status_code=status.HTTP_201_CREATED)
 async def import_bom_excel(
@@ -192,6 +203,7 @@ async def import_bom_excel(
         raise HTTPException(status_code=400, detail="文件超过 10MB 限制")
 
     from src.services.excel_bom_importer import ExcelBOMImporter
+
     importer = ExcelBOMImporter(
         db=db,
         store_id=store_id,
@@ -219,6 +231,7 @@ async def import_bom_excel(
 
 # ── 自然语言→Cypher 查询 ──────────────────────────────────────────────────────
 
+
 @router.post("/query/natural", response_model=NaturalQueryOut)
 async def natural_language_query(
     payload: NaturalQueryIn,
@@ -234,6 +247,7 @@ async def natural_language_query(
     """
     try:
         from src.services.llm_cypher_service import LLMCypherService
+
         svc = LLMCypherService()
         result = await svc.query(
             question=payload.question,

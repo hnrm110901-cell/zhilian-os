@@ -1,9 +1,10 @@
 """电子发票 API — 开票/红冲/作废/查询"""
-from typing import Optional, List
+
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -56,13 +57,20 @@ async def create_invoice(
 ):
     """创建发票（草稿）"""
     result = await EInvoiceService.create_invoice(
-        session, brand_id=req.brand_id, buyer_name=req.buyer_name,
-        buyer_tax_number=req.buyer_tax_number, seller_name=req.seller_name,
-        seller_tax_number=req.seller_tax_number, total_amount_fen=req.total_amount_fen,
+        session,
+        brand_id=req.brand_id,
+        buyer_name=req.buyer_name,
+        buyer_tax_number=req.buyer_tax_number,
+        seller_name=req.seller_name,
+        seller_tax_number=req.seller_tax_number,
+        total_amount_fen=req.total_amount_fen,
         tax_amount_fen=req.tax_amount_fen,
         items=[item.model_dump() for item in req.items],
-        invoice_type=req.invoice_type, platform=req.platform,
-        store_id=req.store_id, order_id=req.order_id, remark=req.remark,
+        invoice_type=req.invoice_type,
+        platform=req.platform,
+        store_id=req.store_id,
+        order_id=req.order_id,
+        remark=req.remark,
     )
     await session.commit()
     return result
@@ -106,9 +114,12 @@ async def invoice_callback(
     """开票平台回调（Webhook，无需鉴权）"""
     try:
         result = await EInvoiceService.handle_callback(
-            session, platform_serial_no=req.serial_no,
-            invoice_code=req.invoice_code, invoice_number=req.invoice_number,
-            pdf_url=req.pdf_url, status=req.status,
+            session,
+            platform_serial_no=req.serial_no,
+            invoice_code=req.invoice_code,
+            invoice_number=req.invoice_number,
+            pdf_url=req.pdf_url,
+            status=req.status,
         )
         await session.commit()
         return result
@@ -128,8 +139,12 @@ async def list_invoices(
 ):
     """发票列表"""
     return await EInvoiceService.list_invoices(
-        session, brand_id=brand_id, status=status,
-        store_id=store_id, limit=limit, offset=offset,
+        session,
+        brand_id=brand_id,
+        status=status,
+        store_id=store_id,
+        limit=limit,
+        offset=offset,
     )
 
 

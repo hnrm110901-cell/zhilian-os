@@ -8,20 +8,22 @@ Reservation Management API
 3. 订金管理（录入/确认）
 4. 桌位冲突检测（同桌同时段不可重复预订）
 """
+
+import uuid
+from datetime import date, datetime, time, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, time, datetime, timedelta
-import structlog
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.reservation import Reservation, ReservationStatus, ReservationType
 from ..models.user import User
 from ..repositories import ReservationRepository
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-import uuid
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -33,7 +35,7 @@ router = APIRouter()
 VALID_TRANSITIONS: Dict[ReservationStatus, List[ReservationStatus]] = {
     ReservationStatus.PENDING: [
         ReservationStatus.CONFIRMED,
-        ReservationStatus.ARRIVED,    # 直接到店（walk-in确认）
+        ReservationStatus.ARRIVED,  # 直接到店（walk-in确认）
         ReservationStatus.CANCELLED,
     ],
     ReservationStatus.CONFIRMED: [
@@ -48,9 +50,9 @@ VALID_TRANSITIONS: Dict[ReservationStatus, List[ReservationStatus]] = {
     ReservationStatus.SEATED: [
         ReservationStatus.COMPLETED,
     ],
-    ReservationStatus.COMPLETED: [],   # 终态
-    ReservationStatus.CANCELLED: [],   # 终态
-    ReservationStatus.NO_SHOW: [],     # 终态
+    ReservationStatus.COMPLETED: [],  # 终态
+    ReservationStatus.CANCELLED: [],  # 终态
+    ReservationStatus.NO_SHOW: [],  # 终态
 }
 
 
@@ -73,6 +75,7 @@ async def _notify_reservation_change(
     """状态变更后异步触发企微通知（fire-and-forget，失败不阻塞）"""
     try:
         from ..services.wechat_trigger_service import wechat_trigger_service
+
         event_map = {
             "confirmed": "reservation.confirmed",
             "cancelled": "reservation.cancelled",
@@ -93,11 +96,9 @@ async def _notify_reservation_change(
                     "table_number": reservation.table_number or "",
                 },
             )
-            logger.info("reservation_notification_sent",
-                        reservation_id=str(reservation.id), event=event_key)
+            logger.info("reservation_notification_sent", reservation_id=str(reservation.id), event=event_key)
     except Exception as e:
-        logger.warning("reservation_notification_failed",
-                       reservation_id=str(reservation.id), error=str(e))
+        logger.warning("reservation_notification_failed", reservation_id=str(reservation.id), error=str(e))
 
 
 async def _check_table_conflict(
@@ -119,12 +120,14 @@ async def _check_table_conflict(
             Reservation.reservation_date == reservation_date,
             Reservation.reservation_time >= time_start,
             Reservation.reservation_time <= time_end,
-            Reservation.status.in_([
-                ReservationStatus.PENDING,
-                ReservationStatus.CONFIRMED,
-                ReservationStatus.ARRIVED,
-                ReservationStatus.SEATED,
-            ]),
+            Reservation.status.in_(
+                [
+                    ReservationStatus.PENDING,
+                    ReservationStatus.CONFIRMED,
+                    ReservationStatus.ARRIVED,
+                    ReservationStatus.SEATED,
+                ]
+            ),
         )
     )
     if exclude_id:
@@ -136,7 +139,7 @@ async def _check_table_conflict(
         raise HTTPException(
             status_code=409,
             detail=f"桌位冲突：桌号 {table_number} 在 {reservation_date} {reservation_time.strftime('%H:%M')} "
-                   f"附近已有预订（{conflict.customer_name}，{conflict.reservation_time.strftime('%H:%M')}）",
+            f"附近已有预订（{conflict.customer_name}，{conflict.reservation_time.strftime('%H:%M')}）",
         )
 
 
@@ -153,8 +156,8 @@ class CreateReservationRequest(BaseModel):
     special_requests: Optional[str] = None
     dietary_restrictions: Optional[str] = None
     customer_email: Optional[str] = None
-    estimated_budget: Optional[int] = None   # 分
-    deposit_amount: Optional[int] = None     # 订金金额（分）
+    estimated_budget: Optional[int] = None  # 分
+    deposit_amount: Optional[int] = None  # 订金金额（分）
     banquet_details: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
 
@@ -167,8 +170,8 @@ class UpdateReservationRequest(BaseModel):
     arrival_time: Optional[datetime] = None
     notes: Optional[str] = None
     banquet_details: Optional[Dict[str, Any]] = None
-    deposit_amount: Optional[int] = None     # 订金金额（分）
-    deposit_paid: Optional[int] = None       # 已付订金（分）
+    deposit_amount: Optional[int] = None  # 订金金额（分）
+    deposit_paid: Optional[int] = None  # 已付订金（分）
 
 
 class AssignTableRequest(BaseModel):
@@ -245,7 +248,7 @@ async def list_reservations(
         query = query.where(
             and_(
                 Reservation.reservation_date >= date.today(),
-                Reservation.status.in_([ReservationStatus.PENDING, ReservationStatus.CONFIRMED])
+                Reservation.status.in_([ReservationStatus.PENDING, ReservationStatus.CONFIRMED]),
             )
         )
     elif reservation_date:
@@ -270,9 +273,7 @@ async def today_overview(
     """今日预约概览（统计看板数据）"""
     today = date.today()
     result = await session.execute(
-        select(Reservation).where(
-            and_(Reservation.store_id == store_id, Reservation.reservation_date == today)
-        )
+        select(Reservation).where(and_(Reservation.store_id == store_id, Reservation.reservation_date == today))
     )
     reservations = result.scalars().all()
 
@@ -289,7 +290,8 @@ async def today_overview(
     # 即将到来（2小时内）
     now = datetime.now().time()
     upcoming_soon = [
-        _to_response(r) for r in reservations
+        _to_response(r)
+        for r in reservations
         if r.status.value in ("pending", "confirmed")
         and r.reservation_time >= now
         and (datetime.combine(today, r.reservation_time) - datetime.now()).seconds <= 7200
@@ -380,8 +382,11 @@ async def create_reservation(
     # 桌位冲突检测
     if req.table_number:
         await _check_table_conflict(
-            session, req.store_id, req.table_number,
-            req.reservation_date, req.reservation_time,
+            session,
+            req.store_id,
+            req.table_number,
+            req.reservation_date,
+            req.reservation_time,
         )
 
     reservation_id = f"RES_{req.reservation_date.strftime('%Y%m%d')}_{str(uuid.uuid4())[:8].upper()}"
@@ -414,6 +419,7 @@ async def create_reservation(
     # CDP 自动关联消费者ID（异步，不阻塞）
     try:
         from ..services.dining_journey_service import link_consumer_to_reservation
+
         await link_consumer_to_reservation(session, r)
         await session.commit()
     except Exception:
@@ -423,8 +429,11 @@ async def create_reservation(
     journey_hint = None
     try:
         from ..services.lifecycle_bridge import check_active_journeys_on_reservation
+
         journey_info = await check_active_journeys_on_reservation(
-            session, req.customer_phone, req.store_id,
+            session,
+            req.customer_phone,
+            req.store_id,
         )
         if journey_info.get("has_active_journey"):
             journey_hint = journey_info
@@ -463,8 +472,12 @@ async def update_reservation(
         res_date = r.reservation_date
         res_time = r.reservation_time
         await _check_table_conflict(
-            session, r.store_id, req.table_number,
-            res_date, res_time, exclude_id=str(r.id),
+            session,
+            r.store_id,
+            req.table_number,
+            res_date,
+            res_time,
+            exclude_id=str(r.id),
         )
 
     for field, value in req.model_dump(exclude_none=True).items():
@@ -507,10 +520,10 @@ async def checkin_reservation(
     # Bridge 1: 预订到店→自动准备订单（含预排菜转入）
     try:
         from ..services.lifecycle_bridge import prepare_order_from_reservation
+
         order_result = await prepare_order_from_reservation(session, reservation_id)
         await session.commit()
-        logger.info("reservation_auto_order", reservation_id=reservation_id,
-                     order_id=order_result.get("order_id"))
+        logger.info("reservation_auto_order", reservation_id=reservation_id, order_id=order_result.get("order_id"))
     except Exception as e:
         logger.warning("reservation_auto_order_failed", error=str(e))
 
@@ -534,8 +547,11 @@ async def seat_reservation(
 
     # 桌位冲突检测
     await _check_table_conflict(
-        session, r.store_id, req.table_number,
-        r.reservation_date, r.reservation_time,
+        session,
+        r.store_id,
+        req.table_number,
+        r.reservation_date,
+        r.reservation_time,
         exclude_id=str(r.id),
     )
 
@@ -584,6 +600,7 @@ async def complete_reservation(
     # 离店满意度调查（异步，不阻塞）
     try:
         from ..services.dining_journey_service import trigger_satisfaction_survey
+
         await trigger_satisfaction_survey(session, reservation_id)
     except Exception:
         pass  # fire-and-forget

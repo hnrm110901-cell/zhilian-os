@@ -4,15 +4,16 @@
   gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.4;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
-.critical { background: rgba(197,48,48,0.12);  color: var(--red); }
-.warning  { background: rgba(200,146,58,0.12); color: var(--yellow); }
-.success  { background: rgba(26,122,82,0.12);  color: var(--green); }
-.info     { background: rgba(10,175,154,0.12); color: var(--accent); }
-.default  { background: var(--border);          color: var(--text-secondary); }
+.critical { background: rgba(220,38,38,0.08);  color: var(--red); }
+.warning  { background: rgba(217,119,6,0.08);  color: var(--yellow); }
+.success  { background: rgba(22,163,74,0.08);  color: var(--green); }
+.info     { background: rgba(10,175,154,0.08); color: var(--accent); }
+.default  { background: rgba(0,0,0,0.04);      color: var(--text-secondary); }
 .accent   { background: var(--accent-soft);     color: var(--accent); }

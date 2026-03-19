@@ -2,12 +2,13 @@
 智能跟进话术生成 — Phase P4 (屯象独有)
 根据客户画像、漏斗阶段、历史交互，AI生成个性化跟进话术
 """
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
 
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 logger = structlog.get_logger()
 
@@ -127,7 +128,9 @@ class FollowUpCopilot:
         competitor_name: Optional[str],
     ) -> List[Dict[str, str]]:
         """生成多个话术版本"""
-        event_label = {"wedding": "婚宴", "birthday": "寿宴", "corporate": "商务宴请", "family": "家庭聚会"}.get(event_type, "宴会")
+        event_label = {"wedding": "婚宴", "birthday": "寿宴", "corporate": "商务宴请", "family": "家庭聚会"}.get(
+            event_type, "宴会"
+        )
         surname = customer_name[0] if customer_name else "客户"
 
         scripts = []
@@ -137,14 +140,14 @@ class FollowUpCopilot:
                 {
                     "type": "首次电话",
                     "content": f"{surname}先生/女士您好，我是XX酒店宴会顾问小张。了解到您有{event_label}的需求"
-                               + (f"，{target_date}是个好日子" if target_date else "")
-                               + "，我们酒店专业承办宴会超过10年，想为您介绍一下我们的场地和服务，方便您参考。",
+                    + (f"，{target_date}是个好日子" if target_date else "")
+                    + "，我们酒店专业承办宴会超过10年，想为您介绍一下我们的场地和服务，方便您参考。",
                 },
                 {
                     "type": "微信消息",
                     "content": f"{surname}先生/女士好！感谢您的关注~我们有多款{event_label}套餐可供选择"
-                               + (f"，{table_count}桌的话推荐我们的大宴会厅" if table_count else "")
-                               + "。这是我们最新的场地照片和菜单，您先看看有没有感兴趣的？随时欢迎到店实地参观！",
+                    + (f"，{table_count}桌的话推荐我们的大宴会厅" if table_count else "")
+                    + "。这是我们最新的场地照片和菜单，您先看看有没有感兴趣的？随时欢迎到店实地参观！",
                 },
             ]
         elif stage == "intent":
@@ -152,9 +155,9 @@ class FollowUpCopilot:
                 {
                     "type": "推荐方案",
                     "content": f"{surname}先生/女士，根据您{table_count or ''}桌{event_label}的需求，为您推荐以下方案：\n"
-                               f"💎 尊享方案：含全套布场+摄影，¥{estimated_value_yuan * 1.2:.0f}\n"
-                               f"🌟 精选方案：含基础布场，¥{estimated_value_yuan:.0f}\n"
-                               f"方便这周末来试菜吗？",
+                    f"💎 尊享方案：含全套布场+摄影，¥{estimated_value_yuan * 1.2:.0f}\n"
+                    f"🌟 精选方案：含基础布场，¥{estimated_value_yuan:.0f}\n"
+                    f"方便这周末来试菜吗？",
                 },
             ]
         elif stage == "room_lock":
@@ -162,41 +165,49 @@ class FollowUpCopilot:
                 {
                     "type": "促签约",
                     "content": f"{surname}先生/女士，您锁定的厅位目前还有另外2组客户在看"
-                               + (f"，{target_date}这个档期很抢手" if target_date else "")
-                               + "。建议您尽早确认，我们可以优先为您保留。本周内签约还有早鸟优惠哦！",
+                    + (f"，{target_date}这个档期很抢手" if target_date else "")
+                    + "。建议您尽早确认，我们可以优先为您保留。本周内签约还有早鸟优惠哦！",
                 },
             ]
         elif stage == "negotiation":
             if competitor_name:
-                scripts.append({
-                    "type": "竞品对比",
-                    "content": f"{surname}先生/女士，了解到您在对比{competitor_name}。我们的优势在于：\n"
-                               f"✅ 一站式服务（含布场+演职人员调度）\n"
-                               f"✅ AI智能配餐，根据宾客口味定制\n"
-                               f"✅ 履约时间线管理，确保当天零失误",
-                })
-            scripts.append({
-                "type": "限时优惠",
-                "content": f"{surname}先生/女士，经请示经理，可以为您争取到一个特别优惠："
-                           f"本周签约赠送迎宾区花艺布置（价值¥2,000）+"
-                           f"婚礼当天摄影跟拍。这个优惠仅限本周哦！",
-            })
+                scripts.append(
+                    {
+                        "type": "竞品对比",
+                        "content": f"{surname}先生/女士，了解到您在对比{competitor_name}。我们的优势在于：\n"
+                        f"✅ 一站式服务（含布场+演职人员调度）\n"
+                        f"✅ AI智能配餐，根据宾客口味定制\n"
+                        f"✅ 履约时间线管理，确保当天零失误",
+                    }
+                )
+            scripts.append(
+                {
+                    "type": "限时优惠",
+                    "content": f"{surname}先生/女士，经请示经理，可以为您争取到一个特别优惠："
+                    f"本周签约赠送迎宾区花艺布置（价值¥2,000）+"
+                    f"婚礼当天摄影跟拍。这个优惠仅限本周哦！",
+                }
+            )
         elif stage == "lost":
             if lost_reason:
-                scripts.append({
-                    "type": "挽回",
-                    "content": f"{surname}先生/女士，之前的沟通中了解到"
-                               + f"（{lost_reason}），我们最近做了一些调整：\n"
-                               + "新推出的性价比套餐可能更适合您的需求。"
-                               + "如果还没有最终确定，欢迎再来看看，我们为老朋友准备了专属优惠。",
-                })
+                scripts.append(
+                    {
+                        "type": "挽回",
+                        "content": f"{surname}先生/女士，之前的沟通中了解到"
+                        + f"（{lost_reason}），我们最近做了一些调整：\n"
+                        + "新推出的性价比套餐可能更适合您的需求。"
+                        + "如果还没有最终确定，欢迎再来看看，我们为老朋友准备了专属优惠。",
+                    }
+                )
 
         if not scripts:
-            scripts = [{
-                "type": "通用跟进",
-                "content": f"{surname}先生/女士您好，距离上次沟通已经{last_follow_up_days}天了，"
-                           f"不知道您{event_label}的筹备进展如何？有任何需要帮忙的随时联系我。",
-            }]
+            scripts = [
+                {
+                    "type": "通用跟进",
+                    "content": f"{surname}先生/女士您好，距离上次沟通已经{last_follow_up_days}天了，"
+                    f"不知道您{event_label}的筹备进展如何？有任何需要帮忙的随时联系我。",
+                }
+            ]
 
         return scripts
 

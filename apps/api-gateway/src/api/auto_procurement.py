@@ -2,10 +2,11 @@
 智能采购 API
 前缀: /api/v1/auto-procurement
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, Dict, Any
 
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -27,9 +28,7 @@ async def trigger_check(
 
     store_id = data.get("store_id")
     try:
-        suggestions = await auto_procurement_service.check_and_generate(
-            db, brand_id, store_id
-        )
+        suggestions = await auto_procurement_service.check_and_generate(db, brand_id, store_id)
         await db.commit()
         return {"success": True, "data": suggestions}
     except Exception as e:
@@ -47,9 +46,7 @@ async def list_suggestions(
 ):
     """获取待处理的采购建议"""
     try:
-        result = await auto_procurement_service.get_suggestions(
-            db, brand_id, page, page_size
-        )
+        result = await auto_procurement_service.get_suggestions(db, brand_id, page, page_size)
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"查询采购建议失败: {str(e)}")
@@ -83,9 +80,7 @@ async def skip_suggestion(
     """跳过采购建议"""
     reason = data.get("reason")
     try:
-        result = await auto_procurement_service.skip_suggestion(
-            db, suggestion_id, reason
-        )
+        result = await auto_procurement_service.skip_suggestion(db, suggestion_id, reason)
         await db.commit()
         return {"success": True, "data": result}
     except ValueError as e:
@@ -181,9 +176,7 @@ async def list_executions(
 ):
     """查询执行记录"""
     try:
-        result = await auto_procurement_service.get_executions(
-            db, brand_id, page, page_size, status, trigger_type
-        )
+        result = await auto_procurement_service.get_executions(db, brand_id, page, page_size, status, trigger_type)
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"查询执行记录失败: {str(e)}")

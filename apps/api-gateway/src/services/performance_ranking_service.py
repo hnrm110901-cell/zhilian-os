@@ -13,6 +13,7 @@
   profit_margin  — 利润率 (%)，越高越好
   health_score   — 财务健康综合评分 (0-100)，越高越好
 """
+
 from __future__ import annotations
 
 import math
@@ -28,30 +29,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 METRICS = ("revenue", "food_cost_rate", "profit_margin", "health_score")
 
 METRIC_LABELS = {
-    "revenue":        "月净收入",
+    "revenue": "月净收入",
     "food_cost_rate": "食材成本率",
-    "profit_margin":  "利润率",
-    "health_score":   "财务健康评分",
+    "profit_margin": "利润率",
+    "health_score": "财务健康评分",
 }
 
 METRIC_UNITS = {
-    "revenue":        "¥",
+    "revenue": "¥",
     "food_cost_rate": "%",
-    "profit_margin":  "%",
-    "health_score":   "分",
+    "profit_margin": "%",
+    "health_score": "分",
 }
 
 # 值越低越好的指标（排名时反转）
 LOWER_IS_BETTER = {"food_cost_rate"}
 
-TIER_TOP        = 75.0
-TIER_ABOVE_AVG  = 50.0
-TIER_BELOW_AVG  = 25.0
+TIER_TOP = 75.0
+TIER_ABOVE_AVG = 50.0
+TIER_BELOW_AVG = 25.0
 
 BENCHMARK_TYPES = ("median", "top_quartile", "best")
 
 
 # ── 内部工具 ──────────────────────────────────────────────────────────────────
+
 
 def _safe_float(val) -> Optional[float]:
     if val is None:
@@ -79,6 +81,7 @@ def _prev_period(period: str) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 # 纯函数层
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def compute_rank(
     value: float,
@@ -213,7 +216,7 @@ def compute_yuan_potential(
     health_score：无直接¥换算，返回 None。
     """
     if metric == "revenue":
-        return benchmark_value - store_value   # 正数 = 还差多少
+        return benchmark_value - store_value  # 正数 = 还差多少
 
     if metric in ("food_cost_rate", "profit_margin") and revenue > 0:
         # food_cost_rate: 降低 → 节省（benchmark < store → potential = (store-benchmark)/100*revenue）
@@ -233,21 +236,21 @@ def build_ranking_row(
 ) -> Dict[str, Any]:
     """构造单条排名记录（纯函数，不访问 DB）。"""
     higher = metric not in LOWER_IS_BETTER
-    rank       = compute_rank(value, all_values, higher)
+    rank = compute_rank(value, all_values, higher)
     percentile = compute_percentile(value, all_values, higher)
-    tier       = classify_tier(percentile)
-    change     = classify_rank_change(rank, prev_rank)
+    tier = classify_tier(percentile)
+    change = classify_rank_change(rank, prev_rank)
     return {
-        "store_id":     store_id,
-        "period":       period,
-        "metric":       metric,
-        "value":        value,
-        "rank":         rank,
+        "store_id": store_id,
+        "period": period,
+        "metric": metric,
+        "value": value,
+        "rank": rank,
         "total_stores": len(all_values),
-        "percentile":   percentile,
-        "tier":         tier,
-        "prev_rank":    prev_rank,
-        "rank_change":  change,
+        "percentile": percentile,
+        "tier": tier,
+        "prev_rank": prev_rank,
+        "rank_change": change,
     }
 
 
@@ -266,26 +269,29 @@ def build_gap_rows(
         bv = compute_benchmark_value(all_values, btype, higher)
         if bv is None:
             continue
-        gap_pct   = compute_gap_pct(store_value, bv)
+        gap_pct = compute_gap_pct(store_value, bv)
         direction = compute_gap_direction(gap_pct, higher)
         potential = compute_yuan_potential(metric, store_value, bv, revenue)
-        rows.append({
-            "store_id":        store_id,
-            "period":          period,
-            "metric":          metric,
-            "benchmark_type":  btype,
-            "store_value":     store_value,
-            "benchmark_value": bv,
-            "gap_pct":         round(gap_pct, 2),
-            "gap_direction":   direction,
-            "yuan_potential":  round(potential, 2) if potential is not None else None,
-        })
+        rows.append(
+            {
+                "store_id": store_id,
+                "period": period,
+                "metric": metric,
+                "benchmark_type": btype,
+                "store_value": store_value,
+                "benchmark_value": bv,
+                "gap_pct": round(gap_pct, 2),
+                "gap_direction": direction,
+                "yuan_potential": round(potential, 2) if potential is not None else None,
+            }
+        )
     return rows
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DB 函数层
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 async def _upsert_ranking(db: AsyncSession, row: Dict[str, Any]) -> None:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -308,11 +314,17 @@ async def _upsert_ranking(db: AsyncSession, row: Dict[str, Any]) -> None:
                 updated_at   = EXCLUDED.updated_at
         """),
         {
-            "sid": row["store_id"], "period": row["period"], "metric": row["metric"],
-            "value": round(row["value"], 4), "rank": row["rank"],
-            "total": row["total_stores"], "pct": row["percentile"],
-            "tier": row["tier"], "prev": row["prev_rank"],
-            "change": row["rank_change"], "now": now,
+            "sid": row["store_id"],
+            "period": row["period"],
+            "metric": row["metric"],
+            "value": round(row["value"], 4),
+            "rank": row["rank"],
+            "total": row["total_stores"],
+            "pct": row["percentile"],
+            "tier": row["tier"],
+            "prev": row["prev_rank"],
+            "change": row["rank_change"],
+            "now": now,
         },
     )
 
@@ -338,12 +350,16 @@ async def _upsert_gap(db: AsyncSession, row: Dict[str, Any]) -> None:
                 computed_at     = EXCLUDED.computed_at
         """),
         {
-            "sid": row["store_id"], "period": row["period"],
-            "metric": row["metric"], "btype": row["benchmark_type"],
+            "sid": row["store_id"],
+            "period": row["period"],
+            "metric": row["metric"],
+            "btype": row["benchmark_type"],
             "sv": round(row["store_value"], 4),
             "bv": round(row["benchmark_value"], 4),
-            "gap": row["gap_pct"], "dir": row["gap_direction"],
-            "pot": row["yuan_potential"], "now": now,
+            "gap": row["gap_pct"],
+            "dir": row["gap_direction"],
+            "pot": row["yuan_potential"],
+            "now": now,
         },
     )
 
@@ -426,8 +442,8 @@ async def compute_period_rankings(
     计算指定期所有门店所有指标的排名 + 对标差距，写入 DB。
     返回汇总统计。
     """
-    total_rows  = 0
-    total_gaps  = 0
+    total_rows = 0
+    total_gaps = 0
     store_count = 0
 
     for metric in METRICS:
@@ -436,13 +452,17 @@ async def compute_period_rankings(
             continue
 
         store_count = max(store_count, len(snapshot))
-        prev_ranks  = await _fetch_prev_ranks(db, period, metric)
-        all_values  = [v for _, v in snapshot]
+        prev_ranks = await _fetch_prev_ranks(db, period, metric)
+        all_values = [v for _, v in snapshot]
 
         for store_id, value in snapshot:
             row = build_ranking_row(
-                store_id, period, metric, value,
-                all_values, prev_ranks.get(store_id),
+                store_id,
+                period,
+                metric,
+                value,
+                all_values,
+                prev_ranks.get(store_id),
             )
             await _upsert_ranking(db, row)
             total_rows += 1
@@ -456,10 +476,10 @@ async def compute_period_rankings(
 
     await db.commit()
     return {
-        "period":       period,
-        "store_count":  store_count,
+        "period": period,
+        "store_count": store_count,
         "ranking_rows": total_rows,
-        "gap_rows":     total_gaps,
+        "gap_rows": total_gaps,
     }
 
 
@@ -486,20 +506,20 @@ async def get_store_ranking(
     metrics_data = {}
     for r in records:
         metrics_data[r[0]] = {
-            "metric":       r[0],
-            "label":        METRIC_LABELS.get(r[0], r[0]),
-            "value":        _safe_float(r[1]),
-            "rank":         r[2],
+            "metric": r[0],
+            "label": METRIC_LABELS.get(r[0], r[0]),
+            "value": _safe_float(r[1]),
+            "rank": r[2],
             "total_stores": r[3],
-            "percentile":   _safe_float(r[4]),
-            "tier":         r[5],
-            "prev_rank":    r[6],
-            "rank_change":  r[7],
+            "percentile": _safe_float(r[4]),
+            "tier": r[5],
+            "prev_rank": r[6],
+            "rank_change": r[7],
         }
     return {
         "store_id": store_id,
-        "period":   period,
-        "metrics":  metrics_data,
+        "period": period,
+        "metrics": metrics_data,
     }
 
 
@@ -522,14 +542,14 @@ async def get_leaderboard(
     )
     return [
         {
-            "store_id":     r[0],
-            "value":        _safe_float(r[1]),
-            "rank":         r[2],
+            "store_id": r[0],
+            "value": _safe_float(r[1]),
+            "rank": r[2],
             "total_stores": r[3],
-            "percentile":   _safe_float(r[4]),
-            "tier":         r[5],
-            "rank_change":  r[6],
-            "label":        METRIC_LABELS.get(metric, metric),
+            "percentile": _safe_float(r[4]),
+            "tier": r[5],
+            "rank_change": r[6],
+            "label": METRIC_LABELS.get(metric, metric),
         }
         for r in rows.fetchall()
     ]
@@ -553,14 +573,14 @@ async def get_benchmark_gaps(
     )
     return [
         {
-            "metric":          r[0],
-            "label":           METRIC_LABELS.get(r[0], r[0]),
-            "benchmark_type":  r[1],
-            "store_value":     _safe_float(r[2]),
+            "metric": r[0],
+            "label": METRIC_LABELS.get(r[0], r[0]),
+            "benchmark_type": r[1],
+            "store_value": _safe_float(r[2]),
             "benchmark_value": _safe_float(r[3]),
-            "gap_pct":         _safe_float(r[4]),
-            "gap_direction":   r[5],
-            "yuan_potential":  _safe_float(r[6]),
+            "gap_pct": _safe_float(r[4]),
+            "gap_direction": r[5],
+            "yuan_potential": _safe_float(r[6]),
         }
         for r in rows.fetchall()
     ]
@@ -585,12 +605,12 @@ async def get_ranking_trend(
     )
     records = [
         {
-            "period":       r[0],
-            "rank":         r[1],
+            "period": r[0],
+            "rank": r[1],
             "total_stores": r[2],
-            "percentile":   _safe_float(r[3]),
-            "tier":         r[4],
-            "rank_change":  r[5],
+            "percentile": _safe_float(r[3]),
+            "tier": r[4],
+            "rank_change": r[5],
         }
         for r in rows.fetchall()
     ]
@@ -623,10 +643,16 @@ async def get_brand_ranking_summary(
 
     for r in records:
         sid, metric, rank, total, pct, tier, val = r
-        by_metric.setdefault(metric, []).append({
-            "store_id": sid, "rank": rank, "total": total,
-            "percentile": _safe_float(pct), "tier": tier, "value": _safe_float(val),
-        })
+        by_metric.setdefault(metric, []).append(
+            {
+                "store_id": sid,
+                "rank": rank,
+                "total": total,
+                "percentile": _safe_float(pct),
+                "tier": tier,
+                "value": _safe_float(val),
+            }
+        )
         # 每个门店只计一次层级（用 health_score 作为代表）
         key = (sid, "health_score")
         if metric == "health_score" and key not in seen_tiers:
@@ -638,17 +664,17 @@ async def get_brand_ranking_summary(
         if not entries:
             continue
         metric_summary[metric] = {
-            "best_store":  entries[0]["store_id"],
+            "best_store": entries[0]["store_id"],
             "worst_store": entries[-1]["store_id"],
-            "best_value":  entries[0]["value"],
+            "best_value": entries[0]["value"],
             "worst_value": entries[-1]["value"],
             "total_stores": entries[0]["total"],
         }
 
     return {
-        "brand_id":     brand_id,
-        "period":       period,
-        "tier_counts":  tier_counts,
+        "brand_id": brand_id,
+        "period": period,
+        "tier_counts": tier_counts,
         "total_stores": len(seen_tiers),
-        "by_metric":    metric_summary,
+        "by_metric": metric_summary,
     }

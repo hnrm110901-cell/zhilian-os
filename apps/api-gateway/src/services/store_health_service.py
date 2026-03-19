@@ -24,7 +24,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import func, select, text, and_
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -32,10 +32,10 @@ logger = structlog.get_logger()
 # ── 维度权重 ────────────────────────────────────────────────────────────────────
 _WEIGHTS: Dict[str, float] = {
     "revenue_completion": 0.30,
-    "table_turnover":     0.20,
-    "cost_rate":          0.25,
-    "complaint_rate":     0.15,
-    "staff_efficiency":   0.10,
+    "table_turnover": 0.20,
+    "cost_rate": 0.25,
+    "complaint_rate": 0.15,
+    "staff_efficiency": 0.10,
 }
 
 # 翻台率目标（次/天）
@@ -47,6 +47,7 @@ _STAFF_EFFICIENCY_TARGET = 500.0
 # ════════════════════════════════════════════════════════════════════════════════
 # 纯函数（无 DB 依赖，便于单元测试）
 # ════════════════════════════════════════════════════════════════════════════════
+
 
 def compute_health_score(dimension_scores: Dict[str, Optional[float]]) -> float:
     """
@@ -170,6 +171,7 @@ def _score_staff_efficiency(
 # StoreHealthService（含 DB 查询的完整入口）
 # ════════════════════════════════════════════════════════════════════════════════
 
+
 class StoreHealthService:
     """
     门店健康指数主入口。
@@ -204,8 +206,8 @@ class StoreHealthService:
                 "target_date": str,
             }
         """
-        from src.models.store import Store
         from src.models.employee import Employee
+        from src.models.store import Store
         from src.services.food_cost_service import FoodCostService
 
         # 1. 加载门店信息
@@ -214,7 +216,7 @@ class StoreHealthService:
             return _empty_result(store_id, target_date)
 
         day_start = target_date
-        day_end   = target_date + timedelta(days=1)
+        day_end = target_date + timedelta(days=1)
 
         # 2. 当日营收 + DISTINCT 桌台数（两项合一查询，减少 round-trip）
         rev_row = await db.execute(
@@ -230,9 +232,9 @@ class StoreHealthService:
             {"sid": store_id, "start": day_start, "end": day_end},
         )
         rev = rev_row.one()
-        revenue_fen     = float(rev.revenue_fen)
+        revenue_fen = float(rev.revenue_fen)
         distinct_tables = int(rev.distinct_tables)
-        revenue_yuan    = revenue_fen / 100.0
+        revenue_yuan = revenue_fen / 100.0
 
         # 3. 在职员工数
         staff_row = await db.execute(
@@ -275,9 +277,9 @@ class StoreHealthService:
             """),
             {"sid": store_id, "start": day_start, "end": day_end},
         )
-        qi       = qi_row.one()
+        qi = qi_row.one()
         qi_total = int(qi.total)
-        qi_fail  = int(qi.fail_count)
+        qi_fail = int(qi.fail_count)
 
         # 6. 各维度得分
         dimension_scores: Dict[str, Optional[float]] = {
@@ -311,14 +313,14 @@ class StoreHealthService:
         )
 
         return {
-            "store_id":           store_id,
-            "store_name":         getattr(store, "name", store_id),
-            "score":              score,
-            "level":              level,
-            "dimensions":         {k: {"score": v} for k, v in dimension_scores.items()},
-            "weakest_dimension":  weakest,
-            "revenue_yuan":       round(revenue_yuan, 2),
-            "target_date":        target_date.isoformat(),
+            "store_id": store_id,
+            "store_name": getattr(store, "name", store_id),
+            "score": score,
+            "level": level,
+            "dimensions": {k: {"score": v} for k, v in dimension_scores.items()},
+            "weakest_dimension": weakest,
+            "revenue_yuan": round(revenue_yuan, 2),
+            "target_date": target_date.isoformat(),
         }
 
     @staticmethod
@@ -356,15 +358,16 @@ class StoreHealthService:
 
 # ── 内部工具 ───────────────────────────────────────────────────────────────────
 
+
 def _empty_result(store_id: str, target_date: date) -> Dict[str, Any]:
     """门店不存在时的兜底返回值"""
     return {
-        "store_id":          store_id,
-        "store_name":        store_id,
-        "score":             50.0,
-        "level":             "warning",
-        "dimensions":        {},
+        "store_id": store_id,
+        "store_name": store_id,
+        "score": 50.0,
+        "level": "warning",
+        "dimensions": {},
         "weakest_dimension": None,
-        "revenue_yuan":      0.0,
-        "target_date":       target_date.isoformat(),
+        "revenue_yuan": 0.0,
+        "target_date": target_date.isoformat(),
     }

@@ -34,6 +34,35 @@ import src.models.forecast  # noqa: F401
 import src.models.agent_config  # noqa: F401
 import src.models.consumer_identity  # noqa: F401 — Sprint 1 CDP
 import src.models.consumer_id_mapping  # noqa: F401 — Sprint 1 CDP
+import src.models.member_check_in       # noqa: F401 — P1 识客
+import src.models.member_dish_preference # noqa: F401 — P1 菜品偏好
+import src.models.service_voucher        # noqa: F401 — P2 服务券
+import src.models.coupon_distribution    # noqa: F401 — P2 发券+ROI
+import src.models.marketing_task          # noqa: F401 — P3 营销任务
+
+# HR 模块 — 业人一体化
+import src.models.payroll  # noqa: F401
+import src.models.approval_flow  # noqa: F401
+import src.models.leave  # noqa: F401
+import src.models.employee_lifecycle  # noqa: F401
+import src.models.recruitment  # noqa: F401
+import src.models.performance_review  # noqa: F401
+import src.models.employee_contract  # noqa: F401
+import src.models.commission  # noqa: F401
+import src.models.reward_penalty  # noqa: F401
+import src.models.social_insurance  # noqa: F401
+import src.models.employee_growth  # noqa: F401
+import src.models.brand_im_config  # noqa: F401
+
+# HR架构重构 M1 — Person-Assignment-Contract + 知识OS层
+import src.models.person  # noqa: F401
+import src.models.assignment  # noqa: F401
+import src.models.person_contract  # noqa: F401
+import src.models.skill_node  # noqa: F401
+import src.models.achievement  # noqa: F401
+import src.models.behavior_pattern  # noqa: F401
+import src.models.retention_signal  # noqa: F401
+import src.models.knowledge_capture  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

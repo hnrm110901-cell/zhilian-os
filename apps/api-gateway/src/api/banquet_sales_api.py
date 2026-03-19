@@ -2,12 +2,14 @@
 宴会销控 API — Phase P2
 档期管理 · 销售漏斗 · 竞对分析 · 动态定价
 """
+
+from datetime import date, datetime
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
@@ -19,6 +21,7 @@ router = APIRouter()
 
 
 # ── Request Models ──
+
 
 class ConfigureDateRequest(BaseModel):
     store_id: str
@@ -60,6 +63,7 @@ class MarkLostRequest(BaseModel):
 
 # ── 档期管理 Routes ──
 
+
 @router.post("/banquet-sales/dates/configure", status_code=201)
 async def configure_date(
     req: ConfigureDateRequest,
@@ -67,9 +71,7 @@ async def configure_date(
     current_user: User = Depends(get_current_active_user),
 ):
     """配置档期（吉日等级+定价系数）"""
-    result = await banquet_sales_service.configure_date(
-        session=session, **req.model_dump()
-    )
+    result = await banquet_sales_service.configure_date(session=session, **req.model_dump())
     await session.commit()
     return result
 
@@ -93,9 +95,7 @@ async def lock_date(
     current_user: User = Depends(get_current_active_user),
 ):
     """锁定档期"""
-    result = await banquet_sales_service.lock_date(
-        session, req.store_id, req.target_date, req.reservation_id, req.lock_days
-    )
+    result = await banquet_sales_service.lock_date(session, req.store_id, req.target_date, req.reservation_id, req.lock_days)
     await session.commit()
     return result
 
@@ -109,12 +109,11 @@ async def get_pricing_suggestion(
     current_user: User = Depends(get_current_active_user),
 ):
     """AI动态定价建议"""
-    return await banquet_sales_service.get_pricing_suggestion(
-        session, store_id, target_date, base_price_per_table
-    )
+    return await banquet_sales_service.get_pricing_suggestion(session, store_id, target_date, base_price_per_table)
 
 
 # ── 销售漏斗 Routes ──
+
 
 @router.post("/banquet-sales/leads", status_code=201)
 async def create_lead(
@@ -159,9 +158,7 @@ async def advance_stage(
 ):
     """推进漏斗阶段"""
     try:
-        result = await banquet_sales_service.advance_stage(
-            session, record_id, req.new_stage, req.note
-        )
+        result = await banquet_sales_service.advance_stage(session, record_id, req.new_stage, req.note)
         await session.commit()
         return result
     except ValueError as e:
@@ -177,9 +174,7 @@ async def mark_lost(
 ):
     """标记输单"""
     try:
-        result = await banquet_sales_service.mark_lost(
-            session, record_id, req.lost_reason, req.lost_to_competitor
-        )
+        result = await banquet_sales_service.mark_lost(session, record_id, req.lost_reason, req.lost_to_competitor)
         await session.commit()
         return result
     except ValueError as e:
@@ -187,6 +182,7 @@ async def mark_lost(
 
 
 # ── 竞对分析 Routes ──
+
 
 @router.get("/banquet-sales/competitors")
 async def list_competitors(

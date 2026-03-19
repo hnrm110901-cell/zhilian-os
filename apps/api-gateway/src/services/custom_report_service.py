@@ -2,22 +2,22 @@
 自定义报表服务
 支持报表模板 CRUD、按模板生成报表、定时订阅管理
 """
-import uuid
-import io
+
 import csv
+import io
+import uuid
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta, date
 
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
-
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.report_template import ReportTemplate, ScheduledReport, ReportFormat, ScheduleFrequency
 from src.models.finance import FinancialTransaction
 from src.models.inventory import InventoryItem
-from src.models.order import Order
 from src.models.kpi import KPIRecord
+from src.models.order import Order
+from src.models.report_template import ReportFormat, ReportTemplate, ScheduledReport, ScheduleFrequency
 
 logger = structlog.get_logger()
 
@@ -85,9 +85,7 @@ class CustomReportService:
                 )
             ]
             if store_id:
-                conditions.append(
-                    or_(ReportTemplate.store_id == store_id, ReportTemplate.store_id.is_(None))
-                )
+                conditions.append(or_(ReportTemplate.store_id == store_id, ReportTemplate.store_id.is_(None)))
 
             count_stmt = select(func.count(ReportTemplate.id)).where(and_(*conditions))
             total = (await session.execute(count_stmt)).scalar() or 0
@@ -162,9 +160,7 @@ class CustomReportService:
     ) -> Optional[ReportTemplate]:
         """更新报表模板（只有创建者可以修改）"""
         async with get_db_session() as session:
-            stmt = select(ReportTemplate).where(
-                and_(ReportTemplate.id == template_id, ReportTemplate.created_by == user_id)
-            )
+            stmt = select(ReportTemplate).where(and_(ReportTemplate.id == template_id, ReportTemplate.created_by == user_id))
             result = await session.execute(stmt)
             template = result.scalar_one_or_none()
             if not template:
@@ -182,9 +178,7 @@ class CustomReportService:
     async def delete_template(self, template_id: str, user_id: str) -> bool:
         """删除报表模板（只有创建者可以删除）"""
         async with get_db_session() as session:
-            stmt = select(ReportTemplate).where(
-                and_(ReportTemplate.id == template_id, ReportTemplate.created_by == user_id)
-            )
+            stmt = select(ReportTemplate).where(and_(ReportTemplate.id == template_id, ReportTemplate.created_by == user_id))
             result = await session.execute(stmt)
             template = result.scalar_one_or_none()
             if not template:
@@ -281,16 +275,18 @@ class CustomReportService:
         result = await session.execute(stmt)
         rows = []
         for t in result.scalars().all():
-            rows.append({
-                "transaction_date": t.transaction_date.isoformat() if t.transaction_date else "",
-                "transaction_type": t.transaction_type or "",
-                "category": t.category or "",
-                "subcategory": t.subcategory or "",
-                "amount": round(t.amount / 100, 2) if t.amount else 0,
-                "description": t.description or "",
-                "payment_method": t.payment_method or "",
-                "store_id": t.store_id or "",
-            })
+            rows.append(
+                {
+                    "transaction_date": t.transaction_date.isoformat() if t.transaction_date else "",
+                    "transaction_type": t.transaction_type or "",
+                    "category": t.category or "",
+                    "subcategory": t.subcategory or "",
+                    "amount": round(t.amount / 100, 2) if t.amount else 0,
+                    "description": t.description or "",
+                    "payment_method": t.payment_method or "",
+                    "store_id": t.store_id or "",
+                }
+            )
         return rows
 
     async def _fetch_inventory(self, session, filters, sort_by):
@@ -310,16 +306,18 @@ class CustomReportService:
         result = await session.execute(stmt)
         rows = []
         for item in result.scalars().all():
-            rows.append({
-                "name": item.name or "",
-                "category": item.category or "",
-                "current_quantity": float(item.current_quantity or 0),
-                "min_quantity": float(item.min_quantity or 0),
-                "unit": item.unit or "",
-                "unit_cost": round((item.unit_cost or 0) / 100, 2),
-                "status": item.status.value if hasattr(item.status, "value") else str(item.status or ""),
-                "store_id": item.store_id or "",
-            })
+            rows.append(
+                {
+                    "name": item.name or "",
+                    "category": item.category or "",
+                    "current_quantity": float(item.current_quantity or 0),
+                    "min_quantity": float(item.min_quantity or 0),
+                    "unit": item.unit or "",
+                    "unit_cost": round((item.unit_cost or 0) / 100, 2),
+                    "status": item.status.value if hasattr(item.status, "value") else str(item.status or ""),
+                    "store_id": item.store_id or "",
+                }
+            )
         return rows
 
     async def _fetch_orders(self, session, filters, sort_by):
@@ -341,14 +339,16 @@ class CustomReportService:
         result = await session.execute(stmt)
         rows = []
         for o in result.scalars().all():
-            rows.append({
-                "order_number": o.order_number or str(o.id),
-                "status": o.status.value if hasattr(o.status, "value") else str(o.status or ""),
-                "total_amount": round((o.total_amount or 0) / 100, 2),
-                "table_number": o.table_number or "",
-                "created_at": o.created_at.isoformat() if o.created_at else "",
-                "store_id": o.store_id or "",
-            })
+            rows.append(
+                {
+                    "order_number": o.order_number or str(o.id),
+                    "status": o.status.value if hasattr(o.status, "value") else str(o.status or ""),
+                    "total_amount": round((o.total_amount or 0) / 100, 2),
+                    "table_number": o.table_number or "",
+                    "created_at": o.created_at.isoformat() if o.created_at else "",
+                    "store_id": o.store_id or "",
+                }
+            )
         return rows
 
     async def _fetch_kpi(self, session, filters, sort_by):
@@ -368,14 +368,16 @@ class CustomReportService:
         result = await session.execute(stmt)
         rows = []
         for r in result.scalars().all():
-            rows.append({
-                "record_date": r.record_date.isoformat() if r.record_date else "",
-                "value": float(r.value or 0),
-                "target_value": float(r.target_value or 0),
-                "achievement_rate": round(float(r.achievement_rate or 0) * 100, 2),
-                "status": r.status or "",
-                "store_id": r.store_id or "",
-            })
+            rows.append(
+                {
+                    "record_date": r.record_date.isoformat() if r.record_date else "",
+                    "value": float(r.value or 0),
+                    "target_value": float(r.target_value or 0),
+                    "achievement_rate": round(float(r.achievement_rate or 0) * 100, 2),
+                    "status": r.status or "",
+                    "store_id": r.store_id or "",
+                }
+            )
         return rows
 
     def _to_csv(self, columns: List[Dict], rows: List[Dict]) -> bytes:
@@ -392,7 +394,7 @@ class CustomReportService:
         """生成 Excel 字节流"""
         try:
             import openpyxl
-            from openpyxl.styles import Font, PatternFill, Alignment
+            from openpyxl.styles import Alignment, Font, PatternFill
             from openpyxl.utils import get_column_letter
         except ImportError:
             raise ImportError("请安装 openpyxl: pip install openpyxl")
@@ -478,24 +480,19 @@ class CustomReportService:
     ) -> Optional[ScheduledReport]:
         """更新定时报表订阅"""
         async with get_db_session() as session:
-            stmt = select(ScheduledReport).where(
-                and_(ScheduledReport.id == scheduled_id, ScheduledReport.user_id == user_id)
-            )
+            stmt = select(ScheduledReport).where(and_(ScheduledReport.id == scheduled_id, ScheduledReport.user_id == user_id))
             result = await session.execute(stmt)
             sr = result.scalar_one_or_none()
             if not sr:
                 return None
 
-            allowed = {"frequency", "run_at", "channels", "recipients", "format", "is_active",
-                       "day_of_week", "day_of_month"}
+            allowed = {"frequency", "run_at", "channels", "recipients", "format", "is_active", "day_of_week", "day_of_month"}
             for key, value in kwargs.items():
                 if key in allowed and value is not None:
                     setattr(sr, key, value)
 
             # 重新计算下次执行时间
-            sr.next_run_at = self._calc_next_run(
-                sr.frequency, sr.run_at, sr.day_of_week, sr.day_of_month
-            )
+            sr.next_run_at = self._calc_next_run(sr.frequency, sr.run_at, sr.day_of_week, sr.day_of_month)
             await session.commit()
             await session.refresh(sr)
             return sr
@@ -503,9 +500,7 @@ class CustomReportService:
     async def delete_scheduled_report(self, scheduled_id: str, user_id: str) -> bool:
         """删除定时报表订阅"""
         async with get_db_session() as session:
-            stmt = select(ScheduledReport).where(
-                and_(ScheduledReport.id == scheduled_id, ScheduledReport.user_id == user_id)
-            )
+            stmt = select(ScheduledReport).where(and_(ScheduledReport.id == scheduled_id, ScheduledReport.user_id == user_id))
             result = await session.execute(stmt)
             sr = result.scalar_one_or_none()
             if not sr:
@@ -532,9 +527,7 @@ class CustomReportService:
         elif frequency == ScheduleFrequency.WEEKLY:
             dow = day_of_week if day_of_week is not None else 0
             days_ahead = (dow - now.weekday()) % 7
-            next_run = (now + timedelta(days=days_ahead)).replace(
-                hour=hour, minute=minute, second=0, microsecond=0
-            )
+            next_run = (now + timedelta(days=days_ahead)).replace(hour=hour, minute=minute, second=0, microsecond=0)
             if next_run <= now:
                 next_run += timedelta(weeks=1)
         elif frequency == ScheduleFrequency.MONTHLY:
@@ -553,4 +546,3 @@ class CustomReportService:
 
 # 全局实例
 custom_report_service = CustomReportService()
-

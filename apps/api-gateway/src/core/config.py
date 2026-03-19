@@ -1,18 +1,17 @@
 """
 配置管理
 """
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from typing import List
+
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """应用配置"""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
     # 应用配置
     APP_ENV: str = "development"
@@ -25,7 +24,7 @@ class Settings(BaseSettings):
     REDIS_URL: str
 
     # Redis Sentinel 配置（生产 HA 模式，留空则使用 REDIS_URL 直连）
-    REDIS_SENTINEL_HOSTS: str = ""   # 逗号分隔，如 "sentinel1:26379,sentinel2:26379"
+    REDIS_SENTINEL_HOSTS: str = ""  # 逗号分隔，如 "sentinel1:26379,sentinel2:26379"
     REDIS_SENTINEL_MASTER: str = "mymaster"
     REDIS_SENTINEL_PASSWORD: str = ""
     REDIS_SENTINEL_DB: int = 0
@@ -128,14 +127,33 @@ class Settings(BaseSettings):
     PINZHI_TIMEOUT: int = 30
     PINZHI_RETRY_TIMES: int = 3
 
+    # Neo4j 图数据库（本体层）
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "changeme"
+
     # Celery配置
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
 
-    # 安全配置
-    SECRET_KEY: str
-    JWT_SECRET: str
+    # 安全配置（兼容 compose 传入 JWT_SECRET_KEY / SECRET_KEY）
+    SECRET_KEY: str = ""
+    JWT_SECRET: str = ""
+    JWT_SECRET_KEY: str = ""  # compose 传入的别名
     JWT_ALGORITHM: str = "HS256"
+
+    @model_validator(mode="after")
+    def _resolve_jwt_secret(self) -> "Settings":
+        """JWT_SECRET 和 JWT_SECRET_KEY 互为别名，取先有值的那个"""
+        if not self.JWT_SECRET and self.JWT_SECRET_KEY:
+            self.JWT_SECRET = self.JWT_SECRET_KEY
+        elif not self.JWT_SECRET_KEY and self.JWT_SECRET:
+            self.JWT_SECRET_KEY = self.JWT_SECRET
+        if not self.JWT_SECRET:
+            raise ValueError("JWT_SECRET 或 JWT_SECRET_KEY 必须配置")
+        if not self.SECRET_KEY:
+            self.SECRET_KEY = self.JWT_SECRET
+        return self
     JWT_EXPIRATION: int = 3600
     EDGE_BOOTSTRAP_TOKEN: str = ""
     EDGE_SHOKZ_CALLBACK_URL: str = ""

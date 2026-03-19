@@ -1,12 +1,13 @@
 """
 邀请函服务 — AI文案生成 + RSVP管理
 """
+
 import secrets
-from typing import Dict, Any, List, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.invitation import Invitation, InvitationRSVP, InvitationTemplate, RSVPStatus
@@ -67,18 +68,13 @@ class InvitationService:
     ) -> List[Invitation]:
         """获取邀请函列表"""
         result = await session.execute(
-            select(Invitation)
-            .where(Invitation.store_id == store_id)
-            .order_by(Invitation.created_at.desc())
-            .limit(limit)
+            select(Invitation).where(Invitation.store_id == store_id).order_by(Invitation.created_at.desc()).limit(limit)
         )
         return list(result.scalars().all())
 
     async def get_by_id(self, session: AsyncSession, invitation_id: str) -> Optional[Invitation]:
         """按ID获取"""
-        result = await session.execute(
-            select(Invitation).where(Invitation.id == invitation_id)
-        )
+        result = await session.execute(select(Invitation).where(Invitation.id == invitation_id))
         return result.scalar_one_or_none()
 
     async def get_by_share_token(self, session: AsyncSession, share_token: str) -> Optional[Invitation]:
@@ -136,6 +132,7 @@ class InvitationService:
 
         try:
             from ..agents.llm_agent import LLMAgent
+
             agent = LLMAgent()
             generated = await agent.generate_text(prompt)
             text = generated if isinstance(generated, str) else str(generated)
@@ -219,9 +216,7 @@ class InvitationService:
         invitation_id: str,
     ) -> Dict[str, Any]:
         """RSVP统计"""
-        result = await session.execute(
-            select(InvitationRSVP).where(InvitationRSVP.invitation_id == invitation_id)
-        )
+        result = await session.execute(select(InvitationRSVP).where(InvitationRSVP.invitation_id == invitation_id))
         rsvps = result.scalars().all()
 
         attending = [r for r in rsvps if r.status == RSVPStatus.ATTENDING]

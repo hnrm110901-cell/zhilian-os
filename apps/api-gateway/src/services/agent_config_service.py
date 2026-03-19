@@ -1,15 +1,14 @@
 """
 Agent 配置管理 Service — CRUD + 批量初始化
 """
+
 import uuid
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.agent_config import AgentConfig
-
 
 # 默认 Agent 配置模板
 DEFAULT_CONFIGS: dict[str, dict] = {
@@ -82,9 +81,7 @@ async def init_brand_agents(session: AsyncSession, brand_id: str) -> list[dict]:
 async def list_brand_agents(session: AsyncSession, brand_id: str) -> list[dict]:
     """列出品牌所有 Agent 配置"""
     result = await session.execute(
-        select(AgentConfig)
-        .where(AgentConfig.brand_id == brand_id)
-        .order_by(AgentConfig.agent_type)
+        select(AgentConfig).where(AgentConfig.brand_id == brand_id).order_by(AgentConfig.agent_type)
     )
     configs = result.scalars().all()
 
@@ -93,18 +90,14 @@ async def list_brand_agents(session: AsyncSession, brand_id: str) -> list[dict]:
         await init_brand_agents(session, brand_id)
         await session.commit()
         result = await session.execute(
-            select(AgentConfig)
-            .where(AgentConfig.brand_id == brand_id)
-            .order_by(AgentConfig.agent_type)
+            select(AgentConfig).where(AgentConfig.brand_id == brand_id).order_by(AgentConfig.agent_type)
         )
         configs = result.scalars().all()
 
     return [_to_dict(c) for c in configs]
 
 
-async def get_agent_config(
-    session: AsyncSession, brand_id: str, agent_type: str
-) -> Optional[dict]:
+async def get_agent_config(session: AsyncSession, brand_id: str, agent_type: str) -> Optional[dict]:
     """获取单个 Agent 配置"""
     result = await session.execute(
         select(AgentConfig).where(
@@ -147,9 +140,7 @@ async def update_agent_config(
     return _to_dict(cfg)
 
 
-async def toggle_agent(
-    session: AsyncSession, brand_id: str, agent_type: str
-) -> Optional[dict]:
+async def toggle_agent(session: AsyncSession, brand_id: str, agent_type: str) -> Optional[dict]:
     """切换 Agent 启用/停用"""
     result = await session.execute(
         select(AgentConfig).where(

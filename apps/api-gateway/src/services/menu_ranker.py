@@ -12,9 +12,11 @@ MenuRanker.rank(store_id) → List[RankedDish]
 
 Redis 缓存：TTL 5分钟（高频读场景，< 200ms 响应目标）
 """
+
 import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+
 import structlog
 
 from ..models.menu_rank import DishScore, RankedDish
@@ -27,8 +29,8 @@ CACHE_KEY_PREFIX = "menu_rank:"
 # 默认时段配置（MealPeriod 表为空时 fallback）
 _DEFAULT_SLOTS = [
     ("breakfast", 6, 10),
-    ("lunch",    10, 14),
-    ("dinner",   17, 21),
+    ("lunch", 10, 14),
+    ("dinner", 17, 21),
 ]
 
 
@@ -51,6 +53,7 @@ async def _current_time_slot(session, store_id: str) -> str:
     """
     try:
         from sqlalchemy import select
+
         from ..models.meal_period import MealPeriod
 
         stmt = select(MealPeriod).where(
@@ -156,15 +159,17 @@ class MenuRanker:
 
                 highlight = self._generate_highlight(score, dish)
 
-                scored_dishes.append(RankedDish(
-                    rank=0,  # 排名在排序后重新赋值
-                    dish_id=dish["dish_id"],
-                    dish_name=dish["dish_name"],
-                    category=dish.get("category"),
-                    price=dish.get("price"),
-                    score=score,
-                    highlight=highlight,
-                ))
+                scored_dishes.append(
+                    RankedDish(
+                        rank=0,  # 排名在排序后重新赋值
+                        dish_id=dish["dish_id"],
+                        dish_name=dish["dish_name"],
+                        category=dish.get("category"),
+                        price=dish.get("price"),
+                        score=score,
+                        highlight=highlight,
+                    )
+                )
 
             # 按总分降序排序
             scored_dishes.sort(key=lambda d: d.score.total_score, reverse=True)
@@ -187,7 +192,8 @@ class MenuRanker:
           2. 各菜品午市 / 晚市销量占比（时段因子）
           3. 各菜品近7天取消/退单量（低退单因子）
         """
-        from sqlalchemy import select, func, case, extract
+        from sqlalchemy import case, extract, func, select
+
         from ..models.dish import Dish
         from ..models.order import Order, OrderItem, OrderStatus
 
@@ -219,8 +225,7 @@ class MenuRanker:
                 func.sum(
                     case(
                         (
-                            (Order.order_time >= two_weeks_ago)
-                            & (Order.order_time < week_ago),
+                            (Order.order_time >= two_weeks_ago) & (Order.order_time < week_ago),
                             OrderItem.quantity,
                         ),
                         else_=0,
@@ -303,20 +308,22 @@ class MenuRanker:
             total_recent = recent_sales or 1
             refund_rate = min(1.0, cancelled / total_recent)
 
-            dish_data.append({
-                "dish_id": did,
-                "dish_name": dish.name,
-                "category": dish.category,
-                "price": dish.price,
-                "cost": getattr(dish, "cost", 0) or 0,
-                "current_stock": getattr(dish, "current_stock", 999),
-                "min_stock": getattr(dish, "min_stock", 10),
-                "recent_sales": recent_sales,
-                "prev_sales": prev_sales,
-                "refund_rate": refund_rate,
-                "lunch_sales_pct": slot["lunch_pct"],
-                "dinner_sales_pct": slot["dinner_pct"],
-            })
+            dish_data.append(
+                {
+                    "dish_id": did,
+                    "dish_name": dish.name,
+                    "category": dish.category,
+                    "price": dish.price,
+                    "cost": getattr(dish, "cost", 0) or 0,
+                    "current_stock": getattr(dish, "current_stock", 999),
+                    "min_stock": getattr(dish, "min_stock", 10),
+                    "recent_sales": recent_sales,
+                    "prev_sales": prev_sales,
+                    "refund_rate": refund_rate,
+                    "lunch_sales_pct": slot["lunch_pct"],
+                    "dinner_sales_pct": slot["dinner_pct"],
+                }
+            )
 
         return dish_data
 

@@ -21,7 +21,7 @@ const { Option } = Select;
 
 // ── 常量 ─────────────────────────────────────────────────────────────────────
 
-const DEFAULT_STORE = 'S001';
+const DEFAULT_STORE = localStorage.getItem('store_id') || '';
 const DEFAULT_PERIOD = dayjs().subtract(1, 'month').format('YYYY-MM');
 
 const DRIVER_CONFIG: Record<string, { color: string; label: string }> = {

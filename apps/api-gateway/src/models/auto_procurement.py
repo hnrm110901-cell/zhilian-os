@@ -2,14 +2,12 @@
 智能采购模型
 ProcurementRule（采购规则）+ ProcurementExecution（执行记录）
 """
+
 import uuid
 from datetime import datetime
-from sqlalchemy import (
-    Column, String, Integer, Text, DateTime, Boolean,
-    ForeignKey, Index, Numeric,
-)
-from sqlalchemy.dialects.postgresql import UUID
 
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from src.models.base import Base
 from src.models.mixins import TimestampMixin
 

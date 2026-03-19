@@ -163,7 +163,7 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询门店信息", ognid=ognid)
 
-        response = await self._request("GET", "/pinzhi/storeInfo.do", params=params)
+        response = await self._request("GET", "/pinzhi/organizations.do", params=params)
         return response.get("res", [])
 
     async def get_dish_categories(self) -> List[Dict[str, Any]]:
@@ -258,41 +258,46 @@ class PinzhiAdapter:
         ognid: Optional[str] = None,
         begin_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        business_date: Optional[str] = None,
         page_index: int = 1,
         page_size: int = int(os.getenv("PINZHI_PAGE_SIZE", "20")),
     ) -> List[Dict[str, Any]]:
         """
-        按日期查询订单数据（V2）
+        按日期查询订单数据
+
+        品智orderNew.do实际使用businessDate参数（单日查询）。
+        为兼容pos_service等上游调用者，同时接受begin_date/end_date，
+        优先使用business_date，其次取begin_date作为businessDate。
 
         Args:
             ognid: 门店omsID
-            begin_date: 开始日期（yyyy-MM-dd）
-            end_date: 结束日期（yyyy-MM-dd）
+            begin_date: 开始日期（yyyy-MM-dd），作为businessDate使用
+            end_date: 结束日期（yyyy-MM-dd），保留兼容但不发送给API
+            business_date: 营业日（yyyy-MM-dd），优先级最高
             page_index: 页码
             page_size: 每页数量
 
         Returns:
             订单列表
         """
+        # 品智API只支持单日查询(businessDate)，取优先级：business_date > begin_date
+        biz_date = business_date or begin_date
         params = {"pageIndex": page_index, "pageSize": page_size}
 
         if ognid:
             params["ognid"] = ognid
-        if begin_date:
-            params["beginDate"] = begin_date
-        if end_date:
-            params["endDate"] = end_date
+        if biz_date:
+            params["businessDate"] = biz_date
 
         params = self._add_sign(params)
         logger.info(
             "查询订单",
             ognid=ognid,
-            begin_date=begin_date,
-            end_date=end_date,
+            business_date=biz_date,
             page=page_index,
         )
 
-        response = await self._request("GET", "/pinzhi/queryOrderListV2.do", params=params)
+        response = await self._request("GET", "/pinzhi/orderNew.do", params=params)
         return response.get("res", [])
 
     async def query_order_summary(
@@ -508,10 +513,10 @@ class PinzhiAdapter:
 
         # 定义所有检测项：name, method, endpoint, params_builder, required(核心=True)
         checks = [
-            ("门店信息", "GET", "/pinzhi/storeInfo.do", lambda: {"ognid": ognid} if ognid else {}, True),
+            ("门店信息", "GET", "/pinzhi/organizations.do", lambda: {"ognid": ognid} if ognid else {}, True),
             ("门店每日经营数据(报表)", "GET", "/pinzhi/queryOgnDailyBizData.do", lambda: {"businessDate": business_date, **({"ognid": ognid} if ognid else {})}, True),
             ("按门店收入数据", "GET", "/pinzhi/queryOrderSummary.do", lambda: {"ognid": ognid or "", "businessDate": business_date}, True),  # 无 ognid 时可能报错，仍尝试
-            ("订单列表V2", "GET", "/pinzhi/queryOrderListV2.do", lambda: {"beginDate": business_date, "endDate": business_date, "pageIndex": 1, "pageSize": 5}, True),
+            ("订单列表V2", "GET", "/pinzhi/orderNew.do", lambda: {"beginDate": business_date, "endDate": business_date, "pageIndex": 1, "pageSize": 5}, True),
             ("菜品类别", "GET", "/pinzhi/reportcategory.do", lambda: {}, True),
             ("支付方式", "GET", "/pinzhi/payType.do", lambda: {}, True),
             ("支付方式(payment)", "GET", "/pinzhi/payment.do", lambda: {}, False),  # 部分环境用 payment.do
@@ -580,7 +585,7 @@ class PinzhiAdapter:
         """
         将品智原始订单字段映射到标准 OrderSchema
 
-        品智订单字段参考（queryOrderListV2.do）：
+        品智订单字段参考（orderNew.do）：
           billId, billNo, orderSource, tableNo, openTime, payTime,
           dishPriceTotal, specialOfferPrice, realPrice, billStatus,
           openOrderUser, cashiers, paymentList

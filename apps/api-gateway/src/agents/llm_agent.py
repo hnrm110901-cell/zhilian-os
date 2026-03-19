@@ -7,6 +7,7 @@
   - execute_with_fallback(): 优先 Tool Use，失败降级到规则引擎
   - stream_response()      : 流式输出支持
 """
+
 from __future__ import annotations
 
 import json
@@ -29,6 +30,7 @@ logger = structlog.get_logger()
 # 标准输出结构
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class AgentResult:
     """
@@ -47,6 +49,7 @@ class AgentResult:
         iterations:      Tool Use 循环次数
         tokens_used:     消耗的 token 数
     """
+
     success: bool
     data: Any
     message: str = ""
@@ -87,6 +90,7 @@ class AgentResult:
 # ─────────────────────────────────────────────────────────────────────────────
 # LLMEnhancedAgent 基类
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class LLMEnhancedAgent:
     """
@@ -152,6 +156,7 @@ class LLMEnhancedAgent:
             # 检查当前 LLM 客户端是否支持 Tool Use
             # AnthropicClient 有完整实现，其他客户端使用基类降级实现
             from ..core.llm import AnthropicClient
+
             is_anthropic = isinstance(llm_client, AnthropicClient)
 
             if not is_anthropic:
@@ -278,9 +283,7 @@ class LLMEnhancedAgent:
         新代码推荐使用 execute_with_tools()。
         """
         try:
-            user_prompt = AgentPrompts.format_user_prompt(
-                action=action, params=params, context=context
-            )
+            user_prompt = AgentPrompts.format_user_prompt(action=action, params=params, context=context)
             logger.info(
                 "agent_single_llm_call",
                 agent=self.agent_type,
@@ -422,6 +425,7 @@ class LLMEnhancedAgent:
         """发布洞察到共享 Agent Memory Bus，供其他 Agent 感知"""
         try:
             from ..services.agent_memory_bus import agent_memory_bus
+
             await agent_memory_bus.publish(
                 store_id=store_id,
                 agent_id=self.agent_type,
@@ -442,6 +446,7 @@ class LLMEnhancedAgent:
         """获取其他 Agent 的最近洞察，注入到 LLM 上下文"""
         try:
             from ..services.agent_memory_bus import agent_memory_bus
+
             return await agent_memory_bus.get_peer_context(
                 store_id=store_id,
                 requesting_agent=self.agent_type,

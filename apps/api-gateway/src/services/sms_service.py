@@ -4,6 +4,7 @@ SMS 验证码服务
 支持阿里云 / 腾讯云短信发送，开发环境降级为固定验证码 888888。
 验证码存储在 Redis，TTL 300s；发送冷却 60s。
 """
+
 import logging
 import random
 import string
@@ -14,7 +15,7 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 
 # Redis key 前缀
-_VERIFY_PREFIX = "sms:verify:"     # sms:verify:{phone} → code, TTL 300s
+_VERIFY_PREFIX = "sms:verify:"  # sms:verify:{phone} → code, TTL 300s
 _COOLDOWN_PREFIX = "sms:cooldown:"  # sms:cooldown:{phone} → 1, TTL 60s
 
 # 验证码有效期（秒）
@@ -35,6 +36,7 @@ class SMSService:
         """懒加载 Redis 连接（复用项目全局 RedisCacheService）"""
         if self._redis is None:
             from .redis_cache_service import RedisCacheService
+
             cache = RedisCacheService()
             await cache.initialize()
             self._redis = cache._redis
@@ -97,12 +99,7 @@ class SMSService:
     @staticmethod
     def _validate_phone(phone: str) -> bool:
         """校验中国大陆手机号（简单规则：11位数字，1开头）"""
-        return (
-            phone is not None
-            and len(phone) == 11
-            and phone.isdigit()
-            and phone.startswith("1")
-        )
+        return phone is not None and len(phone) == 11 and phone.isdigit() and phone.startswith("1")
 
     @staticmethod
     def _generate_code() -> str:
@@ -134,10 +131,11 @@ class SMSService:
     async def _send_aliyun(self, phone: str, code: str) -> bool:
         """阿里云短信发送"""
         try:
-            from alibabacloud_dysmsapi20170525.client import Client
-            from alibabacloud_dysmsapi20170525 import models as sms_models
-            from alibabacloud_tea_openapi import models as open_models
             import json
+
+            from alibabacloud_dysmsapi20170525 import models as sms_models
+            from alibabacloud_dysmsapi20170525.client import Client
+            from alibabacloud_tea_openapi import models as open_models
 
             config = open_models.Config(
                 access_key_id=settings.ALIYUN_ACCESS_KEY_ID,
@@ -171,7 +169,7 @@ class SMSService:
         """腾讯云短信发送"""
         try:
             from tencentcloud.common import credential
-            from tencentcloud.sms.v20210111 import sms_client, models
+            from tencentcloud.sms.v20210111 import models, sms_client
 
             cred = credential.Credential(
                 settings.TENCENT_SECRET_ID,

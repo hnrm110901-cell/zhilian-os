@@ -11,15 +11,17 @@ Vector Database Service - Enhanced Version
 6. 兼容性增强
 7. 添加熔断器防止Silent Failure
 """
-from typing import List, Dict, Any, Optional
-import structlog
-from datetime import datetime
+
+import asyncio
 import hashlib
 import json
-import asyncio
 import os
-from functools import wraps
 import time
+from datetime import datetime
+from functools import wraps
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 from ..core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 
@@ -28,6 +30,7 @@ logger = structlog.get_logger()
 
 def retry_on_failure(max_retries: int = 3, delay: float = 1.0):
     """重试装饰器"""
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -38,21 +41,14 @@ def retry_on_failure(max_retries: int = 3, delay: float = 1.0):
                 except Exception as e:
                     last_exception = e
                     if attempt < max_retries - 1:
-                        logger.warning(
-                            f"操作失败，正在重试",
-                            function=func.__name__,
-                            attempt=attempt + 1,
-                            error=str(e)
-                        )
+                        logger.warning(f"操作失败，正在重试", function=func.__name__, attempt=attempt + 1, error=str(e))
                         await asyncio.sleep(delay * (attempt + 1))
                     else:
-                        logger.error(
-                            f"操作失败，已达最大重试次数",
-                            function=func.__name__,
-                            error=str(e)
-                        )
+                        logger.error(f"操作失败，已达最大重试次数", function=func.__name__, error=str(e))
             raise last_exception
+
         return wrapper
+
     return decorator
 
 
@@ -72,15 +68,17 @@ class VectorDatabaseServiceEnhanced:
 
         # 初始化熔断器（防止Silent Failure）
         self.circuit_breaker = CircuitBreaker(
-            failure_threshold=int(os.getenv("VECTOR_DB_CB_FAILURE_THRESHOLD", "5")),    # 连续失败N次后熔断
-            success_threshold=int(os.getenv("VECTOR_DB_CB_SUCCESS_THRESHOLD", "2")),    # 半开状态成功N次后恢复
-            timeout=float(os.getenv("VECTOR_DB_CB_TIMEOUT", "60.0")),                  # 熔断N秒后尝试恢复
+            failure_threshold=int(os.getenv("VECTOR_DB_CB_FAILURE_THRESHOLD", "5")),  # 连续失败N次后熔断
+            success_threshold=int(os.getenv("VECTOR_DB_CB_SUCCESS_THRESHOLD", "2")),  # 半开状态成功N次后恢复
+            timeout=float(os.getenv("VECTOR_DB_CB_TIMEOUT", "60.0")),  # 熔断N秒后尝试恢复
             expected_exception=Exception,
         )
 
         logger.info("VectorDatabaseServiceEnhanced初始化完成（带熔断器）")
 
-    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX", "3")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY_LONG", "2.0")))
+    @retry_on_failure(
+        max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX", "3")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY_LONG", "2.0"))
+    )
     async def initialize(self):
         """初始化Qdrant客户端和嵌入模型（带重试）"""
         if self._initialized:
@@ -95,16 +93,17 @@ class VectorDatabaseServiceEnhanced:
             # 记录客户端版本（如果可用）
             try:
                 import qdrant_client
-                self._client_version = getattr(qdrant_client, '__version__', 'unknown')
+
+                self._client_version = getattr(qdrant_client, "__version__", "unknown")
             except Exception as e:
-                self._client_version = 'unknown'
+                self._client_version = "unknown"
                 logger.warning("qdrant_version_check_failed", error=str(e))
 
             logger.info(f"使用qdrant-client版本: {self._client_version}")
 
             # 创建客户端（使用gRPC协议以避免HTTP 503错误）
             self.client = QdrantClient(
-                host=self.qdrant_url.replace('http://', '').replace('https://', '').split(':')[0],
+                host=self.qdrant_url.replace("http://", "").replace("https://", "").split(":")[0],
                 port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),  # gRPC端口
                 prefer_grpc=True,
                 timeout=int(os.getenv("QDRANT_TIMEOUT", "30")),
@@ -145,15 +144,13 @@ class VectorDatabaseServiceEnhanced:
             # 记录版本（如果可用）
             try:
                 import sentence_transformers
-                version = getattr(sentence_transformers, '__version__', 'unknown')
+
+                version = getattr(sentence_transformers, "__version__", "unknown")
                 logger.info(f"sentence-transformers版本: {version}")
             except Exception as e:
                 logger.warning("sentence_transformers_version_check_failed", error=str(e))
             model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
-            self.embedding_model = SentenceTransformer(
-                model_name,
-                device='cpu'  # 使用CPU，避免GPU依赖
-            )
+            self.embedding_model = SentenceTransformer(model_name, device="cpu")  # 使用CPU，避免GPU依赖
             logger.info("嵌入模型加载成功", model=model_name)
 
         except Exception as e:
@@ -255,8 +252,8 @@ class VectorDatabaseServiceEnhanced:
           EMBEDDING_API_MODEL — 嵌入模型名（默认 text-embedding-3-small）
         """
         import json
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
         if not api_key:
@@ -266,11 +263,13 @@ class VectorDatabaseServiceEnhanced:
         model = os.getenv("EMBEDDING_API_MODEL", "text-embedding-3-small")
         timeout = float(os.getenv("EMBEDDING_API_TIMEOUT", "10.0"))
 
-        payload = json.dumps({
-            "input": text[:8191],
-            "model": model,
-            "dimensions": dim,
-        }).encode("utf-8")
+        payload = json.dumps(
+            {
+                "input": text[:8191],
+                "model": model,
+                "dimensions": dim,
+            }
+        ).encode("utf-8")
 
         req = urllib.request.Request(
             f"{base_url}/embeddings",
@@ -293,7 +292,9 @@ class VectorDatabaseServiceEnhanced:
             logger.warning(f"嵌入 API 调用异常: {str(e)}")
             return None
 
-    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
+    @retry_on_failure(
+        max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0"))
+    )
     async def index_order(self, order_data: Dict[str, Any]) -> bool:
         """
         索引订单到向量数据库（带重试和熔断器）
@@ -306,10 +307,7 @@ class VectorDatabaseServiceEnhanced:
         """
         try:
             # 使用熔断器保护Qdrant操作
-            return await self.circuit_breaker.call_async(
-                self._index_order_internal,
-                order_data
-            )
+            return await self.circuit_breaker.call_async(self._index_order_internal, order_data)
         except CircuitBreakerOpenError as e:
             logger.warning(
                 "熔断器打开，订单索引降级",
@@ -357,7 +355,11 @@ class VectorDatabaseServiceEnhanced:
                     "order_number": order_data["order_number"],
                     "order_type": order_data["order_type"],
                     "total": float(order_data["total"]),
-                    "created_at": order_data["created_at"].isoformat() if isinstance(order_data["created_at"], datetime) else order_data["created_at"],
+                    "created_at": (
+                        order_data["created_at"].isoformat()
+                        if isinstance(order_data["created_at"], datetime)
+                        else order_data["created_at"]
+                    ),
                     "store_id": order_data["store_id"],
                     "text": text,
                 },
@@ -416,7 +418,11 @@ class VectorDatabaseServiceEnhanced:
                             "order_number": order_data["order_number"],
                             "order_type": order_data["order_type"],
                             "total": float(order_data["total"]),
-                            "created_at": order_data["created_at"].isoformat() if isinstance(order_data["created_at"], datetime) else order_data["created_at"],
+                            "created_at": (
+                                order_data["created_at"].isoformat()
+                                if isinstance(order_data["created_at"], datetime)
+                                else order_data["created_at"]
+                            ),
                             "store_id": order_data["store_id"],
                             "text": text,
                         },
@@ -439,11 +445,7 @@ class VectorDatabaseServiceEnhanced:
             duration = end_time - start_time
 
             logger.info(
-                "批量订单索引完成",
-                total=len(orders),
-                success=success_count,
-                failure=failure_count,
-                duration_seconds=duration
+                "批量订单索引完成", total=len(orders), success=success_count, failure=failure_count, duration_seconds=duration
             )
 
             return {
@@ -510,7 +512,9 @@ class VectorDatabaseServiceEnhanced:
 
         return health_status
 
-    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
+    @retry_on_failure(
+        max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0"))
+    )
     async def index_dish(self, dish_data: Dict[str, Any]) -> bool:
         """
         索引菜品到向量数据库（带重试）
@@ -569,7 +573,9 @@ class VectorDatabaseServiceEnhanced:
             logger.error("菜品索引失败", error=str(e))
             return False
 
-    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
+    @retry_on_failure(
+        max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0"))
+    )
     async def index_event(self, event_data: Dict[str, Any]) -> bool:
         """
         索引神经系统事件到向量数据库（带重试）
@@ -606,7 +612,11 @@ class VectorDatabaseServiceEnhanced:
                     "event_id": event_data["event_id"],
                     "event_type": event_data["event_type"],
                     "event_source": event_data["event_source"],
-                    "timestamp": event_data["timestamp"].isoformat() if isinstance(event_data["timestamp"], datetime) else event_data["timestamp"],
+                    "timestamp": (
+                        event_data["timestamp"].isoformat()
+                        if isinstance(event_data["timestamp"], datetime)
+                        else event_data["timestamp"]
+                    ),
                     "store_id": event_data["store_id"],
                     "priority": event_data.get("priority", 0),
                     "text": text,
@@ -628,7 +638,9 @@ class VectorDatabaseServiceEnhanced:
             logger.error("事件索引失败", error=str(e))
             return False
 
-    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
+    @retry_on_failure(
+        max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0"))
+    )
     async def semantic_search(
         self,
         collection_name: str,
@@ -653,7 +665,7 @@ class VectorDatabaseServiceEnhanced:
             query_embedding = self.generate_embedding(query)
 
             # 构建过滤条件
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
 
             qdrant_filter = None
             if filters:
@@ -679,10 +691,12 @@ class VectorDatabaseServiceEnhanced:
             # 格式化结果
             formatted_results = []
             for result in results:
-                formatted_results.append({
-                    "score": result.score,
-                    "payload": result.payload,
-                })
+                formatted_results.append(
+                    {
+                        "score": result.score,
+                        "payload": result.payload,
+                    }
+                )
 
             logger.info(
                 "语义搜索完成",
@@ -699,75 +713,50 @@ class VectorDatabaseServiceEnhanced:
 
     def _order_to_text(self, order_data: Dict[str, Any]) -> str:
         """将订单数据转换为文本表示"""
-        items_text = ", ".join([
-            f"{item.get('dish_name', 'unknown')} x {item.get('quantity', 0)}"
-            for item in order_data.get("items", [])
-        ])
+        items_text = ", ".join(
+            [f"{item.get('dish_name', 'unknown')} x {item.get('quantity', 0)}" for item in order_data.get("items", [])]
+        )
 
-        return f"订单号 {order_data.get('order_number', 'N/A')}, " \
-               f"类型 {order_data.get('order_type', 'N/A')}, " \
-               f"菜品: {items_text if items_text else '无'}, " \
-               f"总金额 {order_data.get('total', 0)}元"
+        return (
+            f"订单号 {order_data.get('order_number', 'N/A')}, "
+            f"类型 {order_data.get('order_type', 'N/A')}, "
+            f"菜品: {items_text if items_text else '无'}, "
+            f"总金额 {order_data.get('total', 0)}元"
+        )
 
     def _dish_to_text(self, dish_data: Dict[str, Any]) -> str:
         """将菜品数据转换为文本表示"""
         tags_text = ", ".join(dish_data.get("tags", []))
 
-        return f"菜品 {dish_data.get('name', 'N/A')}, " \
-               f"分类 {dish_data.get('category', 'N/A')}, " \
-               f"价格 {dish_data.get('price', 0)}元, " \
-               f"描述: {dish_data.get('description', '')}, " \
-               f"标签: {tags_text}"
+        return (
+            f"菜品 {dish_data.get('name', 'N/A')}, "
+            f"分类 {dish_data.get('category', 'N/A')}, "
+            f"价格 {dish_data.get('price', 0)}元, "
+            f"描述: {dish_data.get('description', '')}, "
+            f"标签: {tags_text}"
+        )
 
     def _event_to_text(self, event_data: Dict[str, Any]) -> str:
         """将事件数据转换为文本表示"""
         data_text = json.dumps(event_data.get("data", {}), ensure_ascii=False)
 
-        return f"事件类型 {event_data.get('event_type', 'N/A')}, " \
-               f"来源 {event_data.get('event_source', 'N/A')}, " \
-               f"数据: {data_text}"
+        return (
+            f"事件类型 {event_data.get('event_type', 'N/A')}, "
+            f"来源 {event_data.get('event_source', 'N/A')}, "
+            f"数据: {data_text}"
+        )
 
-    async def search_orders(
-        self,
-        query: str,
-        store_id: str,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    async def search_orders(self, query: str, store_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """搜索订单"""
-        return await self.semantic_search(
-            collection_name="orders",
-            query=query,
-            limit=limit,
-            filters={"store_id": store_id}
-        )
+        return await self.semantic_search(collection_name="orders", query=query, limit=limit, filters={"store_id": store_id})
 
-    async def search_dishes(
-        self,
-        query: str,
-        store_id: str,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    async def search_dishes(self, query: str, store_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """搜索菜品"""
-        return await self.semantic_search(
-            collection_name="dishes",
-            query=query,
-            limit=limit,
-            filters={"store_id": store_id}
-        )
+        return await self.semantic_search(collection_name="dishes", query=query, limit=limit, filters={"store_id": store_id})
 
-    async def search_events(
-        self,
-        query: str,
-        store_id: str,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    async def search_events(self, query: str, store_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """搜索事件"""
-        return await self.semantic_search(
-            collection_name="events",
-            query=query,
-            limit=limit,
-            filters={"store_id": store_id}
-        )
+        return await self.semantic_search(collection_name="events", query=query, limit=limit, filters={"store_id": store_id})
 
     async def index_dishes_batch(self, dishes: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -834,11 +823,7 @@ class VectorDatabaseServiceEnhanced:
             duration = end_time - start_time
 
             logger.info(
-                "批量菜品索引完成",
-                total=len(dishes),
-                success=success_count,
-                failure=failure_count,
-                duration_seconds=duration
+                "批量菜品索引完成", total=len(dishes), success=success_count, failure=failure_count, duration_seconds=duration
             )
 
             return {
@@ -900,7 +885,11 @@ class VectorDatabaseServiceEnhanced:
                             "event_id": event_data["event_id"],
                             "event_type": event_data["event_type"],
                             "event_source": event_data["event_source"],
-                            "timestamp": event_data["timestamp"].isoformat() if isinstance(event_data["timestamp"], datetime) else event_data["timestamp"],
+                            "timestamp": (
+                                event_data["timestamp"].isoformat()
+                                if isinstance(event_data["timestamp"], datetime)
+                                else event_data["timestamp"]
+                            ),
                             "store_id": event_data["store_id"],
                             "priority": event_data.get("priority", 0),
                             "text": text,
@@ -924,11 +913,7 @@ class VectorDatabaseServiceEnhanced:
             duration = end_time - start_time
 
             logger.info(
-                "批量事件索引完成",
-                total=len(events),
-                success=success_count,
-                failure=failure_count,
-                duration_seconds=duration
+                "批量事件索引完成", total=len(events), success=success_count, failure=failure_count, duration_seconds=duration
             )
 
             return {

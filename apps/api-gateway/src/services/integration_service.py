@@ -2,25 +2,27 @@
 Integration Service
 外部系统集成服务
 """
-from typing import List, Optional, Dict, Any, Callable, Tuple
-from datetime import datetime, timedelta
-from sqlalchemy import select, and_, or_, desc, func
-from sqlalchemy.ext.asyncio import AsyncSession
+
 import asyncio
-import os
-import structlog
-import httpx
 import json
+import os
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import httpx
+import structlog
+from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.integration import (
     ExternalSystem,
-    SyncLog,
-    POSTransaction,
-    SupplierOrder,
-    MemberSync,
-    ReservationSync,
-    IntegrationType,
     IntegrationStatus,
+    IntegrationType,
+    MemberSync,
+    POSTransaction,
+    ReservationSync,
+    SupplierOrder,
+    SyncLog,
     SyncStatus,
 )
 from ..models.reservation import ReservationStatus
@@ -68,13 +70,9 @@ class IntegrationService:
 
         return system
 
-    async def get_system(
-        self, session: AsyncSession, system_id: str
-    ) -> Optional[ExternalSystem]:
+    async def get_system(self, session: AsyncSession, system_id: str) -> Optional[ExternalSystem]:
         """获取外部系统配置"""
-        result = await session.execute(
-            select(ExternalSystem).where(ExternalSystem.id == system_id)
-        )
+        result = await session.execute(select(ExternalSystem).where(ExternalSystem.id == system_id))
         return result.scalar_one_or_none()
 
     async def get_systems(
@@ -133,9 +131,7 @@ class IntegrationService:
         logger.info("外部系统更新成功", system_id=system_id)
         return system
 
-    async def delete_system(
-        self, session: AsyncSession, system_id: str
-    ) -> bool:
+    async def delete_system(self, session: AsyncSession, system_id: str) -> bool:
         """删除外部系统配置"""
         system = await self.get_system(session, system_id)
         if not system:
@@ -147,9 +143,7 @@ class IntegrationService:
         logger.info("外部系统删除成功", system_id=system_id)
         return True
 
-    async def test_connection(
-        self, session: AsyncSession, system_id: str
-    ) -> Dict[str, Any]:
+    async def test_connection(self, session: AsyncSession, system_id: str) -> Dict[str, Any]:
         """测试外部系统连接"""
         system = await self.get_system(session, system_id)
         if not system:
@@ -275,10 +269,9 @@ class IntegrationService:
                 if code in (200, 0, "200", "0"):
                     data = body.get("data", {})
                     total = (
-                        len(data) if isinstance(data, list)
-                        else data.get("total", len(data.get("list", [])))
-                        if isinstance(data, dict)
-                        else "?"
+                        len(data)
+                        if isinstance(data, list)
+                        else data.get("total", len(data.get("list", []))) if isinstance(data, dict) else "?"
                     )
                     return {"success": True, "message": f"品智POS连接成功，共{total}家门店"}
                 else:
@@ -292,9 +285,7 @@ class IntegrationService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def _test_supplier_connection(
-        self, system: ExternalSystem
-    ) -> Dict[str, Any]:
+    async def _test_supplier_connection(self, system: ExternalSystem) -> Dict[str, Any]:
         """测试供应商系统连接"""
         if not system.api_endpoint:
             return {"success": False, "error": "未配置API端点"}
@@ -321,16 +312,14 @@ class IntegrationService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def _test_member_connection(
-        self, system: ExternalSystem
-    ) -> Dict[str, Any]:
+    async def _test_member_connection(self, system: ExternalSystem) -> Dict[str, Any]:
         """测试会员系统连接"""
         if not system.api_endpoint:
             return {"success": False, "error": "未配置API端点"}
 
-        # 奥琦玮微生活会员：使用 CRM 适配器真实 API 测试
-        if system.provider in ("aoqiwei_crm",):
-            return await self._test_aoqiwei_crm_connection(system)
+        # 微生活会员：使用 CRM 适配器真实 API 测试
+        if system.provider in ("weishenghuo",):
+            return await self._test_weishenghuo_connection(system)
 
         try:
             headers = {}
@@ -352,7 +341,7 @@ class IntegrationService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def _test_aoqiwei_crm_connection(self, system: ExternalSystem) -> Dict[str, Any]:
+    async def _test_weishenghuo_connection(self, system: ExternalSystem) -> Dict[str, Any]:
         """
         测试奥琦玮微生活会员 CRM 连接。
         通过调用 /member/info（传入不存在的测试号码）来验证签名算法和网络连通性。
@@ -374,13 +363,15 @@ class IntegrationService:
 
         from packages.api_adapters.aoqiwei.src.crm_adapter import AoqiweiCrmAdapter
 
-        adapter = AoqiweiCrmAdapter({
-            "base_url": system.api_endpoint or "https://welcrm.com",
-            "appid": appid,
-            "appkey": appkey,
-            "timeout": 10,
-            "retry_times": 1,
-        })
+        adapter = AoqiweiCrmAdapter(
+            {
+                "base_url": system.api_endpoint or "https://welcrm.com",
+                "appid": appid,
+                "appkey": appkey,
+                "timeout": 10,
+                "retry_times": 1,
+            }
+        )
         try:
             # 用测试号码触发一次 API 调用，验证签名算法和网络连通性
             # "会员不存在" 类业务错误说明服务可达且签名正确
@@ -394,8 +385,7 @@ class IntegrationService:
             except Exception:
                 pass
             # 业务错误（签名正确但号码不存在）→ 连接成功
-            not_found_keywords = ["会员不存在", "用户不存在", "member not found",
-                                   "status=0", "status=2", "无效用户"]
+            not_found_keywords = ["会员不存在", "用户不存在", "member not found", "status=0", "status=2", "无效用户"]
             if any(kw.lower() in err.lower() for kw in not_found_keywords):
                 return {"success": True, "message": "奥琦玮CRM连接成功（服务正常，测试号码不存在属正常）"}
             return {"success": False, "error": f"奥琦玮CRM连接失败: {err}"}
@@ -422,9 +412,7 @@ class IntegrationService:
             payment_method=transaction_data.get("payment_method"),
             items=transaction_data.get("items"),
             customer_info=transaction_data.get("customer"),
-            transaction_time=datetime.fromisoformat(
-                transaction_data.get("transaction_time", datetime.utcnow().isoformat())
-            ),
+            transaction_time=datetime.fromisoformat(transaction_data.get("transaction_time", datetime.utcnow().isoformat())),
             raw_data=transaction_data,
         )
 
@@ -487,12 +475,10 @@ class IntegrationService:
             total=order_data.get("total", 0),
             items=order_data.get("items"),
             delivery_info=order_data.get("delivery"),
-            order_date=datetime.fromisoformat(
-                order_data.get("order_date", datetime.utcnow().isoformat())
+            order_date=datetime.fromisoformat(order_data.get("order_date", datetime.utcnow().isoformat())),
+            expected_delivery=(
+                datetime.fromisoformat(order_data["expected_delivery"]) if order_data.get("expected_delivery") else None
             ),
-            expected_delivery=datetime.fromisoformat(order_data["expected_delivery"])
-            if order_data.get("expected_delivery")
-            else None,
             raw_data=order_data,
         )
 
@@ -648,8 +634,9 @@ class IntegrationService:
                 customer_count=reservation_data["customer_count"],
                 reservation_date=datetime.fromisoformat(reservation_data["reservation_date"]),
                 reservation_time=reservation_data["reservation_time"],
-                arrival_time=datetime.fromisoformat(reservation_data["arrival_time"])
-                    if reservation_data.get("arrival_time") else None,
+                arrival_time=(
+                    datetime.fromisoformat(reservation_data["arrival_time"]) if reservation_data.get("arrival_time") else None
+                ),
                 table_type=reservation_data.get("table_type"),
                 table_number=reservation_data.get("table_number"),
                 area=reservation_data.get("area"),
@@ -715,9 +702,7 @@ class IntegrationService:
         """更新预订状态"""
         from ..models.integration import ReservationSync
 
-        result = await session.execute(
-            select(ReservationSync).where(ReservationSync.reservation_id == reservation_id)
-        )
+        result = await session.execute(select(ReservationSync).where(ReservationSync.reservation_id == reservation_id))
         reservation = result.scalar_one_or_none()
 
         if not reservation:
@@ -797,7 +782,6 @@ class IntegrationService:
         result = await session.execute(query)
         return list(result.scalars().all())
 
-
     # ──────────────────────────────────────────────────────────────────────────
     # P1 增强功能 #1：自动重试机制
     # ──────────────────────────────────────────────────────────────────────────
@@ -848,9 +832,7 @@ class IntegrationService:
                 await asyncio.sleep(delay)
         raise last_exc
 
-    async def test_connection_with_retry(
-        self, session: AsyncSession, system_id: str, max_attempts: int = 3
-    ) -> Dict[str, Any]:
+    async def test_connection_with_retry(self, session: AsyncSession, system_id: str, max_attempts: int = 3) -> Dict[str, Any]:
         """带自动重试的连接测试"""
         return await self.with_retry(
             self.test_connection,
@@ -940,7 +922,7 @@ class IntegrationService:
         errors: List[Dict[str, Any]] = []
 
         for i in range(0, total, chunk_size):
-            chunk = members[i: i + chunk_size]
+            chunk = members[i : i + chunk_size]
             tasks = []
             for member_data in chunk:
                 if system_type:
@@ -992,7 +974,7 @@ class IntegrationService:
         errors: List[Dict[str, Any]] = []
 
         for i in range(0, total, chunk_size):
-            chunk = transactions[i: i + chunk_size]
+            chunk = transactions[i : i + chunk_size]
             for txn in chunk:
                 if system_type:
                     txn = self.apply_transform(system_type, "order", txn)
@@ -1034,12 +1016,15 @@ class IntegrationService:
 
         since = datetime.utcnow() - timedelta(hours=24)
         result = await session.execute(
-            select(SyncLog).where(
+            select(SyncLog)
+            .where(
                 and_(
                     SyncLog.system_id == system_id,
                     SyncLog.created_at >= since,
                 )
-            ).order_by(desc(SyncLog.created_at)).limit(200)
+            )
+            .order_by(desc(SyncLog.created_at))
+            .limit(200)
         )
         logs = list(result.scalars().all())
 
@@ -1083,6 +1068,7 @@ class IntegrationService:
         success_rate = (success_count / total) if total > 0 else 1.0
 
         from ..models.integration import IntegrationStatus
+
         status_score = {
             IntegrationStatus.ACTIVE: 1.0,
             IntegrationStatus.INACTIVE: 0.5,
@@ -1091,11 +1077,7 @@ class IntegrationService:
 
         error_penalty = 0.0 if (system.last_error is None) else 0.5
 
-        score = (
-            success_rate * 50
-            + status_score * 30
-            + (1.0 - error_penalty) * 20
-        )
+        score = success_rate * 50 + status_score * 30 + (1.0 - error_penalty) * 20
         return round(min(max(score, 0.0), 100.0), 1)
 
     async def get_all_systems_health(
@@ -1192,6 +1174,7 @@ class IntegrationService:
         在写入前先查出本地记录，应用冲突解决策略后再同步
         """
         from sqlalchemy import select as _select
+
         from ..models.integration import MemberSync
 
         result = await session.execute(

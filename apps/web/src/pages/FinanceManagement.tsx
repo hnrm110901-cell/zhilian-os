@@ -28,7 +28,7 @@ const FinanceManagement: React.FC = () => {
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [budgetForm] = Form.useForm();
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<any>([
     dayjs().startOf('month'),
@@ -358,7 +358,7 @@ const FinanceManagement: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
             {stores.length > 0 ? stores.map((s: any) => (
               <Select.Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Select.Option>
-            )) : <Select.Option value="STORE001">STORE001</Select.Option>}
+            )) : null}
           </Select>
           <span>选择日期范围:</span>
           <RangePicker
@@ -553,7 +553,7 @@ const FinanceManagement: React.FC = () => {
             <Select>
               {stores.length > 0 ? stores.map((s: any) => (
                 <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
-              )) : <option value="STORE001">STORE001</option>}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item name="transaction_date" label="交易日期" rules={[{ required: true }]}>
@@ -605,7 +605,7 @@ const FinanceManagement: React.FC = () => {
             <Select>
               {stores.length > 0 ? stores.map((s: any) => (
                 <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
-              )) : <option value="STORE001">STORE001</option>}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item name="year" label="年份" initialValue={dayjs().year()} rules={[{ required: true }]}>

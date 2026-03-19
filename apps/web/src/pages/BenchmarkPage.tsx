@@ -11,7 +11,7 @@ const BenchmarkPage: React.FC = () => {
   const [dimensions, setDimensions] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
 
   const loadStores = useCallback(async () => {
@@ -132,7 +132,7 @@ const BenchmarkPage: React.FC = () => {
         <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">门店001</Option>}
+          ))}
         </Select>
       </div>
       <Tabs items={tabItems} />

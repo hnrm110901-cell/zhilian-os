@@ -4,18 +4,19 @@
 - 出站: 本地状态变更 -> 检查 ReservationSync -> 调适配器推回
 - 幂等: 按 external_order_id 去重
 """
+
 import uuid
-from datetime import date, time, datetime
-from typing import Dict, Any, Optional
+from datetime import date, datetime, time
+from typing import Any, Dict, Optional
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db_session
-from ..models.reservation import Reservation, ReservationStatus, ReservationType
-from ..models.reservation_channel import ReservationChannel, ChannelType
 from ..models.integration import ReservationSync, SyncStatus
+from ..models.reservation import Reservation, ReservationStatus, ReservationType
+from ..models.reservation_channel import ChannelType, ReservationChannel
 
 logger = structlog.get_logger()
 
@@ -48,25 +49,20 @@ class MeituanReservationService:
         async with get_db_session() as session:
             # 幂等检查：按 external_order_id 查找
             existing = await session.execute(
-                select(ReservationChannel).where(
-                    ReservationChannel.external_order_id == external_id
-                )
+                select(ReservationChannel).where(ReservationChannel.external_order_id == external_id)
             )
             channel_record = existing.scalar_one_or_none()
 
             if channel_record:
                 # 更新已有预订
-                result = await session.execute(
-                    select(Reservation).where(Reservation.id == channel_record.reservation_id)
-                )
+                result = await session.execute(select(Reservation).where(Reservation.id == channel_record.reservation_id))
                 reservation = result.scalar_one_or_none()
                 if reservation:
                     reservation.customer_name = data.get("customer_name", reservation.customer_name)
                     reservation.party_size = data.get("party_size", reservation.party_size)
                     reservation.special_requests = data.get("special_requests", reservation.special_requests)
                     await session.commit()
-                    logger.info("meituan_reservation_updated",
-                                reservation_id=reservation.id, external_id=external_id)
+                    logger.info("meituan_reservation_updated", reservation_id=reservation.id, external_id=external_id)
                     return {"action": "updated", "reservation_id": reservation.id}
 
             # 创建新预订
@@ -130,8 +126,7 @@ class MeituanReservationService:
             session.add(sync)
 
             await session.commit()
-            logger.info("meituan_reservation_created",
-                        reservation_id=reservation_id, external_id=external_id)
+            logger.info("meituan_reservation_created", reservation_id=reservation_id, external_id=external_id)
             return {"action": "created", "reservation_id": reservation_id}
 
     async def _handle_cancel(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -140,18 +135,14 @@ class MeituanReservationService:
 
         async with get_db_session() as session:
             result = await session.execute(
-                select(ReservationChannel).where(
-                    ReservationChannel.external_order_id == external_id
-                )
+                select(ReservationChannel).where(ReservationChannel.external_order_id == external_id)
             )
             channel_record = result.scalar_one_or_none()
             if not channel_record:
                 logger.warning("meituan_cancel_not_found", external_id=external_id)
                 return {"action": "skipped", "reason": "not_found"}
 
-            res_result = await session.execute(
-                select(Reservation).where(Reservation.id == channel_record.reservation_id)
-            )
+            res_result = await session.execute(select(Reservation).where(Reservation.id == channel_record.reservation_id))
             reservation = res_result.scalar_one_or_none()
             if reservation and reservation.status not in (
                 ReservationStatus.CANCELLED,
@@ -160,8 +151,7 @@ class MeituanReservationService:
                 reservation.status = ReservationStatus.CANCELLED
                 reservation.cancelled_at = datetime.utcnow()
                 await session.commit()
-                logger.info("meituan_reservation_cancelled",
-                            reservation_id=reservation.id, external_id=external_id)
+                logger.info("meituan_reservation_cancelled", reservation_id=reservation.id, external_id=external_id)
                 return {"action": "cancelled", "reservation_id": reservation.id}
 
             return {"action": "skipped", "reason": "already_terminal"}
@@ -176,11 +166,7 @@ class MeituanReservationService:
     ) -> Dict[str, Any]:
         """将本地状态变更推回美团"""
         # 查找同步记录
-        result = await session.execute(
-            select(ReservationSync).where(
-                ReservationSync.reservation_id == reservation_id
-            )
-        )
+        result = await session.execute(select(ReservationSync).where(ReservationSync.reservation_id == reservation_id))
         sync_record = result.scalar_one_or_none()
         if not sync_record:
             raise ValueError("该预订非美团渠道，无需同步")
@@ -208,10 +194,7 @@ class MeituanReservationService:
             sync_record.synced_at = datetime.utcnow()
             await session.commit()
 
-            logger.info("meituan_sync_success",
-                        reservation_id=reservation_id,
-                        external_id=external_id,
-                        action=action)
+            logger.info("meituan_sync_success", reservation_id=reservation_id, external_id=external_id, action=action)
             return {"synced": True, "external_id": external_id, "action": action}
 
         except Exception as e:

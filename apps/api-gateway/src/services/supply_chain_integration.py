@@ -5,13 +5,14 @@ Supply Chain Integration Service
 
 import os
 import uuid
-from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-import structlog
+from typing import Any, Dict, List, Optional
 
-from ..models.supply_chain import Supplier, PurchaseOrder
+import structlog
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.supply_chain import PurchaseOrder, Supplier
 
 logger = structlog.get_logger()
 
@@ -92,13 +93,9 @@ class SupplyChainIntegration:
     ) -> List[Dict[str, Any]]:
         """向供应商询价，返回模拟报价列表"""
         if supplier_ids:
-            result = await self.db.execute(
-                select(Supplier).where(Supplier.id.in_(supplier_ids), Supplier.status == "active")
-            )
+            result = await self.db.execute(select(Supplier).where(Supplier.id.in_(supplier_ids), Supplier.status == "active"))
         else:
-            result = await self.db.execute(
-                select(Supplier).where(Supplier.status == "active")
-            )
+            result = await self.db.execute(select(Supplier).where(Supplier.status == "active"))
         suppliers = list(result.scalars().all())
 
         base_price = float(os.getenv(f"SUPPLY_PRICE_{material_id.upper()}", os.getenv("SUPPLY_CHAIN_MOCK_BASE_PRICE", "10.0")))
@@ -108,19 +105,21 @@ class SupplyChainIntegration:
             unit_price = round(base_price * rating_factor, 2)
             total_price = round(unit_price * quantity, 2)
             valid_days = int(os.getenv("SUPPLY_CHAIN_QUOTE_VALID_DAYS", "3"))
-            quotes.append({
-                "quote_id": f"quote_{supplier.id}_{material_id}_{int(datetime.utcnow().timestamp())}",
-                "supplier_id": supplier.id,
-                "supplier_name": supplier.name,
-                "material_id": material_id,
-                "quantity": quantity,
-                "unit_price": unit_price,
-                "total_price": total_price,
-                "delivery_date": required_date.isoformat(),
-                "valid_until": (datetime.utcnow() + timedelta(days=valid_days)).isoformat(),
-                "delivery_time_days": supplier.delivery_time,
-                "supplier_rating": supplier.rating,
-            })
+            quotes.append(
+                {
+                    "quote_id": f"quote_{supplier.id}_{material_id}_{int(datetime.utcnow().timestamp())}",
+                    "supplier_id": supplier.id,
+                    "supplier_name": supplier.name,
+                    "material_id": material_id,
+                    "quantity": quantity,
+                    "unit_price": unit_price,
+                    "total_price": total_price,
+                    "delivery_date": required_date.isoformat(),
+                    "valid_until": (datetime.utcnow() + timedelta(days=valid_days)).isoformat(),
+                    "delivery_time_days": supplier.delivery_time,
+                    "supplier_rating": supplier.rating,
+                }
+            )
         return quotes
 
     def compare_quotes(self, quotes: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -297,4 +296,3 @@ class SupplyChainIntegration:
                 "supplier_rating": supplier.rating,
             },
         }
-

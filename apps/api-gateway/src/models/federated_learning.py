@@ -1,10 +1,15 @@
 """
 联邦学习数据模型
 """
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, Enum as SQLEnum, ForeignKey
-from sqlalchemy.orm import relationship
-from datetime import datetime
+
 import enum
+from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
 from .base import Base
 
 
@@ -18,6 +23,7 @@ class RoundStatus(str, enum.Enum):
 
 class FLTrainingRound(Base):
     """联邦学习训练轮次表"""
+
     __tablename__ = "fl_training_rounds"
 
     id = Column(String(36), primary_key=True)
@@ -35,6 +41,7 @@ class FLTrainingRound(Base):
 
 class FLModelUpload(Base):
     """门店上传的本地模型参数表"""
+
     __tablename__ = "fl_model_uploads"
 
     id = Column(String(36), primary_key=True)

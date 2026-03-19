@@ -17,6 +17,7 @@ SkillRegistry 是单例，启动时从 legacy registry bootstrap。
     cost_skills = registry.query(intent="cost_optimization")
     chain = registry.get_composition_chain("schedule.query_staff_availability")
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -31,23 +32,23 @@ logger = structlog.get_logger()
 class SkillDescriptor:
     """Agent Tool 的业务语义描述符。"""
 
-    skill_id: str               # "schedule.query_staff_availability"
-    agent_type: str             # "schedule"
-    tool_name: str              # "query_staff_availability"
+    skill_id: str  # "schedule.query_staff_availability"
+    agent_type: str  # "schedule"
+    tool_name: str  # "query_staff_availability"
 
     # 业务语义（SAP Skill 核心）
-    business_intent: str = ""   # "查询员工排班可用性，用于排班优化"
-    impact_category: str = ""   # "cost_optimization" | "revenue_growth" | "risk_mitigation"
+    business_intent: str = ""  # "查询员工排班可用性，用于排班优化"
+    impact_category: str = ""  # "cost_optimization" | "revenue_growth" | "risk_mitigation"
     estimated_impact_yuan: Optional[float] = None
 
     # 可组合性
-    requires: List[str] = field(default_factory=list)    # 前置 skill_ids
-    provides: List[str] = field(default_factory=list)    # 输出标签
-    chains_with: List[str] = field(default_factory=list) # 可组合的 skill_ids
+    requires: List[str] = field(default_factory=list)  # 前置 skill_ids
+    provides: List[str] = field(default_factory=list)  # 输出标签
+    chains_with: List[str] = field(default_factory=list)  # 可组合的 skill_ids
 
     # 效果度量（连接 P2 EffectEvaluator）
-    effect_metric: Optional[str] = None     # "labor_cost_ratio" | "waste_rate"
-    evaluation_delay_hours: int = 72        # 默认 3 天后评估
+    effect_metric: Optional[str] = None  # "labor_cost_ratio" | "waste_rate"
+    evaluation_delay_hours: int = 72  # 默认 3 天后评估
 
     # 原始 Tool Schema（保持兼容）
     tool_schema: Dict[str, Any] = field(default_factory=dict)
@@ -121,11 +122,7 @@ class SkillRegistry:
             results = [s for s in results if s.agent_type == agent_type]
 
         if intent:
-            results = [
-                s for s in results
-                if s.impact_category == intent
-                or intent.lower() in s.business_intent.lower()
-            ]
+            results = [s for s in results if s.impact_category == intent or intent.lower() in s.business_intent.lower()]
 
         return results
 

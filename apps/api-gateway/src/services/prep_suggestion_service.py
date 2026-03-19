@@ -7,23 +7,23 @@
              - 当前库存量
              + 损耗补偿量(损耗率 × 总需求)
 """
+
 import uuid
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
-from sqlalchemy import select, func, and_, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.bom import BOMTemplate, BOMItem
+from sqlalchemy import and_, func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.models.bom import BOMItem, BOMTemplate
 from src.models.inventory import InventoryItem, InventoryTransaction
 from src.models.supply_chain import PurchaseOrder
 
-
 # ---------- 常量 ----------
-SAFETY_FACTOR = Decimal("1.1")         # 安全系数
-DEFAULT_WASTE_RATE = Decimal("0.05")   # 默认损耗率 5%
-DEFAULT_AVG_GUESTS = 3                 # 默认每桌人数
-DEFAULT_DISH_HIT_RATE = Decimal("0.6") # 默认菜品点击率
+SAFETY_FACTOR = Decimal("1.1")  # 安全系数
+DEFAULT_WASTE_RATE = Decimal("0.05")  # 默认损耗率 5%
+DEFAULT_AVG_GUESTS = 3  # 默认每桌人数
+DEFAULT_DISH_HIT_RATE = Decimal("0.6")  # 默认菜品点击率
 
 
 class PrepSuggestionService:
@@ -89,9 +89,9 @@ class PrepSuggestionService:
         all_ingredient_ids = set(bom_map.keys())
         for ingredient_id in sorted(all_ingredient_ids):
             bom_info = bom_map[ingredient_id]
-            std_qty = bom_info["std_qty"]           # BOM 单位用量
+            std_qty = bom_info["std_qty"]  # BOM 单位用量
             waste_factor = bom_info["waste_factor"]  # 损耗系数
-            unit_cost_fen = bom_info["unit_cost"]    # 分
+            unit_cost_fen = bom_info["unit_cost"]  # 分
 
             # 预订需求（桌数 × 人均 × 点击率 × BOM用量）
             res_qty = reservation_demand * DEFAULT_AVG_GUESTS * DEFAULT_DISH_HIT_RATE * std_qty
@@ -119,26 +119,30 @@ class PrepSuggestionService:
             total_cost += cost_yuan
 
             # 置信度
-            confidence = "high" if hist_dishes > 0 and reservation_demand > 0 else (
-                "medium" if hist_dishes > 0 or reservation_demand > 0 else "low"
+            confidence = (
+                "high"
+                if hist_dishes > 0 and reservation_demand > 0
+                else ("medium" if hist_dishes > 0 or reservation_demand > 0 else "low")
             )
 
-            items.append({
-                "ingredient_id": ingredient_id,
-                "ingredient_name": bom_info["name"],
-                "category": bom_info["category"],
-                "unit": bom_info["unit"],
-                "current_stock": float(current_stock),
-                "predicted_demand": float(predicted),
-                "suggested_qty": float(suggested.quantize(Decimal("0.01"))),
-                "estimated_cost_yuan": float(cost_yuan.quantize(Decimal("0.01"))),
-                "sources": {
-                    "reservation": float(res_qty.quantize(Decimal("0.01"))),
-                    "history": float(hist_qty.quantize(Decimal("0.01"))),
-                    "waste_buffer": float(waste_buffer.quantize(Decimal("0.01"))),
-                },
-                "confidence": confidence,
-            })
+            items.append(
+                {
+                    "ingredient_id": ingredient_id,
+                    "ingredient_name": bom_info["name"],
+                    "category": bom_info["category"],
+                    "unit": bom_info["unit"],
+                    "current_stock": float(current_stock),
+                    "predicted_demand": float(predicted),
+                    "suggested_qty": float(suggested.quantize(Decimal("0.01"))),
+                    "estimated_cost_yuan": float(cost_yuan.quantize(Decimal("0.01"))),
+                    "sources": {
+                        "reservation": float(res_qty.quantize(Decimal("0.01"))),
+                        "history": float(hist_qty.quantize(Decimal("0.01"))),
+                        "waste_buffer": float(waste_buffer.quantize(Decimal("0.01"))),
+                    },
+                    "confidence": confidence,
+                }
+            )
 
         # 按建议量降序
         items.sort(key=lambda x: x["suggested_qty"], reverse=True)
@@ -176,14 +180,16 @@ class PrepSuggestionService:
             qty = item["qty"]
             line_total = int(qty * unit_cost)
             total_amount += line_total
-            po_items.append({
-                "ingredient_id": item["ingredient_id"],
-                "name": inv.name if inv else item["ingredient_id"],
-                "quantity": qty,
-                "unit": inv.unit if inv else "kg",
-                "unit_cost_fen": unit_cost,
-                "line_total_fen": line_total,
-            })
+            po_items.append(
+                {
+                    "ingredient_id": item["ingredient_id"],
+                    "name": inv.name if inv else item["ingredient_id"],
+                    "quantity": qty,
+                    "unit": inv.unit if inv else "kg",
+                    "unit_cost_fen": unit_cost,
+                    "line_total_fen": line_total,
+                }
+            )
 
         po = PurchaseOrder(
             id=str(uuid.uuid4()),
@@ -317,12 +323,15 @@ class PrepSuggestionService:
                   AND EXTRACT(DOW FROM t.transaction_time) = :dow
                 GROUP BY t.item_id
             """)
-            result = await self.db.execute(stmt, {
-                "store_id": self.store_id,
-                "start_date": four_weeks_ago,
-                "end_date": target_date,
-                "dow": weekday,
-            })
+            result = await self.db.execute(
+                stmt,
+                {
+                    "store_id": self.store_id,
+                    "start_date": four_weeks_ago,
+                    "end_date": target_date,
+                    "dow": weekday,
+                },
+            )
             rows = result.all()
             return {row.ingredient_id: Decimal(str(row.avg_qty)) for row in rows}
         except Exception:
@@ -330,10 +339,7 @@ class PrepSuggestionService:
 
     async def _get_current_stock(self) -> dict:
         """获取本店当前库存"""
-        stmt = (
-            select(InventoryItem.id, InventoryItem.current_quantity)
-            .where(InventoryItem.store_id == self.store_id)
-        )
+        stmt = select(InventoryItem.id, InventoryItem.current_quantity).where(InventoryItem.store_id == self.store_id)
         result = await self.db.execute(stmt)
         return {row.id: row.current_quantity for row in result.all()}
 

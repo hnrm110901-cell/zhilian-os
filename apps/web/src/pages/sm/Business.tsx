@@ -14,9 +14,8 @@ import {
 } from '../../design-system/components';
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
+import { useAuthStore } from '../../stores/authStore';
 import styles from './Business.module.css';
-
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
 
 interface ChefData {
   store_id:           string;
@@ -63,6 +62,8 @@ const SLUG_LABEL: Record<string, string> = {
 };
 
 export default function SmBusiness() {
+  const user = useAuthStore((s) => s.user);
+  const STORE_ID = user?.store_id || localStorage.getItem('store_id') || '';
   const [data,          setData]          = useState<ChefData | null>(null);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState<string | null>(null);

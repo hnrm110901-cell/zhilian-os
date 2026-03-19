@@ -14,7 +14,7 @@ import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
 import styles from './BanquetFollowups.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const STAGE_OPTIONS = [
   { value: 'contacted',        label: '已联系' },

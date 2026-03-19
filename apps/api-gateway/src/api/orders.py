@@ -1,13 +1,13 @@
 """
 Orders API - 订单管理REST接口
 """
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime, date
 
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from src.core.dependencies import get_current_user
-from fastapi import Depends
 from src.services.order_service import OrderService
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -153,6 +153,7 @@ async def update_status(
             try:
                 from src.core.database import get_db as _get_db
                 from src.services.lifecycle_bridge import on_order_completed
+
                 async for db in _get_db():
                     result = await on_order_completed(db, order_id)
                     await db.commit()

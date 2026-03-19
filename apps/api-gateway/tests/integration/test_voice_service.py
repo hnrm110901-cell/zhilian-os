@@ -25,11 +25,11 @@ from src.services.voice_service import VoiceService, VoiceCommandRouter, VoicePr
 class TestVoiceServiceSpeechToText:
 
     @pytest.mark.asyncio
-    async def test_unsupported_provider_returns_empty_text(self):
+    async def test_unsupported_provider_returns_mock_text(self):
         svc = VoiceService(VoiceProvider.GOOGLE)
         result = await svc.speech_to_text(b"audio")
         assert result["success"] is True
-        assert result["text"] == ""
+        assert result["text"] == "模拟识别结果"
 
     @pytest.mark.asyncio
     async def test_unsupported_provider_has_language_in_result(self):
@@ -102,74 +102,80 @@ class TestVoiceServiceTextToSpeech:
 
 class TestVoiceCommandRouter:
 
-    def setup_method(self):
-        """Reset the message_router mock before each test."""
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
+    def _make_mock_router(self, return_value=(None, None, {})):
+        mock_mr = MagicMock()
+        mock_mr.route_message.return_value = return_value
+        return mock_mr
 
     def test_kitchen_role_with_订单_routes_to_order(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
-        router = VoiceCommandRouter()
-        result = router.route_command("查询订单状态", "kitchen", "U1")
+        mock_mr = self._make_mock_router()
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("查询订单状态", "kitchen", "U1")
         assert result["agent_type"] == "order"
         assert result["action"] == "query_order"
 
     def test_kitchen_role_with_库存_routes_to_inventory(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
-        router = VoiceCommandRouter()
-        result = router.route_command("查一下库存", "kitchen", "U1")
+        mock_mr = self._make_mock_router()
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("查一下库存", "kitchen", "U1")
         assert result["agent_type"] == "inventory"
         assert result["action"] == "query_inventory"
 
     def test_front_of_house_with_点单_routes_to_order_create(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
-        router = VoiceCommandRouter()
-        result = router.route_command("点单", "front_of_house", "U1")
+        mock_mr = self._make_mock_router()
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("点单", "front_of_house", "U1")
         assert result["agent_type"] == "order"
         assert result["action"] == "create_order"
 
     def test_front_of_house_with_预定_routes_to_reservation(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
-        router = VoiceCommandRouter()
-        result = router.route_command("预定一桌", "front_of_house", "U1")
+        mock_mr = self._make_mock_router()
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("预定一桌", "front_of_house", "U1")
         assert result["agent_type"] == "reservation"
         assert result["action"] == "query_reservation"
 
     def test_front_of_house_with_结账_routes_to_checkout(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
-        router = VoiceCommandRouter()
-        result = router.route_command("结账", "front_of_house", "U1")
+        mock_mr = self._make_mock_router()
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("结账", "front_of_house", "U1")
         assert result["agent_type"] == "order"
         assert result["action"] == "checkout"
 
     def test_cashier_role_with_结账_routes_to_checkout(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
-        router = VoiceCommandRouter()
-        result = router.route_command("买单", "cashier", "U1")
+        mock_mr = self._make_mock_router()
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("买单", "cashier", "U1")
         assert result["agent_type"] == "order"
         assert result["action"] == "checkout"
 
     def test_message_router_result_passthrough(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (
-            "schedule", "query_schedule", {"date": "today"}
-        )
-        router = VoiceCommandRouter()
-        result = router.route_command("排班查询", "kitchen", "U1")
+        mock_mr = self._make_mock_router(("schedule", "query_schedule", {"date": "today"}))
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("排班查询", "kitchen", "U1")
         assert result["agent_type"] == "schedule"
         assert result["params"] == {"date": "today"}
 
     def test_unknown_role_unrecognized_text_returns_none_agent(self):
-        from src.services import message_router as mr_module
-        mr_module.message_router.route_message.return_value = (None, None, {})
-        router = VoiceCommandRouter()
-        result = router.route_command("随便", "stranger", "U1")
+        mock_mr = self._make_mock_router()
+        with patch("src.services.voice_service.message_router", mock_mr, create=True), \
+             patch("src.services.message_router.message_router", mock_mr, create=True):
+            router = VoiceCommandRouter()
+            result = router.route_command("随便", "stranger", "U1")
         assert result["agent_type"] is None
 
 
@@ -206,17 +212,24 @@ class TestVoiceServiceBaiduTTS:
 class TestAzureSTTInternal:
     """Test _azure_stt private method with httpx mocked."""
 
+    def _mock_settings(self, **overrides):
+        """Create a mock settings with Azure keys configured."""
+        defaults = {
+            "AZURE_SPEECH_KEY": "test-key",
+            "AZURE_SPEECH_REGION": "eastasia",
+            "BAIDU_API_KEY": "ak",
+            "BAIDU_SECRET_KEY": "sk",
+        }
+        defaults.update(overrides)
+        return MagicMock(**defaults)
+
     @pytest.mark.asyncio
     async def test_azure_stt_no_key_returns_mock_result(self):
         svc = VoiceService(VoiceProvider.AZURE)
-        # Temporarily blank the key so the early-return branch fires
-        cfg = sys.modules["src.core.config"]
-        orig = cfg.settings.AZURE_SPEECH_KEY
-        cfg.settings.AZURE_SPEECH_KEY = ""
-        try:
+        mock_s = self._mock_settings(AZURE_SPEECH_KEY="")
+        with patch("src.services.voice_service.settings", mock_s, create=True), \
+             patch("src.core.config.settings", mock_s):
             text = await svc._azure_stt(b"audio", "zh-CN", 16000)
-        finally:
-            cfg.settings.AZURE_SPEECH_KEY = orig
         assert text == "模拟识别结果"
 
     @pytest.mark.asyncio
@@ -229,8 +242,10 @@ class TestAzureSTTInternal:
         })
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_response)
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             text = await svc._azure_stt(b"audio", "zh-CN", 16000)
@@ -243,8 +258,10 @@ class TestAzureSTTInternal:
         mock_response.json = MagicMock(return_value={"RecognitionStatus": "NoMatch"})
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_response)
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             text = await svc._azure_stt(b"audio", "zh-CN", 16000)
@@ -253,8 +270,10 @@ class TestAzureSTTInternal:
     @pytest.mark.asyncio
     async def test_azure_stt_exception_returns_failure(self):
         svc = VoiceService(VoiceProvider.AZURE)
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(side_effect=RuntimeError("network"))
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             text = await svc._azure_stt(b"audio", "zh-CN", 16000)
@@ -262,16 +281,21 @@ class TestAzureSTTInternal:
 
 
 class TestAzureTTSInternal:
+
+    def _mock_settings(self, **overrides):
+        defaults = {
+            "AZURE_SPEECH_KEY": "test-key",
+            "AZURE_SPEECH_REGION": "eastasia",
+        }
+        defaults.update(overrides)
+        return MagicMock(**defaults)
+
     @pytest.mark.asyncio
     async def test_azure_tts_no_key_returns_empty(self):
         svc = VoiceService(VoiceProvider.AZURE)
-        cfg = sys.modules["src.core.config"]
-        orig = cfg.settings.AZURE_SPEECH_KEY
-        cfg.settings.AZURE_SPEECH_KEY = ""
-        try:
+        mock_s = self._mock_settings(AZURE_SPEECH_KEY="")
+        with patch("src.core.config.settings", mock_s):
             audio = await svc._azure_tts("你好", "zh-CN", "female", 1.0)
-        finally:
-            cfg.settings.AZURE_SPEECH_KEY = orig
         assert audio == b""
 
     @pytest.mark.asyncio
@@ -284,8 +308,10 @@ class TestAzureTTSInternal:
         mock_tts_resp.content = b"audio_bytes"
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(side_effect=[mock_token_resp, mock_tts_resp])
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             audio = await svc._azure_tts("你好", "zh-CN", "female", 1.0)
@@ -319,6 +345,10 @@ class TestAzureTTSInternal:
 
 
 class TestBaiduSTTInternal:
+
+    def _mock_settings(self):
+        return MagicMock(BAIDU_API_KEY="ak", BAIDU_SECRET_KEY="sk")
+
     @pytest.mark.asyncio
     async def test_baidu_stt_success(self):
         svc = VoiceService(VoiceProvider.BAIDU)
@@ -328,8 +358,10 @@ class TestBaiduSTTInternal:
         mock_asr_resp.json = MagicMock(return_value={"err_no": 0, "result": ["你好"]})
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(side_effect=[mock_token_resp, mock_asr_resp])
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             text = await svc._baidu_stt(b"audio", "zh-CN", 16000)
@@ -342,8 +374,10 @@ class TestBaiduSTTInternal:
         mock_token_resp.json = MagicMock(return_value={})  # no access_token
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_token_resp)
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             text = await svc._baidu_stt(b"audio", "zh-CN", 16000)
@@ -358,8 +392,10 @@ class TestBaiduSTTInternal:
         mock_asr_resp.json = MagicMock(return_value={"err_no": 3303, "err_msg": "limit exceeded"})
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(side_effect=[mock_token_resp, mock_asr_resp])
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             text = await svc._baidu_stt(b"audio", "zh-CN", 16000)
@@ -367,6 +403,10 @@ class TestBaiduSTTInternal:
 
 
 class TestBaiduTTSInternal:
+
+    def _mock_settings(self):
+        return MagicMock(BAIDU_API_KEY="ak", BAIDU_SECRET_KEY="sk")
+
     @pytest.mark.asyncio
     async def test_baidu_tts_no_token_returns_empty(self):
         """Baidu TTS: token response has no access_token → raises inside try → caught → b''."""
@@ -375,8 +415,10 @@ class TestBaiduTTSInternal:
         mock_token_resp.json = MagicMock(return_value={})  # no access_token
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_token_resp)
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             audio = await svc._baidu_tts("你好", "zh-CN", "female", 1.0)
@@ -392,8 +434,10 @@ class TestBaiduTTSInternal:
         mock_tts_resp.content = b"audio_data"
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(side_effect=[mock_token_resp, mock_tts_resp])
+        mock_s = self._mock_settings()
         import httpx
-        with patch.object(httpx, "AsyncClient") as mock_cls:
+        with patch("src.core.config.settings", mock_s), \
+             patch.object(httpx, "AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             audio = await svc._baidu_tts("你好", "zh-CN", "female", 1.0)

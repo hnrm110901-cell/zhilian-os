@@ -28,9 +28,8 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.knowledge_rule import RuleCategory, RuleStatus
-from src.models.reasoning import ReasoningReport, SeverityLevel, ReasoningDimension
+from src.models.reasoning import ReasoningDimension, ReasoningReport, SeverityLevel
 from src.services.knowledge_rule_service import KnowledgeRuleService
 
 logger = structlog.get_logger()
@@ -39,11 +38,11 @@ logger = structlog.get_logger()
 # ── 维度 → 规则品类映射 ────────────────────────────────────────────────────────
 
 DIMENSION_CATEGORIES: Dict[str, List[RuleCategory]] = {
-    "waste":       [RuleCategory.WASTE],
-    "efficiency":  [RuleCategory.EFFICIENCY],
-    "quality":     [RuleCategory.QUALITY],
-    "cost":        [RuleCategory.COST],
-    "inventory":   [RuleCategory.INVENTORY],
+    "waste": [RuleCategory.WASTE],
+    "efficiency": [RuleCategory.EFFICIENCY],
+    "quality": [RuleCategory.QUALITY],
+    "cost": [RuleCategory.COST],
+    "inventory": [RuleCategory.INVENTORY],
     "cross_store": [RuleCategory.CROSS_STORE, RuleCategory.BENCHMARK],
 }
 
@@ -52,34 +51,31 @@ ALL_DIMENSIONS = list(DIMENSION_CATEGORIES.keys())
 # ── 严重程度阈值（置信度 → P1/P2/P3） ────────────────────────────────────────
 
 SEVERITY_THRESHOLDS = {
-    SeverityLevel.P1: 0.80,   # 立即处理
-    SeverityLevel.P2: 0.65,   # 本日内处理
-    SeverityLevel.P3: 0.50,   # 本周内处理
+    SeverityLevel.P1: 0.80,  # 立即处理
+    SeverityLevel.P2: 0.65,  # 本日内处理
+    SeverityLevel.P3: 0.50,  # 本周内处理
 }
 
 # ── 维度权重（整体健康评分） ──────────────────────────────────────────────────
 
 DIMENSION_WEIGHTS = {
-    "waste":       0.30,
-    "efficiency":  0.25,
-    "cost":        0.20,
-    "quality":     0.15,
-    "inventory":   0.10,
-    "cross_store": 0.00,   # 不计入整体分（作为修正因子）
+    "waste": 0.30,
+    "efficiency": 0.25,
+    "cost": 0.20,
+    "quality": 0.15,
+    "inventory": 0.10,
+    "cross_store": 0.00,  # 不计入整体分（作为修正因子）
 }
 
 # ── 维度关联 KPI 集合 ─────────────────────────────────────────────────────────
 
 _DIMENSION_METRICS: Dict[str, List[str]] = {
-    "waste":       ["waste_rate", "waste_cost_ratio", "spoilage_rate", "bom_compliance"],
-    "efficiency":  ["labor_cost_ratio", "revenue_per_staff", "table_turnover",
-                    "revenue_per_seat"],
-    "cost":        ["food_cost_ratio", "total_cost_ratio", "gross_margin",
-                    "cost_ratio"],
-    "quality":     ["complaint_rate", "return_rate", "negative_review_rate"],
-    "inventory":   ["inventory_turnover_days", "stockout_count", "overstock_cost"],
-    "cross_store": ["waste_rate", "cost_ratio", "bom_compliance", "labor_ratio",
-                    "menu_coverage", "revenue_per_seat"],
+    "waste": ["waste_rate", "waste_cost_ratio", "spoilage_rate", "bom_compliance"],
+    "efficiency": ["labor_cost_ratio", "revenue_per_staff", "table_turnover", "revenue_per_seat"],
+    "cost": ["food_cost_ratio", "total_cost_ratio", "gross_margin", "cost_ratio"],
+    "quality": ["complaint_rate", "return_rate", "negative_review_rate"],
+    "inventory": ["inventory_turnover_days", "stockout_count", "overstock_cost"],
+    "cross_store": ["waste_rate", "cost_ratio", "bom_compliance", "labor_ratio", "menu_coverage", "revenue_per_seat"],
 }
 
 
@@ -87,50 +83,55 @@ _DIMENSION_METRICS: Dict[str, List[str]] = {
 # 数据类
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class ReasoningContext:
     """推理输入上下文"""
-    store_id:     str
-    kpi_context:  Dict[str, Any]
-    peer_context: Dict[str, float]  = field(default_factory=dict)
-    peer_group:   Optional[str]     = None
-    causal_hints: List[str]         = field(default_factory=list)
-    event_ids:    List[str]         = field(default_factory=list)
-    report_date:  date              = field(default_factory=date.today)
+
+    store_id: str
+    kpi_context: Dict[str, Any]
+    peer_context: Dict[str, float] = field(default_factory=dict)
+    peer_group: Optional[str] = None
+    causal_hints: List[str] = field(default_factory=list)
+    event_ids: List[str] = field(default_factory=list)
+    report_date: date = field(default_factory=date.today)
 
 
 @dataclass
 class DimensionConclusion:
     """单维度推理结论"""
-    dimension:           str
-    severity:            str               # P1 / P2 / P3 / OK
-    root_cause:          Optional[str]
-    confidence:          float
-    evidence_chain:      List[str]
-    triggered_rules:     List[str]         # rule_codes
+
+    dimension: str
+    severity: str  # P1 / P2 / P3 / OK
+    root_cause: Optional[str]
+    confidence: float
+    evidence_chain: List[str]
+    triggered_rules: List[str]  # rule_codes
     recommended_actions: List[str]
-    peer_percentile:     Optional[float]
-    peer_context:        Dict[str, float]
-    kpi_values:          Dict[str, float]  # 本维度相关 KPI
+    peer_percentile: Optional[float]
+    peer_context: Dict[str, float]
+    kpi_values: Dict[str, float]  # 本维度相关 KPI
 
 
 @dataclass
 class StoreHealthReport:
     """门店整体健康报告"""
-    store_id:         str
-    report_date:      date
-    overall_score:    float               # 0-100
-    severity_summary: str                 # 全维度中最高严重程度
-    dimensions:       Dict[str, DimensionConclusion]
-    priority_actions: List[str]           # Top-5 优先行动
-    causal_insights:  List[str]           # Neo4j 因果图谱发现
-    cross_store_hints: List[str]          # 跨店改善线索
-    peer_group:       Optional[str]
+
+    store_id: str
+    report_date: date
+    overall_score: float  # 0-100
+    severity_summary: str  # 全维度中最高严重程度
+    dimensions: Dict[str, DimensionConclusion]
+    priority_actions: List[str]  # Top-5 优先行动
+    causal_insights: List[str]  # Neo4j 因果图谱发现
+    cross_store_hints: List[str]  # 跨店改善线索
+    peer_group: Optional[str]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 纯函数（无 IO，可单元测试）
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _determine_severity(max_confidence: float) -> str:
     """根据最高规则置信度确定维度严重程度"""
@@ -180,16 +181,13 @@ def _extract_dimension_kpis(
 ) -> Dict[str, float]:
     """提取本维度相关 KPI 子集"""
     relevant = _DIMENSION_METRICS.get(dimension, [])
-    return {
-        k: float(v)
-        for k, v in kpi_context.items()
-        if k in relevant and isinstance(v, (int, float))
-    }
+    return {k: float(v) for k, v in kpi_context.items() if k in relevant and isinstance(v, (int, float))}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # UniversalReasoningEngine — L4 核心
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class UniversalReasoningEngine:
     """
@@ -216,9 +214,9 @@ class UniversalReasoningEngine:
 
     async def diagnose(
         self,
-        store_id:     str,
-        kpi_context:  Dict[str, Any],
-        dimensions:   Optional[List[str]] = None,
+        store_id: str,
+        kpi_context: Dict[str, Any],
+        dimensions: Optional[List[str]] = None,
         peer_context: Optional[Dict[str, float]] = None,
         causal_hints: Optional[List[str]] = None,
     ) -> StoreHealthReport:
@@ -236,8 +234,8 @@ class UniversalReasoningEngine:
             StoreHealthReport — 整体分 / 分维度结论 / 优先行动 / 因果洞察
         """
         target_dims = dimensions or ALL_DIMENSIONS
-        peer_ctx    = peer_context or {}
-        hints       = causal_hints or []
+        peer_ctx = peer_context or {}
+        hints = causal_hints or []
 
         ctx = ReasoningContext(
             store_id=store_id,
@@ -253,7 +251,7 @@ class UniversalReasoningEngine:
         # 持久化 reasoning_reports（upsert）
         await self._persist_conclusions(store_id, conclusions)
 
-        overall_score    = _calculate_overall_score(conclusions)
+        overall_score = _calculate_overall_score(conclusions)
         severity_summary = self._overall_severity(conclusions)
         priority_actions = self._collect_priority_actions(conclusions)
 
@@ -265,20 +263,15 @@ class UniversalReasoningEngine:
             dimensions=conclusions,
             priority_actions=priority_actions[:5],
             causal_insights=hints,
-            cross_store_hints=[
-                ev
-                for c in conclusions.values()
-                if c.dimension == "cross_store"
-                for ev in c.evidence_chain
-            ],
+            cross_store_hints=[ev for c in conclusions.values() if c.dimension == "cross_store" for ev in c.evidence_chain],
             peer_group=peer_ctx.get("peer_group"),
         )
 
     async def reason_single(
         self,
-        store_id:     str,
-        dimension:    str,
-        kpi_context:  Dict[str, Any],
+        store_id: str,
+        dimension: str,
+        kpi_context: Dict[str, Any],
         peer_context: Optional[Dict[str, float]] = None,
     ) -> DimensionConclusion:
         """单维度轻量推理（不全量持久化）"""
@@ -294,12 +287,12 @@ class UniversalReasoningEngine:
 
     async def list_reports(
         self,
-        store_id:   str,
+        store_id: str,
         start_date: Optional[date] = None,
-        end_date:   Optional[date] = None,
-        dimension:  Optional[str]  = None,
-        severity:   Optional[str]  = None,
-        limit:      int = 50,
+        end_date: Optional[date] = None,
+        dimension: Optional[str] = None,
+        severity: Optional[str] = None,
+        limit: int = 50,
     ) -> List[ReasoningReport]:
         """查询历史推理报告"""
         conditions = [ReasoningReport.store_id == store_id]
@@ -312,17 +305,13 @@ class UniversalReasoningEngine:
         if severity:
             conditions.append(ReasoningReport.severity == severity)
 
-        stmt = (
-            select(ReasoningReport)
-            .where(and_(*conditions))
-            .order_by(ReasoningReport.report_date.desc())
-            .limit(limit)
-        )
+        stmt = select(ReasoningReport).where(and_(*conditions)).order_by(ReasoningReport.report_date.desc()).limit(limit)
         return list((await self.db.execute(stmt)).scalars().all())
 
     async def mark_actioned(self, report_id: str, actioned_by: str) -> bool:
         """标记报告已行动（Human-in-the-Loop 闭环）"""
         from sqlalchemy import update
+
         await self.db.execute(
             update(ReasoningReport)
             .where(ReasoningReport.id == uuid.UUID(report_id))
@@ -358,9 +347,7 @@ class UniversalReasoningEngine:
 
         # Step 3: 跨店规则匹配（peer_context 注入）
         if dimension == "cross_store" and ctx.peer_context:
-            cross_hits = await self.rule_svc.match_cross_store_rules(
-                ctx.kpi_context, ctx.peer_context
-            )
+            cross_hits = await self.rule_svc.match_cross_store_rules(ctx.kpi_context, ctx.peer_context)
             matched.extend(cross_hits)
 
         if not matched:
@@ -383,7 +370,7 @@ class UniversalReasoningEngine:
         top_rule = matched[0]
         severity = _determine_severity(top_rule["confidence"])
 
-        evidence_chain      = self._build_evidence_chain(matched, ctx)
+        evidence_chain = self._build_evidence_chain(matched, ctx)
         recommended_actions = self._collect_actions(matched)
 
         return DimensionConclusion(
@@ -412,10 +399,7 @@ class UniversalReasoningEngine:
         # 1. 规则命中证据
         for hit in matched_rules[:3]:
             root_cause = hit.get("conclusion", {}).get("root_cause", "unknown")
-            evidence.append(
-                f"[{hit['rule_code']}] {hit['name']} "
-                f"→ 根因: {root_cause} (置信度: {hit['confidence']:.0%})"
-            )
+            evidence.append(f"[{hit['rule_code']}] {hit['name']} " f"→ 根因: {root_cause} (置信度: {hit['confidence']:.0%})")
 
         # 2. 同伴组对比证据
         for metric, val in ctx.kpi_context.items():
@@ -424,15 +408,9 @@ class UniversalReasoningEngine:
             p75 = ctx.peer_context.get("peer.p75")
             p50 = ctx.peer_context.get("peer.p50")
             if p75 and float(val) > float(p75):
-                evidence.append(
-                    f"[PEER] {metric}={val:.3f} 超过同伴组 p75={p75:.3f}，"
-                    f"处于底部 25% 区间"
-                )
+                evidence.append(f"[PEER] {metric}={val:.3f} 超过同伴组 p75={p75:.3f}，" f"处于底部 25% 区间")
             elif p50 and float(val) > float(p50):
-                evidence.append(
-                    f"[PEER] {metric}={val:.3f} 超过同伴组 p50={p50:.3f}，"
-                    f"低于中位数水平"
-                )
+                evidence.append(f"[PEER] {metric}={val:.3f} 超过同伴组 p50={p50:.3f}，" f"低于中位数水平")
 
         # 3. Neo4j 因果提示
         for hint in ctx.causal_hints[:2]:
@@ -458,11 +436,7 @@ class UniversalReasoningEngine:
         actions: List[str] = []
         for hit in matched_rules:
             conclusion = hit.get("conclusion", {})
-            action = (
-                conclusion.get("action") or
-                conclusion.get("recommended_action") or
-                conclusion.get("conclusion")
-            )
+            action = conclusion.get("action") or conclusion.get("recommended_action") or conclusion.get("conclusion")
             if action and action not in seen:
                 seen.add(action)
                 actions.append(action)
@@ -501,7 +475,7 @@ class UniversalReasoningEngine:
 
     async def _persist_conclusions(
         self,
-        store_id:    str,
+        store_id: str,
         conclusions: Dict[str, DimensionConclusion],
     ) -> None:
         """
@@ -533,16 +507,16 @@ class UniversalReasoningEngine:
                 .on_conflict_do_update(
                     constraint="uq_reasoning_report_store_date_dim",
                     set_={
-                        "severity":              c.severity,
-                        "root_cause":            c.root_cause,
-                        "confidence":            c.confidence,
-                        "evidence_chain":        c.evidence_chain,
-                        "triggered_rule_codes":  c.triggered_rules,
-                        "recommended_actions":   c.recommended_actions,
-                        "peer_percentile":       c.peer_percentile,
-                        "peer_context":          c.peer_context,
-                        "kpi_snapshot":          c.kpi_values,
-                        "updated_at":            datetime.utcnow(),
+                        "severity": c.severity,
+                        "root_cause": c.root_cause,
+                        "confidence": c.confidence,
+                        "evidence_chain": c.evidence_chain,
+                        "triggered_rule_codes": c.triggered_rules,
+                        "recommended_actions": c.recommended_actions,
+                        "peer_percentile": c.peer_percentile,
+                        "peer_context": c.peer_context,
+                        "kpi_snapshot": c.kpi_values,
+                        "updated_at": datetime.utcnow(),
                     },
                 )
             )

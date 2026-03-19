@@ -1,7 +1,7 @@
 .card {
-  background: linear-gradient(135deg, rgba(10,175,154,0.05) 0%, rgba(10,175,154,0.02) 100%);
+  background: linear-gradient(135deg, rgba(10,175,154,0.04) 0%, rgba(10,175,154,0.01) 100%);
   border-left: 3px solid #0AAF9A;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-md, 12px);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -9,7 +9,7 @@
 }
 
 [data-theme='dark'] .card {
-  background: linear-gradient(135deg, rgba(10,175,154,0.12) 0%, rgba(10,175,154,0.04) 100%);
+  background: linear-gradient(135deg, rgba(10,175,154,0.1) 0%, rgba(10,175,154,0.03) 100%);
 }
 
 .header {
@@ -22,7 +22,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(10,175,154,0.15);
+  background: rgba(10,175,154,0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -45,7 +45,7 @@
 }
 
 .high   .confidenceDot { background: var(--green); }
-.medium .confidenceDot { background: #C8923A; }
+.medium .confidenceDot { background: var(--yellow); }
 .low    .confidenceDot { background: var(--text-tertiary); }
 
 .body {

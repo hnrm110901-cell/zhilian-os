@@ -42,7 +42,7 @@ const journeyLabel: Record<string, string> = {
 };
 
 const PrivateDomainPage: React.FC = () => {
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [dashboard, setDashboard] = useState<any>(null);
   const [rfmData, setRfmData] = useState<any[]>([]);
@@ -387,7 +387,7 @@ const PrivateDomainPage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">STORE001</Option>}
+          ))}
         </Select>
         <Button icon={<ReloadOutlined />} onClick={loadAll}>刷新</Button>
         <span style={{ color: '#999', fontSize: 12 }}>每60秒自动刷新</span>

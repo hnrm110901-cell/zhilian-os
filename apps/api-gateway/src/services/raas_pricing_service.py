@@ -7,15 +7,16 @@ RaaS定价服务 (Result-as-a-Service Pricing Service)
 - 效果版: 省下成本的20%作为服务费
 - 增长版: 增加营收的15%作为分成
 """
+
 import os
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional
 from enum import Enum
+from typing import Dict, List, Optional
+
+import structlog
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
-
 from src.core.money import D, mul_rate
 
 logger = structlog.get_logger()
@@ -23,6 +24,7 @@ logger = structlog.get_logger()
 
 class PricingTier(str, Enum):
     """定价层级"""
+
     FREE_TRIAL = "free_trial"  # 基础版（免费试用）
     COST_SAVING = "cost_saving"  # 效果版（按省下的成本分成）
     REVENUE_GROWTH = "revenue_growth"  # 增长版（按增加的营收分成）
@@ -31,6 +33,7 @@ class PricingTier(str, Enum):
 
 class CostCategory(str, Enum):
     """成本类别"""
+
     FOOD_WASTE = "food_waste"  # 食材损耗
     LABOR_COST = "labor_cost"  # 人工成本
     ENERGY_COST = "energy_cost"  # 能源成本
@@ -39,6 +42,7 @@ class CostCategory(str, Enum):
 
 class RevenueCategory(str, Enum):
     """营收类别"""
+
     CUSTOMER_TRAFFIC = "customer_traffic"  # 客流增加
     AVERAGE_ORDER_VALUE = "average_order_value"  # 客单价提升
     REPEAT_RATE = "repeat_rate"  # 复购率提升
@@ -46,6 +50,7 @@ class RevenueCategory(str, Enum):
 
 class EffectMetrics(BaseModel):
     """效果指标"""
+
     # 成本节省
     food_waste_saved: float = 0.0  # 食材损耗节省（元）
     labor_cost_saved: float = 0.0  # 人工成本节省（元）
@@ -67,6 +72,7 @@ class EffectMetrics(BaseModel):
 
 class BaselineMetrics(BaseModel):
     """基线指标（试用期前3个月的平均值）"""
+
     # 成本基线
     avg_food_waste_rate: float  # 平均食材损耗率（%）
     avg_labor_cost: float  # 平均人工成本（元/月）
@@ -97,25 +103,15 @@ class RaaSPricingService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def calculate_baseline(
-        self,
-        store_id: str,
-        start_date: datetime,
-        end_date: datetime
-    ) -> BaselineMetrics:
+    async def calculate_baseline(self, store_id: str, start_date: datetime, end_date: datetime) -> BaselineMetrics:
         """
         计算基线指标
 
         在免费试用期开始前，收集门店过去3个月的运营数据作为基线
         """
-        logger.info(
-            "计算基线指标",
-            store_id=store_id,
-            start_date=start_date,
-            end_date=end_date
-        )
+        logger.info("计算基线指标", store_id=store_id, start_date=start_date, end_date=end_date)
 
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.daily_report import DailyReport
 
@@ -152,31 +148,22 @@ class RaaSPricingService:
             avg_order_value=avg_order_value,
             avg_repeat_rate=float(os.getenv("RAAS_DEFAULT_REPEAT_RATE", "25.0")),
             baseline_start_date=start_date,
-            baseline_end_date=end_date
+            baseline_end_date=end_date,
         )
 
         return baseline
 
     async def calculate_effect_metrics(
-        self,
-        store_id: str,
-        baseline: BaselineMetrics,
-        current_period_start: datetime,
-        current_period_end: datetime
+        self, store_id: str, baseline: BaselineMetrics, current_period_start: datetime, current_period_end: datetime
     ) -> EffectMetrics:
         """
         计算效果指标
 
         对比基线和当前期间的数据，计算实际产生的效果
         """
-        logger.info(
-            "计算效果指标",
-            store_id=store_id,
-            period_start=current_period_start,
-            period_end=current_period_end
-        )
+        logger.info("计算效果指标", store_id=store_id, period_start=current_period_start, period_end=current_period_end)
 
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.daily_report import DailyReport
 
@@ -213,17 +200,17 @@ class RaaSPricingService:
         try:
             from sqlalchemy import and_
             from src.models.inventory import InventoryItem
-            from src.models.store import Store
             from src.models.order import Order
+            from src.models.store import Store
 
             async with get_db_session() as session:
                 # 食材损耗率：低库存物品占比 × 10（估算损耗百分比）
                 inv_result = await session.execute(
                     select(
                         func.count(InventoryItem.id).label("total"),
-                        func.sum(func.case(
-                            (InventoryItem.quantity <= InventoryItem.min_quantity, 1), else_=0
-                        )).label("low_stock")
+                        func.sum(func.case((InventoryItem.quantity <= InventoryItem.min_quantity, 1), else_=0)).label(
+                            "low_stock"
+                        ),
                     ).where(InventoryItem.store_id == store_id)
                 )
                 inv_row = inv_result.first()
@@ -233,15 +220,17 @@ class RaaSPricingService:
                     )
 
                 # 人工成本 & 能源成本：从 Store 配置读取
-                store_result = await session.execute(
-                    select(Store).where(Store.id == store_id)
-                )
+                store_result = await session.execute(select(Store).where(Store.id == store_id))
                 store = store_result.scalar_one_or_none()
                 if store:
                     monthly_rev = store.monthly_revenue_target or 0
-                    labor_ratio = float(store.labor_cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))) / 100
+                    labor_ratio = (
+                        float(store.labor_cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))) / 100
+                    )
                     if monthly_rev:
-                        current_labor_cost = monthly_rev * labor_ratio / int(os.getenv("RAAS_DAYS_PER_MONTH", "30")) * days_in_period
+                        current_labor_cost = (
+                            monthly_rev * labor_ratio / int(os.getenv("RAAS_DAYS_PER_MONTH", "30")) * days_in_period
+                        )
                     current_energy_cost = float(
                         (store.config or {}).get("monthly_energy_cost", float(os.getenv("RAAS_DEFAULT_ENERGY_COST", "7500.0")))
                     )
@@ -266,32 +255,27 @@ class RaaSPricingService:
 
                 # 复购率：有多次订单的手机号 / 总手机号
                 phone_counts_sq = (
-                    select(
-                        Order.customer_phone,
-                        func.count(Order.id).label("cnt")
-                    ).where(
+                    select(Order.customer_phone, func.count(Order.id).label("cnt"))
+                    .where(
                         and_(
                             Order.store_id == store_id,
                             Order.created_at >= current_period_start,
                             Order.created_at <= current_period_end,
                             Order.customer_phone.isnot(None),
                         )
-                    ).group_by(Order.customer_phone)
+                    )
+                    .group_by(Order.customer_phone)
                     .subquery()
                 )
                 repeat_result = await session.execute(
                     select(
                         func.count(phone_counts_sq.c.customer_phone).label("total"),
-                        func.sum(func.case(
-                            (phone_counts_sq.c.cnt > 1, 1), else_=0
-                        )).label("repeat")
+                        func.sum(func.case((phone_counts_sq.c.cnt > 1, 1), else_=0)).label("repeat"),
                     )
                 )
                 repeat_row = repeat_result.first()
                 if repeat_row and repeat_row.total:
-                    current_repeat_rate = round(
-                        (repeat_row.repeat or 0) / repeat_row.total * 100, 1
-                    )
+                    current_repeat_rate = round((repeat_row.repeat or 0) / repeat_row.total * 100, 1)
         except Exception as _e:
             logger.warning("效果指标DB查询失败，使用默认值", error=str(_e))
 
@@ -311,9 +295,13 @@ class RaaSPricingService:
         energy_cost_saved = max(0, (baseline.avg_energy_cost - current_energy_cost) * months_in_period)
 
         # 库存成本节省（周转率提升意味着库存成本降低）
-        inventory_improvement = (current_inventory_turnover - baseline.avg_inventory_turnover) / baseline.avg_inventory_turnover
+        inventory_improvement = (
+            current_inventory_turnover - baseline.avg_inventory_turnover
+        ) / baseline.avg_inventory_turnover
         _inventory_cost_ratio = float(os.getenv("RAAS_INVENTORY_COST_RATIO", "0.3"))
-        inventory_cost_saved = max(0, baseline.avg_daily_revenue * _inventory_cost_ratio * inventory_improvement * days_in_period)
+        inventory_cost_saved = max(
+            0, baseline.avg_daily_revenue * _inventory_cost_ratio * inventory_improvement * days_in_period
+        )
 
         total_cost_saved = food_waste_saved + labor_cost_saved + energy_cost_saved + inventory_cost_saved
 
@@ -347,17 +335,15 @@ class RaaSPricingService:
             energy_cost_saved=energy_cost_saved,
             inventory_cost_saved=inventory_cost_saved,
             total_cost_saved=total_cost_saved,
-
             # 营收增长
             revenue_from_traffic=revenue_from_traffic,
             revenue_from_aov=revenue_from_aov,
             revenue_from_repeat=revenue_from_repeat,
             total_revenue_growth=total_revenue_growth,
-
             # 计费金额
             cost_saving_fee=cost_saving_fee,
             revenue_growth_fee=revenue_growth_fee,
-            total_fee=total_fee
+            total_fee=total_fee,
         )
 
         logger.info(
@@ -365,32 +351,28 @@ class RaaSPricingService:
             store_id=store_id,
             total_cost_saved=total_cost_saved,
             total_revenue_growth=total_revenue_growth,
-            total_fee=total_fee
+            total_fee=total_fee,
         )
 
         return metrics
 
-    async def get_pricing_tier(
-        self,
-        store_id: str,
-        current_date: datetime
-    ) -> PricingTier:
+    async def get_pricing_tier(self, store_id: str, current_date: datetime) -> PricingTier:
         """
         获取门店当前的定价层级
         """
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.store import Store
-        from sqlalchemy import select
 
         async with get_db_session() as session:
-            result = await session.execute(
-                select(Store.created_at, Store.config).where(Store.id == store_id)
-            )
+            result = await session.execute(select(Store.created_at, Store.config).where(Store.id == store_id))
             row = result.one_or_none()
             created_at = row[0] if row else None
             store_config = row[1] if row else {}
 
-        start_date = created_at if created_at else current_date - timedelta(days=int(os.getenv("RAAS_DEFAULT_HISTORY_DAYS", "120")))
+        start_date = (
+            created_at if created_at else current_date - timedelta(days=int(os.getenv("RAAS_DEFAULT_HISTORY_DAYS", "120")))
+        )
 
         # 如果在免费试用期内
         if (current_date - start_date).days <= self.FREE_TRIAL_DAYS:
@@ -405,12 +387,7 @@ class RaaSPricingService:
                 logger.warning("raas_pricing.invalid_tier", tier_str=tier_str, fallback="COST_SAVING")
         return PricingTier.COST_SAVING
 
-    async def generate_monthly_bill(
-        self,
-        store_id: str,
-        year: int,
-        month: int
-    ) -> Dict:
+    async def generate_monthly_bill(self, store_id: str, year: int, month: int) -> Dict:
         """
         生成月度账单
         """
@@ -434,7 +411,7 @@ class RaaSPricingService:
                 "month": month,
                 "pricing_tier": pricing_tier,
                 "total_fee": 0.0,
-                "message": "免费试用期，无需付费"
+                "message": "免费试用期，无需付费",
             }
 
         # 获取基线指标
@@ -443,12 +420,7 @@ class RaaSPricingService:
         baseline = await self.calculate_baseline(store_id, baseline_start, baseline_end)
 
         # 计算效果指标
-        effect_metrics = await self.calculate_effect_metrics(
-            store_id,
-            baseline,
-            period_start,
-            period_end
-        )
+        effect_metrics = await self.calculate_effect_metrics(store_id, baseline, period_start, period_end)
 
         # 生成账单
         bill = {
@@ -459,7 +431,7 @@ class RaaSPricingService:
             "baseline": baseline.model_dump(),
             "effect_metrics": effect_metrics.model_dump(),
             "total_fee": effect_metrics.total_fee,
-            "message": f"本月为您节省成本 ¥{effect_metrics.total_cost_saved:,.2f}，增加营收 ¥{effect_metrics.total_revenue_growth:,.2f}"
+            "message": f"本月为您节省成本 ¥{effect_metrics.total_cost_saved:,.2f}，增加营收 ¥{effect_metrics.total_revenue_growth:,.2f}",
         }
 
         return bill

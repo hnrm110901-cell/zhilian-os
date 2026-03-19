@@ -6,44 +6,52 @@
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  transition: opacity 150ms ease, transform 100ms ease, box-shadow 150ms ease;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 8px);
+  transition: all 200ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1));
   white-space: nowrap;
   user-select: none;
+  letter-spacing: -0.01em;
 }
 
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn:not(:disabled):active { transform: scale(0.97); }
 
 /* Sizes */
-.sm { font-size: 13px; padding: 6px 14px; height: 32px; }
-.md { font-size: 15px; padding: 9px 20px; height: 40px; }
-.lg { font-size: 16px; padding: 12px 28px; height: 48px; }
+.sm { font-size: 13px; padding: 6px 14px; height: 32px; border-radius: var(--radius-xs, 6px); }
+.md { font-size: 14px; padding: 8px 18px; height: 38px; }
+.lg { font-size: 15px; padding: 10px 24px; height: 44px; border-radius: var(--radius-md, 12px); }
 
 /* Variants */
 .primary {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(10,175,154,0.3);
+  box-shadow: 0 1px 3px rgba(10,175,154,0.25);
 }
-.primary:not(:disabled):hover { box-shadow: 0 4px 16px rgba(10,175,154,0.4); }
+.primary:not(:disabled):hover {
+  box-shadow: 0 4px 14px rgba(10,175,154,0.3);
+  transform: translateY(-1px);
+}
 
 .secondary {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.secondary:not(:disabled):hover { background: rgba(10,175,154,0.14); }
+.secondary:not(:disabled):hover { background: rgba(10,175,154,0.12); }
 
 .ghost {
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border);
 }
-.ghost:not(:disabled):hover { background: var(--surface-hover); color: var(--text-primary); }
+.ghost:not(:disabled):hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: rgba(0,0,0,0.1);
+}
 
 .danger {
-  background: rgba(197,48,48,0.1);
+  background: rgba(220,38,38,0.06);
   color: var(--red);
 }
-.danger:not(:disabled):hover { background: rgba(197,48,48,0.18); }
+.danger:not(:disabled):hover { background: rgba(220,38,38,0.12); }

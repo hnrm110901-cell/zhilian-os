@@ -2,13 +2,15 @@
 监控API端点
 提供错误和性能监控数据的查询接口
 """
+
 import os
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
 
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 from ..core.dependencies import get_current_active_user, require_permission
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
 from ..core.permissions import Permission
 from ..models.user import User
 from ..services.agent_monitor_service import agent_monitor_service
@@ -19,6 +21,7 @@ router = APIRouter()
 
 class ErrorSummaryResponse(BaseModel):
     """错误摘要响应"""
+
     time_window_minutes: int
     total_errors: int
     severity_distribution: Dict[str, int]
@@ -28,6 +31,7 @@ class ErrorSummaryResponse(BaseModel):
 
 class PerformanceSummaryResponse(BaseModel):
     """性能摘要响应"""
+
     time_window_minutes: int
     total_requests: int
     avg_duration_ms: float
@@ -131,6 +135,7 @@ async def get_error_details(
 
     if not error_details:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="错误记录不存在")
 
     return error_details
@@ -228,6 +233,7 @@ async def clear_old_errors(
 
 # ==================== Agent监控端点 ====================
 
+
 @router.get("/monitoring/agents/metrics")
 async def get_agent_metrics(
     agent_type: Optional[str] = Query(None, description="Agent类型"),
@@ -273,6 +279,7 @@ async def get_agent_realtime_stats(
 
 # ==================== 调度任务监控端点 ====================
 
+
 @router.get("/monitoring/scheduler/metrics")
 async def get_scheduler_metrics(
     task_name: Optional[str] = Query(None, description="任务名称"),
@@ -317,6 +324,7 @@ async def get_queue_stats(
 
 # ==================== 监控大盘 ====================
 
+
 @router.get("/monitoring/dashboard")
 async def get_monitoring_dashboard(
     current_user: User = Depends(get_current_active_user),
@@ -336,20 +344,19 @@ async def get_monitoring_dashboard(
     queue_stats = await scheduler_monitor_service.get_queue_stats()
 
     # 错误监控
-    error_summary = error_monitor.get_error_summary(time_window_minutes=int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60")))
+    error_summary = error_monitor.get_error_summary(
+        time_window_minutes=int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
+    )
 
     return {
         "success": True,
         "dashboard": {
-            "agents": {
-                "metrics": agent_metrics.get("metrics", {}),
-                "realtime": agent_realtime.get("stats", {})
-            },
+            "agents": {"metrics": agent_metrics.get("metrics", {}), "realtime": agent_realtime.get("stats", {})},
             "scheduler": {
                 "metrics": scheduler_metrics.get("metrics", {}),
                 "health": scheduler_health.get("health", {}),
-                "queue": queue_stats.get("stats", {})
+                "queue": queue_stats.get("stats", {}),
             },
-            "errors": error_summary
-        }
+            "errors": error_summary,
+        },
     }

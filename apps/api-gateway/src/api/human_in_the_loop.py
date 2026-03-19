@@ -2,27 +2,29 @@
 Human-in-the-Loop API - 人机协同审批API
 "机器不可信"安全防线 - 高危操作分级审批
 """
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List, Dict
 
-from src.core.dependencies import get_db, get_current_user
+from typing import Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.dependencies import get_current_user, get_db
+from src.models.user import User
 from src.services.human_in_the_loop_service import (
-    get_human_in_the_loop_service,
+    ApprovalStatus,
     HumanInTheLoopService,
     OperationType,
     RiskLevel,
     TrustPhase,
-    ApprovalStatus
+    get_human_in_the_loop_service,
 )
-from src.models.user import User
-from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/v1/human-in-the-loop")
 
 
 class AIDecisionRequest(BaseModel):
     """AI决策请求"""
+
     store_id: str
     operation_type: OperationType
     description: str
@@ -34,6 +36,7 @@ class AIDecisionRequest(BaseModel):
 
 class ApprovalDecision(BaseModel):
     """审批决定"""
+
     request_id: str
     approved: bool
     comment: Optional[str] = None
@@ -41,9 +44,7 @@ class ApprovalDecision(BaseModel):
 
 @router.post("/submit-decision")
 async def submit_ai_decision(
-    request: AIDecisionRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    request: AIDecisionRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     提交AI决策
@@ -65,7 +66,7 @@ async def submit_ai_decision(
         reasoning=request.reasoning,
         expected_impact=request.expected_impact,
         confidence_score=request.confidence_score,
-        operation_params=request.operation_params
+        operation_params=request.operation_params,
     )
 
     return result
@@ -73,9 +74,7 @@ async def submit_ai_decision(
 
 @router.post("/approve")
 async def approve_request(
-    decision: ApprovalDecision,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    decision: ApprovalDecision, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     审批请求
@@ -85,24 +84,15 @@ async def approve_request(
     service = get_human_in_the_loop_service(db)
 
     approval = await service.approve_request(
-        request_id=decision.request_id,
-        approver_id=current_user.id,
-        approved=decision.approved,
-        comment=decision.comment
+        request_id=decision.request_id, approver_id=current_user.id, approved=decision.approved, comment=decision.comment
     )
 
-    return {
-        "success": True,
-        "approval": approval.model_dump(),
-        "message": "审批成功" if decision.approved else "已拒绝"
-    }
+    return {"success": True, "approval": approval.model_dump(), "message": "审批成功" if decision.approved else "已拒绝"}
 
 
 @router.get("/pending-approvals/{store_id}")
 async def get_pending_approvals(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取待审批的请求
@@ -112,19 +102,11 @@ async def get_pending_approvals(
     service = get_human_in_the_loop_service(db)
     approvals = await service.get_pending_approvals(store_id)
 
-    return {
-        "store_id": store_id,
-        "total": len(approvals),
-        "approvals": [a.model_dump() for a in approvals]
-    }
+    return {"store_id": store_id, "total": len(approvals), "approvals": [a.model_dump() for a in approvals]}
 
 
 @router.get("/trust-phase/{store_id}")
-async def get_trust_phase(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_trust_phase(store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取门店的信任阶段
 
@@ -141,35 +123,28 @@ async def get_trust_phase(
             "name": "观察期",
             "duration": "1-3个月",
             "description": "AI只提建议，不执行。人工对比AI建议和实际决策，建立信任基础。",
-            "ai_autonomy": "0%"
+            "ai_autonomy": "0%",
         },
         TrustPhase.ASSISTANCE: {
             "name": "辅助期",
             "duration": "3-6个月",
             "description": "AI执行低风险操作，高风险操作需审批。逐步放权。",
-            "ai_autonomy": "60%"
+            "ai_autonomy": "60%",
         },
         TrustPhase.AUTONOMOUS: {
             "name": "自主期",
             "duration": "6个月+",
             "description": "AI自主执行大部分操作，仅极高风险需审批。完全信任。",
-            "ai_autonomy": "90%"
-        }
+            "ai_autonomy": "90%",
+        },
     }
 
-    return {
-        "store_id": store_id,
-        "trust_phase": trust_phase,
-        "details": phase_descriptions.get(trust_phase, {})
-    }
+    return {"store_id": store_id, "trust_phase": trust_phase, "details": phase_descriptions.get(trust_phase, {})}
 
 
 @router.get("/trust-metrics/{store_id}")
 async def get_trust_metrics(
-    store_id: str,
-    days: int = 30,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, days: int = 30, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取门店动态信任指标
@@ -197,9 +172,7 @@ async def get_trust_metrics(
 
 @router.get("/statistics/{store_id}")
 async def get_approval_statistics(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取审批统计
@@ -217,17 +190,14 @@ async def get_approval_statistics(
             "factors": {
                 "effect": "一周内必须看到数据改善",
                 "time": "3个月免费试用建立信任",
-                "transparency": "所有AI决策可追溯可解释"
-            }
-        }
+                "transparency": "所有AI决策可追溯可解释",
+            },
+        },
     }
 
 
 @router.get("/risk-classification")
-async def get_risk_classification(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_risk_classification(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取风险分类规则
 
@@ -236,37 +206,20 @@ async def get_risk_classification(
     risk_classification = {
         "Level 1 - 自动执行（低风险）": {
             "operations": ["查询操作", "数据分析", "报表生成", "提醒通知"],
-            "handling": "自动执行，无需审批"
+            "handling": "自动执行，无需审批",
         },
         "Level 2 - 自动执行+事后审计（中风险）": {
-            "operations": [
-                "自动排班（在预算范围内）",
-                "自动采购（小额订单）",
-                "优惠券发放（在额度内）"
-            ],
-            "handling": "自动执行，记录审计日志"
+            "operations": ["自动排班（在预算范围内）", "自动采购（小额订单）", "优惠券发放（在额度内）"],
+            "handling": "自动执行，记录审计日志",
         },
         "Level 3 - 人工审批（高风险）": {
-            "operations": [
-                "大额采购（>5000元）",
-                "人员调动",
-                "价格调整",
-                "供应商变更"
-            ],
-            "handling": "推送企业微信，店长审批后执行"
+            "operations": ["大额采购（>5000元）", "人员调动", "价格调整", "供应商变更"],
+            "handling": "推送企业微信，店长审批后执行",
         },
         "Level 4 - 禁止AI操作（极高风险）": {
-            "operations": [
-                "资金打款",
-                "数据删除",
-                "权限变更",
-                "合同签署"
-            ],
-            "handling": "禁止AI自动执行，必须人工操作"
-        }
+            "operations": ["资金打款", "数据删除", "权限变更", "合同签署"],
+            "handling": "禁止AI自动执行，必须人工操作",
+        },
     }
 
-    return {
-        "principle": "建立信任需要三年，摧毁信任只需大模型发疯一次",
-        "risk_classification": risk_classification
-    }
+    return {"principle": "建立信任需要三年，摧毁信任只需大模型发疯一次", "risk_classification": risk_classification}

@@ -11,7 +11,7 @@ import type { ZTableColumn } from '../../design-system/components/ZTable';
 import apiClient from '../../services/api';
 import styles from './FloorHome.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface Reservation {
   id:               string;

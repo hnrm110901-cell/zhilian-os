@@ -146,7 +146,7 @@ const PluginCard: React.FC<PluginCardProps> = ({ plugin, installed, onInstall, o
 // ── Page component ─────────────────────────────────────────────────────────────
 
 const PluginMarketplacePage: React.FC = () => {
-  const storeId = localStorage.getItem('store_id') || 'STORE001';
+  const storeId = localStorage.getItem('store_id') || '';
 
   const [stats, setStats] = useState<MarketplaceStats | null>(null);
   const [plugins, setPlugins] = useState<Plugin[]>([]);

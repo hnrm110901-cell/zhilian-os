@@ -8,36 +8,41 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ------------------------------------------------------------------
-# Stub out config and redis_cache BEFORE importing the module
+# Import the real module (config is already loaded by conftest.py).
+# Ensure redis_cache_service exists so the runtime `from .redis_cache_service
+# import redis_cache` inside the service succeeds.
 # ------------------------------------------------------------------
-sys.modules["src.core.config"] = MagicMock(settings=MagicMock(
-    WECHAT_CORP_ID="test_corp",
-    WECHAT_CORP_SECRET="test_secret",
-    WECHAT_AGENT_ID=1,
-))
 sys.modules.setdefault("src.services.redis_cache_service", MagicMock(
     redis_cache=MagicMock(
-        get=AsyncMock(return_value=None),   # cache miss by default
+        get=AsyncMock(return_value=None),
         set=AsyncMock(return_value=True),
     )
 ))
 
-# ------------------------------------------------------------------
-# Import the module and inject the missing 'os' reference
-# ------------------------------------------------------------------
 import src.services.wechat_work_message_service as _wwms_mod
-import os as _os
-_wwms_mod.os = _os  # fix the bug: source uses os.getenv without importing os
-
 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
+# Test settings to override the real config's settings on the module
+_TEST_SETTINGS = MagicMock(
+    WECHAT_CORP_ID="test_corp",
+    WECHAT_CORP_SECRET="test_secret",
+    WECHAT_AGENT_ID=1,
+)
+
+
+@pytest.fixture(autouse=True)
+def _patch_settings():
+    """Ensure each test sees mocked settings on the module."""
+    with patch.object(_wwms_mod, "settings", _TEST_SETTINGS):
+        yield
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_success_http_client(payload: dict) -> tuple:
-    """Return (mock_cls patcher context, mock_client) for a successful POST/GET."""
+def _make_success_http_client(payload: dict):
+    """Return mock_client for a successful POST/GET."""
     mock_client = AsyncMock()
     mock_response = MagicMock()
     mock_response.json = MagicMock(return_value=payload)
@@ -62,37 +67,12 @@ class TestGetAccessToken:
     @pytest.mark.asyncio
     async def test_cache_hit_returns_cached_token(self):
         """Lines 21-28: cached_token exists → return it without HTTP."""
-        import httpx as _httpx
-
         svc = WeChatWorkMessageService()
+        rc = _redis_cache_stub(cached_value=b"cached-tok")
 
-        rc = _redis_cache_stub(cached_value="cached-tok")
-        with patch.dict("sys.modules", {
-            "src.services.redis_cache_service": MagicMock(redis_cache=rc),
-        }):
-            # Re-patch the module attribute so the local import inside the method picks it up
-            original = _wwms_mod.__dict__.copy()
-            with patch.object(_httpx, "AsyncClient") as mock_cls:
-                mock_cls.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
-                mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
-
-                # Simulate the cache hit by patching the import inside the method
-                import importlib
-                with patch("src.services.wechat_work_message_service.WeChatWorkMessageService.get_access_token",
-                           new_callable=lambda: property(lambda self: None)) as _:
-                    pass  # just checking the method exists; use direct patching below
-
-        # Simpler approach: directly patch redis_cache in the module
-        rc2 = _redis_cache_stub(cached_value=b"cached-tok")
-        _wwms_mod_rc = sys.modules["src.services.redis_cache_service"]
-        orig_rc = _wwms_mod_rc.redis_cache
-        _wwms_mod_rc.redis_cache = rc2
-
-        try:
+        with patch("src.services.redis_cache_service.redis_cache", rc):
             result = await svc.get_access_token()
             assert result == b"cached-tok"
-        finally:
-            _wwms_mod_rc.redis_cache = orig_rc
 
     @pytest.mark.asyncio
     async def test_cache_miss_http_success(self):
@@ -108,17 +88,12 @@ class TestGetAccessToken:
         })
 
         rc = _redis_cache_stub(cached_value=None)
-        _wwms_rc_mod = sys.modules["src.services.redis_cache_service"]
-        orig_rc = _wwms_rc_mod.redis_cache
-        _wwms_rc_mod.redis_cache = rc
 
-        try:
-            with patch.object(_httpx, "AsyncClient") as mock_cls:
-                mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-                mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
-                result = await svc.get_access_token()
-        finally:
-            _wwms_rc_mod.redis_cache = orig_rc
+        with patch("src.services.redis_cache_service.redis_cache", rc), \
+             patch.object(_httpx, "AsyncClient") as mock_cls:
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+            result = await svc.get_access_token()
 
         assert result == "new-work-tok"
         rc.set.assert_awaited_once()
@@ -136,18 +111,13 @@ class TestGetAccessToken:
         })
 
         rc = _redis_cache_stub(cached_value=None)
-        _wwms_rc_mod = sys.modules["src.services.redis_cache_service"]
-        orig_rc = _wwms_rc_mod.redis_cache
-        _wwms_rc_mod.redis_cache = rc
 
-        try:
-            with patch.object(_httpx, "AsyncClient") as mock_cls:
-                mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-                mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
-                with pytest.raises(Exception, match="获取access_token失败"):
-                    await svc.get_access_token()
-        finally:
-            _wwms_rc_mod.redis_cache = orig_rc
+        with patch("src.services.redis_cache_service.redis_cache", rc), \
+             patch.object(_httpx, "AsyncClient") as mock_cls:
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+            with pytest.raises(Exception, match="获取access_token失败"):
+                await svc.get_access_token()
 
 
 # ===========================================================================
@@ -193,8 +163,6 @@ class TestSendTextMessage:
     @pytest.mark.asyncio
     async def test_send_text_exception_returns_error_dict(self):
         """Lines 75-123: outer except → returns error dict."""
-        import httpx as _httpx
-
         svc = WeChatWorkMessageService()
         svc.get_access_token = AsyncMock(side_effect=RuntimeError("auth failed"))
 

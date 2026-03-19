@@ -8,6 +8,7 @@ export interface User {
   full_name: string | null;
   role: string;
   store_id: string | null;
+  brand_id: string | null;
   is_active: boolean;
 }
 
@@ -37,7 +38,11 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
 
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setUser: (user) => {
+        if (user?.store_id) localStorage.setItem('store_id', user.store_id);
+        if (user?.brand_id) localStorage.setItem('brand_id', user.brand_id);
+        set({ user, isAuthenticated: !!user });
+      },
 
       setToken: (token) => set({ token }),
 
@@ -64,6 +69,14 @@ export const useAuthStore = create<AuthState>()(
 
           const data = await response.json();
 
+          // 同步 store_id/brand_id 到 localStorage（兼容使用 localStorage 的页面）
+          if (data.user?.store_id) {
+            localStorage.setItem('store_id', data.user.store_id);
+          }
+          if (data.user?.brand_id) {
+            localStorage.setItem('brand_id', data.user.brand_id);
+          }
+
           set({
             token: data.access_token,
             user: data.user,
@@ -81,6 +94,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        localStorage.removeItem('store_id');
+        localStorage.removeItem('brand_id');
         set({
           user: null,
           token: null,

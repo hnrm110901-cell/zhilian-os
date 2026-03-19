@@ -10,7 +10,7 @@ const { Option } = Select;
 const ForecastPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [metric, setMetric] = useState('revenue');
   const [horizonDays, setHorizonDays] = useState(7);
   const [forecastData, setForecastData] = useState<any>(null);
@@ -89,7 +89,7 @@ const ForecastPage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }} placeholder="选择门店">
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">STORE001</Option>}
+          ))}
         </Select>
         <Select value={metric} onChange={setMetric} style={{ width: 120 }}>
           <Option value="revenue">营收</Option>

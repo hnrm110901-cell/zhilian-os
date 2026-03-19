@@ -22,11 +22,7 @@ const CONFIG_TYPES = [
   { value: 'promotion', label: '促销活动' },
 ];
 
-const STAFF_AVAILABLE_MOCK = [
-  { store_id: 'S001', store_name: '总店', scheduled_count: 8, available_for_transfer: 2 },
-  { store_id: 'S002', store_name: '分店一', scheduled_count: 5, available_for_transfer: 0 },
-  { store_id: 'S003', store_name: '分店二', scheduled_count: 6, available_for_transfer: 1 },
-];
+const STAFF_AVAILABLE_MOCK: { store_id: string; store_name: string; scheduled_count: number; available_for_transfer: number }[] = [];
 
 export default function CrossStoreConfigPage() {
   const [stores, setStores] = useState<Store[]>([]);
@@ -178,10 +174,10 @@ export default function CrossStoreConfigPage() {
                 <Card title="发起借调申请">
                   <Form form={transferForm} layout="vertical" onFinish={handleTransfer}>
                     <Form.Item name="from_store_id" label="借出门店" rules={[{ required: true }]}>
-                      <Select options={storeOptions.length ? storeOptions : [{ value: 'S001', label: '总店' }]} />
+                      <Select options={storeOptions} placeholder="选择借出门店" />
                     </Form.Item>
                     <Form.Item name="to_store_id" label="借入门店" rules={[{ required: true }]}>
-                      <Select options={storeOptions.length ? storeOptions : [{ value: 'S002', label: '分店一' }]} />
+                      <Select options={storeOptions} placeholder="选择借入门店" />
                     </Form.Item>
                     <Form.Item name="employee_id" label="员工ID" rules={[{ required: true }]}>
                       <Input placeholder="输入员工工号或姓名" />

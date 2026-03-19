@@ -1,18 +1,19 @@
 """
 联邦学习API端点
 """
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
 
-from src.services.federated_learning_service import (
-    FederatedLearningService,
-    FederatedLearningCoordinator,
-    ModelType,
-    AggregationMethod,
-)
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from src.core.dependencies import get_current_user
 from src.models.user import User
+from src.services.federated_learning_service import (
+    AggregationMethod,
+    FederatedLearningCoordinator,
+    FederatedLearningService,
+    ModelType,
+)
 
 router = APIRouter(prefix="/federated-learning", tags=["federated-learning"])
 
@@ -32,10 +33,7 @@ class ModelUpload(BaseModel):
 
 class AggregationRequest(BaseModel):
     round_id: str = Field(..., description="训练轮次ID")
-    method: AggregationMethod = Field(
-        AggregationMethod.FEDAVG,
-        description="聚合方法"
-    )
+    method: AggregationMethod = Field(AggregationMethod.FEDAVG, description="聚合方法")
 
 
 # 全局协调器实例
@@ -168,9 +166,9 @@ async def list_training_rounds(
     """
     列出训练轮次
     """
+    from sqlalchemy import select
     from src.core.database import get_db_session
     from src.models.federated_learning import FLTrainingRound
-    from sqlalchemy import select
 
     async with get_db_session() as session:
         stmt = select(FLTrainingRound).order_by(FLTrainingRound.created_at.desc()).limit(50)

@@ -4,15 +4,17 @@ Voice Interaction Orchestrator
 
 整合Shokz设备、语音服务和Agent系统，提供完整的语音交互流程
 """
+
 import os
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import structlog
 
-from .shokz_service import shokz_service, DeviceRole
-from .voice_service import voice_service, voice_command_router
-from .iflytek_websocket_service import iflytek_ws_service
 from .agent_service import AgentService
+from .iflytek_websocket_service import iflytek_ws_service
 from .message_router import message_router
+from .shokz_service import DeviceRole, shokz_service
+from .voice_service import voice_command_router, voice_service
 
 logger = structlog.get_logger()
 
@@ -112,13 +114,11 @@ class VoiceInteractionOrchestrator:
                     {
                         "action": action,
                         "params": params,
-                    }
+                    },
                 )
 
                 # 5. 格式化响应
-                response_text = message_router.format_agent_response(
-                    agent_type, action, agent_result
-                )
+                response_text = message_router.format_agent_response(agent_type, action, agent_result)
 
                 # 简化语音响应（去除emoji和格式化）
                 response_text = self._simplify_for_voice(response_text)
@@ -298,10 +298,11 @@ class VoiceInteractionOrchestrator:
         """
         # 移除emoji
         import re
-        text = re.sub(r'[^\w\s\u4e00-\u9fff，。！？、：；""''（）【】]', '', text)
+
+        text = re.sub(r'[^\w\s\u4e00-\u9fff，。！？、：；""' "（）【】]", "", text)
 
         # 移除多余的换行和空格
-        text = ' '.join(text.split())
+        text = " ".join(text.split())
 
         # 限制长度（语音播报不宜过长）
         _max_len = int(os.getenv("VOICE_MAX_TEXT_LENGTH", "200"))

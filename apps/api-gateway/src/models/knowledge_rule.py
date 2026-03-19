@@ -14,43 +14,40 @@
 目标：500+ 条规则（Phase 3 验收标准）
 """
 
-import uuid
 import enum
-from sqlalchemy import (
-    Column, String, Text, Float, Boolean, Integer,
-    DateTime, Enum, JSON, Index, UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import UUID
+import uuid
 from datetime import datetime
 
+from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Float, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
 from src.models.base import Base, TimestampMixin
 
 
 class RuleCategory(str, enum.Enum):
-    WASTE       = "waste"        # 损耗规则
-    EFFICIENCY  = "efficiency"   # 人效规则
-    QUALITY     = "quality"      # 品质规则
-    COST        = "cost"         # 成本规则
-    TRAFFIC     = "traffic"      # 客流规则
-    INVENTORY   = "inventory"    # 库存规则
-    COMPLIANCE  = "compliance"   # 合规规则
-    BENCHMARK   = "benchmark"    # 行业基准
+    WASTE = "waste"  # 损耗规则
+    EFFICIENCY = "efficiency"  # 人效规则
+    QUALITY = "quality"  # 品质规则
+    COST = "cost"  # 成本规则
+    TRAFFIC = "traffic"  # 客流规则
+    INVENTORY = "inventory"  # 库存规则
+    COMPLIANCE = "compliance"  # 合规规则
+    BENCHMARK = "benchmark"  # 行业基准
     CROSS_STORE = "cross_store"  # 跨店知识聚合规则（L3）
 
 
 class RuleType(str, enum.Enum):
-    THRESHOLD   = "threshold"    # 阈值规则（if metric > X then alert）
-    PATTERN     = "pattern"      # 模式规则（if A and B and C then D）
-    ANOMALY     = "anomaly"      # 异常规则（标准差 / 趋势偏离）
-    CAUSAL      = "causal"       # 因果规则（root cause 映射）
-    BENCHMARK   = "benchmark"    # 基准对比规则
+    THRESHOLD = "threshold"  # 阈值规则（if metric > X then alert）
+    PATTERN = "pattern"  # 模式规则（if A and B and C then D）
+    ANOMALY = "anomaly"  # 异常规则（标准差 / 趋势偏离）
+    CAUSAL = "causal"  # 因果规则（root cause 映射）
+    BENCHMARK = "benchmark"  # 基准对比规则
 
 
 class RuleStatus(str, enum.Enum):
-    DRAFT     = "draft"       # 草稿（未生效）
-    ACTIVE    = "active"      # 生效中
-    INACTIVE  = "inactive"    # 暂停
-    ARCHIVED  = "archived"    # 已归档（替代版本已上线）
+    DRAFT = "draft"  # 草稿（未生效）
+    ACTIVE = "active"  # 生效中
+    INACTIVE = "inactive"  # 暂停
+    ARCHIVED = "archived"  # 已归档（替代版本已上线）
 
 
 class KnowledgeRule(Base, TimestampMixin):
@@ -60,6 +57,7 @@ class KnowledgeRule(Base, TimestampMixin):
     每条规则描述一个可量化的业务逻辑：
       "当菜品损耗率连续3天超过基准值15%时，根因为人员操作失误的概率为72%"
     """
+
     __tablename__ = "knowledge_rules"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -96,9 +94,9 @@ class KnowledgeRule(Base, TimestampMixin):
     status = Column(Enum(RuleStatus), nullable=False, default=RuleStatus.DRAFT, index=True)
 
     # 质量指标（持续更新）
-    hit_count = Column(Integer, default=0)          # 命中次数
-    correct_count = Column(Integer, default=0)       # 正确命中次数（人工验证）
-    accuracy_rate = Column(Float)                    # 准确率
+    hit_count = Column(Integer, default=0)  # 命中次数
+    correct_count = Column(Integer, default=0)  # 正确命中次数（人工验证）
+    accuracy_rate = Column(Float)  # 准确率
     last_hit_at = Column(DateTime)
 
     # 版本管理
@@ -129,6 +127,7 @@ class RuleExecution(Base, TimestampMixin):
 
     每次推理引擎匹配到规则并输出结论时记录。
     """
+
     __tablename__ = "rule_executions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -165,6 +164,7 @@ class IndustryBenchmark(Base, TimestampMixin):
 
     存储餐饮行业各品类的标准指标基准值（来自头部门店数据归纳 + 行业报告）。
     """
+
     __tablename__ = "industry_benchmarks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -175,18 +175,18 @@ class IndustryBenchmark(Base, TimestampMixin):
     metric_category = Column(Enum(RuleCategory), nullable=False)
 
     # 基准值
-    p25_value = Column(Float)   # 行业 25 分位（落后）
-    p50_value = Column(Float)   # 行业中位数
-    p75_value = Column(Float)   # 行业 75 分位（优秀）
-    p90_value = Column(Float)   # 行业 90 分位（标杆）
+    p25_value = Column(Float)  # 行业 25 分位（落后）
+    p50_value = Column(Float)  # 行业中位数
+    p75_value = Column(Float)  # 行业 75 分位（优秀）
+    p90_value = Column(Float)  # 行业 90 分位（标杆）
 
-    unit = Column(String(20))          # %、元/人天、件/天
-    direction = Column(String(10))     # lower_better / higher_better
+    unit = Column(String(20))  # %、元/人天、件/天
+    direction = Column(String(10))  # lower_better / higher_better
 
     # 元数据
     data_source = Column(String(200))  # 来源描述（如 "2025中国餐饮白皮书"）
-    sample_size = Column(Integer)      # 样本量
-    valid_until = Column(DateTime)     # 有效期
+    sample_size = Column(Integer)  # 样本量
+    valid_until = Column(DateTime)  # 有效期
 
     description = Column(Text)
 

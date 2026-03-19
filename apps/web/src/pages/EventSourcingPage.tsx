@@ -13,7 +13,7 @@ const EventSourcingPage: React.FC = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [eventType] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -94,7 +94,7 @@ const EventSourcingPage: React.FC = () => {
             <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 140 }}>
               {stores.length > 0 ? stores.map((s: any) => (
                 <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-              )) : <Option value="STORE001">STORE001</Option>}
+              ))}
             </Select>
             <span>状态：</span>
             <Select value={statusFilter} onChange={setStatusFilter} style={{ width: 110 }} allowClear placeholder="全部">

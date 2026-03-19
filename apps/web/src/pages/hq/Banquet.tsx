@@ -17,7 +17,7 @@ import { handleApiError } from '../../utils/message';
 import styles from './Banquet.module.css';
 import ReactECharts from 'echarts-for-react';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 // 兼容后续 Tab 使用的 useStore hook（内部统一用 STORE_ID）
 function useStore() {
@@ -1897,7 +1897,7 @@ function AnalyticsTab() {
   const load = useCallback(async (m: string) => {
     setLoading(true);
     try {
-      const STORE = localStorage.getItem('store_id') || 'S001';
+      const STORE = localStorage.getItem('store_id') || '';
       const [y, mo] = m.split('-');
       const [
         funnelR, forecastR, lostR, arR, excR, excStatsR,
@@ -2607,7 +2607,7 @@ interface CustomerDetailResp {
   orders:   Array<{ order_id: string; banquet_type: string; banquet_date: string; order_status: string; total_amount_yuan: number }>;
 }
 
-const HQ_STORE_ID = localStorage.getItem('store_id') || 'S001';
+const HQ_STORE_ID = localStorage.getItem('store_id') || '';
 
 function CustomerTab() {
   const [q,           setQ]           = useState('');
@@ -2904,7 +2904,7 @@ function HallScheduleTab() {
   const loadSchedule = useCallback(async (m: string) => {
     setLoading(true);
     const [y, mo] = m.split('-').map(Number);
-    const STORE = localStorage.getItem('store_id') || 'S001';
+    const STORE = localStorage.getItem('store_id') || '';
     try {
       const resp = await apiClient.get(
         `/api/v1/banquet-agent/stores/${STORE}/halls/monthly-schedule`,
@@ -3064,7 +3064,7 @@ function CrossStoreTab() {
   const load = useCallback(async (m: string) => {
     setLoading(true);
     const [y, mo] = m.split('-').map(Number);
-    const STORE = localStorage.getItem('store_id') || 'S001';
+    const STORE = localStorage.getItem('store_id') || '';
     try {
       const [bmR, compR] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/benchmark`, { params: { year: y, month: mo } }),
@@ -3162,7 +3162,7 @@ interface ComplianceData {
 }
 
 function ContractTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [data,    setData]    = useState<ComplianceData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -3269,7 +3269,7 @@ interface ReviewSummaryData {
 interface LowScoreItem { review_id: string; order_id: string; score: number; banquet_date: string; banquet_type: string; contact_name: string | null; ai_summary: string | null; tags: string[]; created_at: string | null }
 
 function ReviewsTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [summary,    setSummary]    = useState<ReviewSummaryData | null>(null);
   const [lowScores,  setLowScores]  = useState<LowScoreItem[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -3416,7 +3416,7 @@ interface RankingRow {
 }
 
 function PostEventTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [costData,  setCostData]  = useState<CostByType[]>([]);
   const [aging,     setAging]     = useState<AgingBucket[]>([]);
   const [ranking,   setRanking]   = useState<RankingRow[]>([]);
@@ -3574,7 +3574,7 @@ interface QuarterlySummary {
 }
 
 function HealthScoreTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [health,    setHealth]    = useState<HealthScore | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkRow[]>([]);
   const [quarterly, setQuarterly] = useState<QuarterlySummary | null>(null);
@@ -3696,7 +3696,7 @@ function HealthScoreTab() {
 
 /* ─── Phase 17: 运营简报 Tab ─── */
 function DailyBriefTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [brief,     setBrief]     = useState<DailyBriefData | null>(null);
   const [loading,   setLoading]   = useState(true);
   const [pushing,   setPushing]   = useState(false);
@@ -3906,7 +3906,7 @@ export default function HQBanquet() {
 
 /* ─── Phase 57: 渠道收入 Tab ─── */
 function CustomerSourceRevenueTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -3963,7 +3963,7 @@ function CustomerSourceRevenueTab() {
 
 /* ─── Phase 57: 取消时机 Tab ─── */
 function OrderCancellationTimingTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -4022,7 +4022,7 @@ function OrderCancellationTimingTab() {
 
 /* ─── Phase 58: 订单完成率 Tab ─── */
 function OrderCompletionRateTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -4081,7 +4081,7 @@ function OrderCompletionRateTab() {
 
 /* ─── Phase 58: 异常类型分布 Tab ─── */
 function ExceptionTypeDistributionTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -4138,7 +4138,7 @@ function ExceptionTypeDistributionTab() {
 
 /* ─── Phase 59: 星期分布 Tab ─── */
 function BanquetWeekdayDistributionTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -4195,7 +4195,7 @@ function BanquetWeekdayDistributionTab() {
 
 /* ─── Phase 59: 尾款未清 Tab ─── */
 function PaymentPartialRateTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -4252,7 +4252,7 @@ function PaymentPartialRateTab() {
 
 /* ─── Phase 21: 客户洞察 Tab ─── */
 function CustomerInsightTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface SegmentItem {
     segment: string;
@@ -4380,7 +4380,7 @@ function CustomerInsightTab() {
 
 /* ─── Phase 21: 获客漏斗 Tab ─── */
 function FunnelAnalyticsTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface FunnelStage {
     stage: string;
@@ -4503,7 +4503,7 @@ function FunnelAnalyticsTab() {
 
 /* ─── Phase 22: 套餐洞察 Tab ─── */
 function MenuInsightTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface PkgPerfItem {
     package_id: string;
@@ -4633,7 +4633,7 @@ function MenuInsightTab() {
 
 /* ─── Phase 22: 营收预测 Tab ─── */
 function RevenueForecastTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface HistoryItem { month: string; revenue_yuan: number; order_count: number; }
   interface ForecastItem { month: string; forecast_revenue_yuan: number; forecast_orders: number; confidence: string; }
@@ -4767,7 +4767,7 @@ function RevenueForecastTab() {
 
 /* ─── Phase 23: 员工绩效 & 异常分析 Tab ─── */
 function StaffExceptionTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface StaffItem {
     owner_user_id: string | null;
@@ -4901,7 +4901,7 @@ function StaffExceptionTab() {
 
 /* ─── Phase 23: 满意度 & 定金预测 Tab ─── */
 function SatisfactionTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface TrendItem  { month: string; avg_rating: number; count: number; }
   interface TagItem    { tag: string; count: number; }
@@ -5036,7 +5036,7 @@ function SatisfactionTab() {
 
 /* ─── Phase 24: 年度对比 Tab ─── */
 function YearOverYearTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface YoyMetric {
     metric: string;
@@ -5156,7 +5156,7 @@ function YearOverYearTab() {
 
 /* ─── Phase 24: 预警中心 Tab ─── */
 function AlertCenterTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
 
   interface AlertItem {
     alert_id: string;
@@ -7997,7 +7997,7 @@ function ReviewSentimentTab() {
 
 /* ─── Phase 38: 加购分析 Tab ─── */
 function UpsellAnalysisTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [upsellData, setUpsellData]   = useState<any>(null);
   const [capData,    setCapData]      = useState<any>(null);
   const [refData,    setRefData]      = useState<any>(null);
@@ -8110,7 +8110,7 @@ function UpsellAnalysisTab() {
 
 /* ─── Phase 38: 收入趋势 Tab ─── */
 function RevenueTrendTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [trendData, setTrendData]     = useState<any>(null);
   const [reviewRate, setReviewRate]   = useState<any>(null);
   const [coordData,  setCoordData]    = useState<any>(null);
@@ -8246,7 +8246,7 @@ function RevenueTrendTab() {
 
 /* ─── Phase 39: 利润率 Tab ─── */
 function ProfitMarginTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [marginData,  setMarginData]  = useState<any>(null);
   const [turnData,    setTurnData]    = useState<any>(null);
   const [payData,     setPayData]     = useState<any>(null);
@@ -8367,7 +8367,7 @@ function ProfitMarginTab() {
 
 /* ─── Phase 39: 类型趋势 Tab ─── */
 function TypeTrendTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [typeData,   setTypeData]   = useState<any>(null);
   const [respData,   setRespData]   = useState<any>(null);
   const [satData,    setSatData]    = useState<any>(null);
@@ -8492,7 +8492,7 @@ function TypeTrendTab() {
 
 /* ─── Phase 40: 复购分析 Tab ─── */
 function ReorderAnalysisTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [convData,   setConvData]   = useState<any>(null);
   const [reordData,  setReordData]  = useState<any>(null);
   const [ageData,    setAgeData]    = useState<any>(null);
@@ -8607,7 +8607,7 @@ function ReorderAnalysisTab() {
 
 /* ─── Phase 40: 定金分析 Tab ─── */
 function DepositAnalysisTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [depositData,  setDepositData]  = useState<any>(null);
   const [customData,   setCustomData]   = useState<any>(null);
   const [perfData,     setPerfData]     = useState<any>(null);
@@ -8728,7 +8728,7 @@ function DepositAnalysisTab() {
 
 /* ─── Phase 41: 爽约分析 Tab ─── */
 function NoShowAnalysisTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [noShowData,  setNoShowData]  = useState<any>(null);
   const [quoteData,   setQuoteData]   = useState<any>(null);
   const [slotData,    setSlotData]    = useState<any>(null);
@@ -8837,7 +8837,7 @@ function NoShowAnalysisTab() {
 
 /* ─── Phase 41: 套餐热度 Tab ─── */
 function PackagePopularityTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [pkgData,    setPkgData]    = useState<any>(null);
   const [acqData,    setAcqData]    = useState<any>(null);
   const [tpData,     setTpData]     = useState<any>(null);
@@ -8958,7 +8958,7 @@ function PackagePopularityTab() {
 
 /* ─── Phase 42: 人均消费 Tab ─── */
 function GuestRevenueTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [rpgData,    setRpgData]    = useState<any>(null);
   const [densData,   setDensData]   = useState<any>(null);
   const [fbData,     setFbData]     = useState<any>(null);
@@ -9099,7 +9099,7 @@ function GuestRevenueTab() {
 
 /* ─── Phase 42: VIP分析 Tab ─── */
 function VipAnalysisTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [vipData,   setVipData]   = useState<any>(null);
   const [budgData,  setBudgData]  = useState<any>(null);
   const [addonData, setAddonData] = useState<any>(null);
@@ -9233,7 +9233,7 @@ function VipAnalysisTab() {
 
 /* ─── Phase 43: 每桌收入 Tab ─── */
 function PerTableRevenueTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [rptData,  setRptData]  = useState<any>(null);
   const [roiData,  setRoiData]  = useState<any>(null);
   const [payData,  setPayData]  = useState<any>(null);
@@ -9370,7 +9370,7 @@ function PerTableRevenueTab() {
 
 /* ─── Phase 43: 客户价值 Tab ─── */
 function CustomerLtvTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [ltvData,    setLtvData]    = useState<any>(null);
   const [seasonData, setSeasonData] = useState<any>(null);
   const [loadData,   setLoadData]   = useState<any>(null);
@@ -9526,7 +9526,7 @@ function CustomerLtvTab() {
 
 /* ─── Phase 44: 转化漏斗 Tab ─── */
 function LeadFunnelTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [funnelData, setFunnelData] = useState<any>(null);
   const [winLossData,setWinLossData]= useState<any>(null);
   const [concData,   setConcData]   = useState<any>(null);
@@ -9647,7 +9647,7 @@ function LeadFunnelTab() {
 
 /* ─── Phase 44: 退款分析 Tab ─── */
 function RefundAnalysisTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [refundData,  setRefundData]  = useState<any>(null);
   const [upgradeData, setUpgradeData] = useState<any>(null);
   const [speedData,   setSpeedData]   = useState<any>(null);
@@ -9765,7 +9765,7 @@ function RefundAnalysisTab() {
 
 /* ─── Phase 45: 高峰日 Tab ─── */
 function PeakDayTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [peakData,   setPeakData]   = useState<any>(null);
   const [sqmData,    setSqmData]    = useState<any>(null);
   const [nurData,    setNurData]    = useState<any>(null);
@@ -9907,7 +9907,7 @@ function PeakDayTab() {
 
 /* ─── Phase 45: 风险预警 Tab ─── */
 function EarlyWarningTab() {
-  const STORE = localStorage.getItem('store_id') || 'S001';
+  const STORE = localStorage.getItem('store_id') || '';
   const [warnData,    setWarnData]    = useState<any>(null);
   const [staffData,   setStaffData]   = useState<any>(null);
   const [cmpData,     setCmpData]     = useState<any>(null);

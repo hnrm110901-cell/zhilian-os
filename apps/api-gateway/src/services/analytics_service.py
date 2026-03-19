@@ -2,18 +2,19 @@
 高级分析服务
 提供预测分析、异常检测、关联分析等功能
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime, date, timedelta
-from collections import defaultdict
-import structlog
-import os
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload
 
-from src.models import Order, OrderItem, InventoryItem, FinancialTransaction, Store
-from src.models.order import OrderStatus
+import os
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from src.core.exceptions import NotFoundError, ValidationError
+from src.models import FinancialTransaction, InventoryItem, Order, OrderItem, Store
+from src.models.order import OrderStatus
 
 logger = structlog.get_logger()
 
@@ -24,38 +25,35 @@ class AnalyticsService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def predict_sales(
-        self, store_id: str, days_ahead: int = 7
-    ) -> Dict[str, Any]:
+    async def predict_sales(self, store_id: str, days_ahead: int = 7) -> Dict[str, Any]:
         """销售预测 - 基于历史数据预测未来销售"""
         # 获取过去N天的销售数据
         end_date = date.today()
         start_date = end_date - timedelta(days=int(os.getenv("ANALYTICS_HISTORY_DAYS", "30")))
 
-        query = select(
-            func.date(FinancialTransaction.transaction_date).label("date"),
-            func.sum(FinancialTransaction.amount).label("revenue"),
-            func.count(FinancialTransaction.id).label("transactions")
-        ).where(
-            and_(
-                FinancialTransaction.store_id == store_id,
-                FinancialTransaction.transaction_date >= start_date,
-                FinancialTransaction.transaction_date <= end_date,
-                FinancialTransaction.transaction_type == "income",
-                FinancialTransaction.category == "sales"
+        query = (
+            select(
+                func.date(FinancialTransaction.transaction_date).label("date"),
+                func.sum(FinancialTransaction.amount).label("revenue"),
+                func.count(FinancialTransaction.id).label("transactions"),
             )
-        ).group_by(func.date(FinancialTransaction.transaction_date))
+            .where(
+                and_(
+                    FinancialTransaction.store_id == store_id,
+                    FinancialTransaction.transaction_date >= start_date,
+                    FinancialTransaction.transaction_date <= end_date,
+                    FinancialTransaction.transaction_type == "income",
+                    FinancialTransaction.category == "sales",
+                )
+            )
+            .group_by(func.date(FinancialTransaction.transaction_date))
+        )
 
         result = await self.db.execute(query)
         historical_data = result.all()
 
         if not historical_data:
-            return {
-                "store_id": store_id,
-                "predictions": [],
-                "confidence": "low",
-                "message": "历史数据不足，无法进行预测"
-            }
+            return {"store_id": store_id, "predictions": [], "confidence": "low", "message": "历史数据不足，无法进行预测"}
 
         # 简单的移动平均预测
         # 计算最近N天的平均值
@@ -73,14 +71,8 @@ class AnalyticsService:
             trend = 0
 
         # 从历史数据计算实际周末效应系数
-        weekend_revs = [
-            d.revenue for d in historical_data
-            if date.fromisoformat(str(d.date)).weekday() in [5, 6]
-        ]
-        weekday_revs = [
-            d.revenue for d in historical_data
-            if date.fromisoformat(str(d.date)).weekday() not in [5, 6]
-        ]
+        weekend_revs = [d.revenue for d in historical_data if date.fromisoformat(str(d.date)).weekday() in [5, 6]]
+        weekday_revs = [d.revenue for d in historical_data if date.fromisoformat(str(d.date)).weekday() not in [5, 6]]
         if weekend_revs and weekday_revs:
             avg_wkend = sum(weekend_revs) / len(weekend_revs)
             avg_wkday = sum(weekday_revs) / len(weekday_revs)
@@ -99,16 +91,22 @@ class AnalyticsService:
             weekend_factor = computed_weekend_factor if weekday in [5, 6] else 1.0
 
             # 应用趋势和周末因素
-            predicted_revenue = int(avg_revenue * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor)
-            predicted_transactions = int(avg_transactions * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor)
+            predicted_revenue = int(
+                avg_revenue * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor
+            )
+            predicted_transactions = int(
+                avg_transactions * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor
+            )
 
-            predictions.append({
-                "date": pred_date.isoformat(),
-                "predicted_revenue": predicted_revenue,
-                "predicted_transactions": predicted_transactions,
-                "confidence": "medium" if i <= 3 else "low",
-                "is_weekend": weekday in [5, 6]
-            })
+            predictions.append(
+                {
+                    "date": pred_date.isoformat(),
+                    "predicted_revenue": predicted_revenue,
+                    "predicted_transactions": predicted_transactions,
+                    "confidence": "medium" if i <= 3 else "low",
+                    "is_weekend": weekday in [5, 6],
+                }
+            )
 
         return {
             "store_id": store_id,
@@ -116,7 +114,7 @@ class AnalyticsService:
             "historical_period": {
                 "start_date": start_date.isoformat(),
                 "end_date": end_date.isoformat(),
-                "days": len(historical_data)
+                "days": len(historical_data),
             },
             "predictions": predictions,
             "trend": round(trend * 100, 2),  # 百分比
@@ -132,29 +130,37 @@ class AnalyticsService:
 
         # 根据指标类型查询数据
         if metric == "revenue":
-            query = select(
-                func.date(FinancialTransaction.transaction_date).label("date"),
-                func.sum(FinancialTransaction.amount).label("value")
-            ).where(
-                and_(
-                    FinancialTransaction.store_id == store_id,
-                    FinancialTransaction.transaction_date >= start_date,
-                    FinancialTransaction.transaction_date <= end_date,
-                    FinancialTransaction.transaction_type == "income"
+            query = (
+                select(
+                    func.date(FinancialTransaction.transaction_date).label("date"),
+                    func.sum(FinancialTransaction.amount).label("value"),
                 )
-            ).group_by(func.date(FinancialTransaction.transaction_date))
+                .where(
+                    and_(
+                        FinancialTransaction.store_id == store_id,
+                        FinancialTransaction.transaction_date >= start_date,
+                        FinancialTransaction.transaction_date <= end_date,
+                        FinancialTransaction.transaction_type == "income",
+                    )
+                )
+                .group_by(func.date(FinancialTransaction.transaction_date))
+            )
         elif metric == "cost":
-            query = select(
-                func.date(FinancialTransaction.transaction_date).label("date"),
-                func.sum(FinancialTransaction.amount).label("value")
-            ).where(
-                and_(
-                    FinancialTransaction.store_id == store_id,
-                    FinancialTransaction.transaction_date >= start_date,
-                    FinancialTransaction.transaction_date <= end_date,
-                    FinancialTransaction.transaction_type == "expense"
+            query = (
+                select(
+                    func.date(FinancialTransaction.transaction_date).label("date"),
+                    func.sum(FinancialTransaction.amount).label("value"),
                 )
-            ).group_by(func.date(FinancialTransaction.transaction_date))
+                .where(
+                    and_(
+                        FinancialTransaction.store_id == store_id,
+                        FinancialTransaction.transaction_date >= start_date,
+                        FinancialTransaction.transaction_date <= end_date,
+                        FinancialTransaction.transaction_type == "expense",
+                    )
+                )
+                .group_by(func.date(FinancialTransaction.transaction_date))
+            )
         else:
             raise ValidationError(f"不支持的指标类型: {metric}")
 
@@ -162,18 +168,13 @@ class AnalyticsService:
         data_points = result.all()
 
         if len(data_points) < 7:
-            return {
-                "store_id": store_id,
-                "metric": metric,
-                "anomalies": [],
-                "message": "数据不足，无法进行异常检测"
-            }
+            return {"store_id": store_id, "metric": metric, "anomalies": [], "message": "数据不足，无法进行异常检测"}
 
         # 计算统计指标
         values = [d.value for d in data_points]
         mean = sum(values) / len(values)
         variance = sum((x - mean) ** 2 for x in values) / len(values)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         # 使用3-sigma规则检测异常
         threshold_upper = mean + 3 * std_dev
@@ -182,41 +183,41 @@ class AnalyticsService:
         anomalies = []
         for data_point in data_points:
             if data_point.value > threshold_upper:
-                anomalies.append({
-                    "date": data_point.date.isoformat(),
-                    "value": data_point.value,
-                    "expected_range": [int(threshold_lower), int(threshold_upper)],
-                    "deviation": round((data_point.value - mean) / std_dev, 2),
-                    "type": "high",
-                    "severity": "high" if data_point.value > mean + 4 * std_dev else "medium"
-                })
+                anomalies.append(
+                    {
+                        "date": data_point.date.isoformat(),
+                        "value": data_point.value,
+                        "expected_range": [int(threshold_lower), int(threshold_upper)],
+                        "deviation": round((data_point.value - mean) / std_dev, 2),
+                        "type": "high",
+                        "severity": "high" if data_point.value > mean + 4 * std_dev else "medium",
+                    }
+                )
             elif data_point.value < threshold_lower:
-                anomalies.append({
-                    "date": data_point.date.isoformat(),
-                    "value": data_point.value,
-                    "expected_range": [int(threshold_lower), int(threshold_upper)],
-                    "deviation": round((data_point.value - mean) / std_dev, 2),
-                    "type": "low",
-                    "severity": "high" if data_point.value < mean - 4 * std_dev else "medium"
-                })
+                anomalies.append(
+                    {
+                        "date": data_point.date.isoformat(),
+                        "value": data_point.value,
+                        "expected_range": [int(threshold_lower), int(threshold_upper)],
+                        "deviation": round((data_point.value - mean) / std_dev, 2),
+                        "type": "low",
+                        "severity": "high" if data_point.value < mean - 4 * std_dev else "medium",
+                    }
+                )
 
         return {
             "store_id": store_id,
             "metric": metric,
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "days": days
-            },
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat(), "days": days},
             "statistics": {
                 "mean": int(mean),
                 "std_dev": int(std_dev),
                 "threshold_upper": int(threshold_upper),
-                "threshold_lower": int(threshold_lower)
+                "threshold_lower": int(threshold_lower),
             },
             "anomalies": anomalies,
             "anomaly_count": len(anomalies),
-            "anomaly_rate": round(len(anomalies) / len(data_points) * 100, 2)
+            "anomaly_rate": round(len(anomalies) / len(data_points) * 100, 2),
         }
 
     async def analyze_associations(
@@ -228,12 +229,16 @@ class AnalyticsService:
         start_date = end_date - timedelta(days=int(os.getenv("ANALYTICS_HISTORY_DAYS", "30")))
 
         # 查询订单及其商品
-        query = select(Order).options(selectinload(Order.items)).where(
-            and_(
-                Order.store_id == store_id,
-                Order.created_at >= datetime.combine(start_date, datetime.min.time()),
-                Order.created_at <= datetime.combine(end_date, datetime.max.time()),
-                Order.status == OrderStatus.COMPLETED.value
+        query = (
+            select(Order)
+            .options(selectinload(Order.items))
+            .where(
+                and_(
+                    Order.store_id == store_id,
+                    Order.created_at >= datetime.combine(start_date, datetime.min.time()),
+                    Order.created_at <= datetime.combine(end_date, datetime.max.time()),
+                    Order.status == OrderStatus.COMPLETED.value,
+                )
             )
         )
 
@@ -241,11 +246,7 @@ class AnalyticsService:
         orders = result.scalars().all()
 
         if len(orders) < int(os.getenv("ANALYTICS_MIN_ORDERS_FOR_ANALYSIS", "10")):
-            return {
-                "store_id": store_id,
-                "associations": [],
-                "message": "订单数据不足，无法进行关联分析"
-            }
+            return {"store_id": store_id, "associations": [], "message": "订单数据不足，无法进行关联分析"}
 
         # 构建商品共现矩阵
         item_counts = defaultdict(int)
@@ -271,7 +272,7 @@ class AnalyticsService:
 
             # 统计商品对出现次数
             for i, item1 in enumerate(items):
-                for item2 in items[i + 1:]:
+                for item2 in items[i + 1 :]:
                     pair = tuple(sorted([item1, item2]))
                     pair_counts[pair] += 1
 
@@ -290,30 +291,33 @@ class AnalyticsService:
             expected = (item_counts[item1] / total_orders) * (item_counts[item2] / total_orders)
             lift = support / expected if expected > 0 else 0
 
-            associations.append({
-                "item1": item1,
-                "item2": item2,
-                "support": round(support, 3),
-                "confidence_1_to_2": round(confidence_1_to_2, 3),
-                "confidence_2_to_1": round(confidence_2_to_1, 3),
-                "lift": round(lift, 2),
-                "count": count,
-                "strength": "strong" if lift > float(os.getenv("ANALYTICS_LIFT_STRONG", "1.5")) else "moderate" if lift > float(os.getenv("ANALYTICS_LIFT_MODERATE", "1.0")) else "weak"
-            })
+            associations.append(
+                {
+                    "item1": item1,
+                    "item2": item2,
+                    "support": round(support, 3),
+                    "confidence_1_to_2": round(confidence_1_to_2, 3),
+                    "confidence_2_to_1": round(confidence_2_to_1, 3),
+                    "lift": round(lift, 2),
+                    "count": count,
+                    "strength": (
+                        "strong"
+                        if lift > float(os.getenv("ANALYTICS_LIFT_STRONG", "1.5"))
+                        else "moderate" if lift > float(os.getenv("ANALYTICS_LIFT_MODERATE", "1.0")) else "weak"
+                    ),
+                }
+            )
 
         # 按提升度排序
         associations.sort(key=lambda x: x["lift"], reverse=True)
 
         return {
             "store_id": store_id,
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat()
-            },
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
             "total_orders": total_orders,
             "unique_items": len(item_counts),
             "associations": associations[:20],  # 返回前20个最强关联
-            "min_support": min_support
+            "min_support": min_support,
         }
 
     async def analyze_time_patterns(
@@ -324,21 +328,24 @@ class AnalyticsService:
         start_date = end_date - timedelta(days=days)
 
         # 查询交易数据
-        query = select(
-            func.extract('hour', FinancialTransaction.created_at).label("hour"),
-            func.extract('dow', FinancialTransaction.created_at).label("day_of_week"),
-            func.sum(FinancialTransaction.amount).label("revenue"),
-            func.count(FinancialTransaction.id).label("transactions")
-        ).where(
-            and_(
-                FinancialTransaction.store_id == store_id,
-                FinancialTransaction.transaction_date >= start_date,
-                FinancialTransaction.transaction_date <= end_date,
-                FinancialTransaction.transaction_type == "income"
+        query = (
+            select(
+                func.extract("hour", FinancialTransaction.created_at).label("hour"),
+                func.extract("dow", FinancialTransaction.created_at).label("day_of_week"),
+                func.sum(FinancialTransaction.amount).label("revenue"),
+                func.count(FinancialTransaction.id).label("transactions"),
             )
-        ).group_by(
-            func.extract('hour', FinancialTransaction.created_at),
-            func.extract('dow', FinancialTransaction.created_at)
+            .where(
+                and_(
+                    FinancialTransaction.store_id == store_id,
+                    FinancialTransaction.transaction_date >= start_date,
+                    FinancialTransaction.transaction_date <= end_date,
+                    FinancialTransaction.transaction_type == "income",
+                )
+            )
+            .group_by(
+                func.extract("hour", FinancialTransaction.created_at), func.extract("dow", FinancialTransaction.created_at)
+            )
         )
 
         result = await self.db.execute(query)
@@ -377,13 +384,15 @@ class AnalyticsService:
                 else:
                     period = "其他"
 
-                hourly_analysis.append({
-                    "hour": hour,
-                    "period": period,
-                    "avg_revenue": int(avg_revenue),
-                    "avg_transactions": int(avg_transactions),
-                    "total_days": stats["count"]
-                })
+                hourly_analysis.append(
+                    {
+                        "hour": hour,
+                        "period": period,
+                        "avg_revenue": int(avg_revenue),
+                        "avg_transactions": int(avg_transactions),
+                        "total_days": stats["count"],
+                    }
+                )
 
         # 找出高峰时段
         if hourly_analysis:
@@ -394,14 +403,10 @@ class AnalyticsService:
 
         return {
             "store_id": store_id,
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "days": days
-            },
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat(), "days": days},
             "hourly_analysis": hourly_analysis,
             "peak_hours": peak_hours,
-            "insights": self._generate_time_insights(hourly_analysis)
+            "insights": self._generate_time_insights(hourly_analysis),
         }
 
     def _generate_time_insights(self, hourly_analysis: List[Dict]) -> List[str]:
@@ -437,37 +442,37 @@ class AnalyticsService:
 
         return insights
 
-
     async def get_revenue_trend(
         self,
-        store_id:    str,
-        days:        int = 30,
-        granularity: str = "daily",   # "daily" | "weekly"
+        store_id: str,
+        days: int = 30,
+        granularity: str = "daily",  # "daily" | "weekly"
     ) -> Dict[str, Any]:
         """
         营收趋势 — 返回指定颗粒度的营收时间序列及环比趋势。
         """
-        end_date   = date.today()
+        end_date = date.today()
         start_date = end_date - timedelta(days=days)
 
-        query = select(
-            func.date(FinancialTransaction.transaction_date).label("day"),
-            func.sum(FinancialTransaction.amount).label("revenue"),
-            func.count(FinancialTransaction.id).label("tx_count"),
-        ).where(
-            and_(
-                FinancialTransaction.store_id == store_id,
-                FinancialTransaction.transaction_date >= start_date,
-                FinancialTransaction.transaction_date <= end_date,
-                FinancialTransaction.transaction_type == "income",
+        query = (
+            select(
+                func.date(FinancialTransaction.transaction_date).label("day"),
+                func.sum(FinancialTransaction.amount).label("revenue"),
+                func.count(FinancialTransaction.id).label("tx_count"),
             )
-        ).group_by(func.date(FinancialTransaction.transaction_date))
+            .where(
+                and_(
+                    FinancialTransaction.store_id == store_id,
+                    FinancialTransaction.transaction_date >= start_date,
+                    FinancialTransaction.transaction_date <= end_date,
+                    FinancialTransaction.transaction_type == "income",
+                )
+            )
+            .group_by(func.date(FinancialTransaction.transaction_date))
+        )
 
         rows = (await self.db.execute(query)).all()
-        daily_map = {
-            str(r.day): {"revenue": int(r.revenue), "tx_count": int(r.tx_count)}
-            for r in rows
-        }
+        daily_map = {str(r.day): {"revenue": int(r.revenue), "tx_count": int(r.tx_count)} for r in rows}
 
         if granularity == "weekly":
             weekly: Dict[str, Dict] = defaultdict(lambda: {"revenue": 0, "tx_count": 0})
@@ -475,19 +480,15 @@ class AnalyticsService:
                 d = date.fromisoformat(str(r.day))
                 iso_y, iso_w, _ = d.isocalendar()
                 week_key = f"{iso_y}-W{iso_w:02d}"
-                weekly[week_key]["revenue"]  += int(r.revenue)
+                weekly[week_key]["revenue"] += int(r.revenue)
                 weekly[week_key]["tx_count"] += int(r.tx_count)
             series = [{"period": k, **v} for k, v in sorted(weekly.items())]
         else:
             series = [
                 {
-                    "period":   (start_date + timedelta(days=i)).isoformat(),
-                    "revenue":  daily_map.get(
-                                    (start_date + timedelta(days=i)).isoformat(), {}
-                                ).get("revenue", 0),
-                    "tx_count": daily_map.get(
-                                    (start_date + timedelta(days=i)).isoformat(), {}
-                                ).get("tx_count", 0),
+                    "period": (start_date + timedelta(days=i)).isoformat(),
+                    "revenue": daily_map.get((start_date + timedelta(days=i)).isoformat(), {}).get("revenue", 0),
+                    "tx_count": daily_map.get((start_date + timedelta(days=i)).isoformat(), {}).get("tx_count", 0),
                 }
                 for i in range(days + 1)
             ]
@@ -495,108 +496,114 @@ class AnalyticsService:
         revenues = [s["revenue"] for s in series if s["revenue"] > 0]
         trend_pct = 0.0
         if len(revenues) >= 2:
-            half      = len(revenues) // 2
+            half = len(revenues) // 2
             first_avg = sum(revenues[:half]) / half
-            last_avg  = sum(revenues[half:]) / (len(revenues) - half)
+            last_avg = sum(revenues[half:]) / (len(revenues) - half)
             trend_pct = round((last_avg - first_avg) / first_avg * 100, 2) if first_avg > 0 else 0.0
 
         return {
-            "store_id":      store_id,
-            "granularity":   granularity,
-            "period":        {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
-            "series":        series,
-            "trend_pct":     trend_pct,
+            "store_id": store_id,
+            "granularity": granularity,
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "series": series,
+            "trend_pct": trend_pct,
             "total_revenue": sum(s["revenue"] for s in series),
         }
 
-    async def get_customer_traffic(
-        self, store_id: str, days: int = 30
-    ) -> Dict[str, Any]:
+    async def get_customer_traffic(self, store_id: str, days: int = 30) -> Dict[str, Any]:
         """
         客流分析 — 以订单数作为客流代理指标，返回每日趋势及时段分布。
         """
-        end_date   = date.today()
+        end_date = date.today()
         start_date = end_date - timedelta(days=days)
 
         from src.models.order import Order, OrderStatus
 
-        daily_query = select(
-            func.date(Order.created_at).label("day"),
-            func.count(Order.id).label("order_count"),
-            func.sum(Order.final_amount).label("revenue"),
-        ).where(
-            and_(
-                Order.store_id == store_id,
-                Order.created_at >= datetime.combine(start_date, datetime.min.time()),
-                Order.created_at <= datetime.combine(end_date,   datetime.max.time()),
-                Order.status == OrderStatus.COMPLETED.value,
+        daily_query = (
+            select(
+                func.date(Order.created_at).label("day"),
+                func.count(Order.id).label("order_count"),
+                func.sum(Order.final_amount).label("revenue"),
             )
-        ).group_by(func.date(Order.created_at)).order_by(func.date(Order.created_at))
+            .where(
+                and_(
+                    Order.store_id == store_id,
+                    Order.created_at >= datetime.combine(start_date, datetime.min.time()),
+                    Order.created_at <= datetime.combine(end_date, datetime.max.time()),
+                    Order.status == OrderStatus.COMPLETED.value,
+                )
+            )
+            .group_by(func.date(Order.created_at))
+            .order_by(func.date(Order.created_at))
+        )
 
         daily_rows = (await self.db.execute(daily_query)).all()
 
-        hourly_query = select(
-            func.extract("hour", Order.created_at).label("hour"),
-            func.count(Order.id).label("order_count"),
-        ).where(
-            and_(
-                Order.store_id == store_id,
-                Order.created_at >= datetime.combine(start_date, datetime.min.time()),
-                Order.status == OrderStatus.COMPLETED.value,
+        hourly_query = (
+            select(
+                func.extract("hour", Order.created_at).label("hour"),
+                func.count(Order.id).label("order_count"),
             )
-        ).group_by(func.extract("hour", Order.created_at))
+            .where(
+                and_(
+                    Order.store_id == store_id,
+                    Order.created_at >= datetime.combine(start_date, datetime.min.time()),
+                    Order.status == OrderStatus.COMPLETED.value,
+                )
+            )
+            .group_by(func.extract("hour", Order.created_at))
+        )
 
         hourly_rows = (await self.db.execute(hourly_query)).all()
 
-        daily_series = [
-            {"date": str(r.day), "orders": int(r.order_count), "revenue": int(r.revenue or 0)}
-            for r in daily_rows
-        ]
-        total_orders   = sum(r["orders"] for r in daily_series)
-        avg_daily      = round(total_orders / days, 1) if days > 0 else 0
-        hourly_dist    = {int(r.hour): int(r.order_count) for r in hourly_rows}
-        peak_hour      = max(hourly_dist, key=hourly_dist.get) if hourly_dist else None
+        daily_series = [{"date": str(r.day), "orders": int(r.order_count), "revenue": int(r.revenue or 0)} for r in daily_rows]
+        total_orders = sum(r["orders"] for r in daily_series)
+        avg_daily = round(total_orders / days, 1) if days > 0 else 0
+        hourly_dist = {int(r.hour): int(r.order_count) for r in hourly_rows}
+        peak_hour = max(hourly_dist, key=hourly_dist.get) if hourly_dist else None
 
         return {
-            "store_id":    store_id,
-            "period":      {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
-            "total_orders":  total_orders,
+            "store_id": store_id,
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "total_orders": total_orders,
             "avg_daily_orders": avg_daily,
-            "peak_hour":   peak_hour,
-            "daily_series":  daily_series,
-            "hourly_distribution": [
-                {"hour": h, "orders": hourly_dist.get(h, 0)} for h in range(24)
-            ],
+            "peak_hour": peak_hour,
+            "daily_series": daily_series,
+            "hourly_distribution": [{"hour": h, "orders": hourly_dist.get(h, 0)} for h in range(24)],
         }
 
     async def get_dish_contribution(
         self,
         store_id: str,
-        days:     int = 30,
-        top_n:    int = 20,
+        days: int = 30,
+        top_n: int = 20,
     ) -> Dict[str, Any]:
         """
         菜品贡献度 — 帕累托分析，返回各菜品营收/销量占比及累计贡献曲线。
         """
-        end_date   = date.today()
+        end_date = date.today()
         start_date = end_date - timedelta(days=days)
 
         from src.models.order import Order, OrderItem, OrderStatus
 
-        query = select(
-            OrderItem.item_name,
-            func.sum(OrderItem.quantity).label("total_qty"),
-            func.sum(OrderItem.subtotal).label("total_revenue"),
-            func.count(OrderItem.id.distinct()).label("order_count"),
-        ).join(
-            Order, OrderItem.order_id == Order.id
-        ).where(
-            and_(
-                Order.store_id == store_id,
-                Order.created_at >= datetime.combine(start_date, datetime.min.time()),
-                Order.status == OrderStatus.COMPLETED.value,
+        query = (
+            select(
+                OrderItem.item_name,
+                func.sum(OrderItem.quantity).label("total_qty"),
+                func.sum(OrderItem.subtotal).label("total_revenue"),
+                func.count(OrderItem.id.distinct()).label("order_count"),
             )
-        ).group_by(OrderItem.item_name).order_by(func.sum(OrderItem.subtotal).desc())
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(
+                and_(
+                    Order.store_id == store_id,
+                    Order.created_at >= datetime.combine(start_date, datetime.min.time()),
+                    Order.status == OrderStatus.COMPLETED.value,
+                )
+            )
+            .group_by(OrderItem.item_name)
+            .order_by(func.sum(OrderItem.subtotal).desc())
+        )
 
         rows = (await self.db.execute(query)).all()
         grand_total = sum(int(r.total_revenue) for r in rows) or 1
@@ -605,51 +612,55 @@ class AnalyticsService:
         cumulative = 0
         for r in rows[:top_n]:
             revenue = int(r.total_revenue)
-            pct     = round(revenue / grand_total * 100, 2)
+            pct = round(revenue / grand_total * 100, 2)
             cumulative += pct
-            items.append({
-                "item_name":      r.item_name,
-                "total_qty":      int(r.total_qty),
-                "total_revenue":  revenue,
-                "revenue_pct":    pct,
-                "cumulative_pct": round(cumulative, 2),
-                "tier":           "A" if cumulative <= 70 else ("B" if cumulative <= 90 else "C"),
-            })
+            items.append(
+                {
+                    "item_name": r.item_name,
+                    "total_qty": int(r.total_qty),
+                    "total_revenue": revenue,
+                    "revenue_pct": pct,
+                    "cumulative_pct": round(cumulative, 2),
+                    "tier": "A" if cumulative <= 70 else ("B" if cumulative <= 90 else "C"),
+                }
+            )
 
         return {
-            "store_id":       store_id,
-            "period":         {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
-            "total_revenue":  grand_total,
-            "total_items":    len(rows),
-            "top_n":          top_n,
-            "items":          items,
-            "pareto_note":    "A级=累计贡献前70%; B级=70-90%; C级=90%以上",
+            "store_id": store_id,
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "total_revenue": grand_total,
+            "total_items": len(rows),
+            "top_n": top_n,
+            "items": items,
+            "pareto_note": "A级=累计贡献前70%; B级=70-90%; C级=90%以上",
         }
 
-    async def get_time_heatmap(
-        self, store_id: str, days: int = 30
-    ) -> Dict[str, Any]:
+    async def get_time_heatmap(self, store_id: str, days: int = 30) -> Dict[str, Any]:
         """
         时段热力图 — 返回 7（周）× 24（小时）的平均营收矩阵，供前端渲染热力图。
         """
-        end_date   = date.today()
+        end_date = date.today()
         start_date = end_date - timedelta(days=days)
 
-        query = select(
-            func.extract("dow",  FinancialTransaction.created_at).label("dow"),
-            func.extract("hour", FinancialTransaction.created_at).label("hour"),
-            func.avg(FinancialTransaction.amount).label("avg_revenue"),
-            func.count(FinancialTransaction.id).label("data_points"),
-        ).where(
-            and_(
-                FinancialTransaction.store_id == store_id,
-                FinancialTransaction.transaction_date >= start_date,
-                FinancialTransaction.transaction_date <= end_date,
-                FinancialTransaction.transaction_type == "income",
+        query = (
+            select(
+                func.extract("dow", FinancialTransaction.created_at).label("dow"),
+                func.extract("hour", FinancialTransaction.created_at).label("hour"),
+                func.avg(FinancialTransaction.amount).label("avg_revenue"),
+                func.count(FinancialTransaction.id).label("data_points"),
             )
-        ).group_by(
-            func.extract("dow",  FinancialTransaction.created_at),
-            func.extract("hour", FinancialTransaction.created_at),
+            .where(
+                and_(
+                    FinancialTransaction.store_id == store_id,
+                    FinancialTransaction.transaction_date >= start_date,
+                    FinancialTransaction.transaction_date <= end_date,
+                    FinancialTransaction.transaction_type == "income",
+                )
+            )
+            .group_by(
+                func.extract("dow", FinancialTransaction.created_at),
+                func.extract("hour", FinancialTransaction.created_at),
+            )
         )
 
         rows = (await self.db.execute(query)).all()
@@ -662,18 +673,18 @@ class AnalyticsService:
         day_labels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
         heatmap = [
             {
-                "day":       d,
+                "day": d,
                 "day_label": day_labels[d],
-                "hours":     [{"hour": h, "avg_revenue": matrix[d][h]} for h in range(24)],
+                "hours": [{"hour": h, "avg_revenue": matrix[d][h]} for h in range(24)],
             }
             for d in range(7)
         ]
 
         all_values = [matrix[d][h] for d in range(7) for h in range(24)]
         return {
-            "store_id":  store_id,
-            "period":    {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
-            "heatmap":   heatmap,
+            "store_id": store_id,
+            "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "heatmap": heatmap,
             "max_value": max(all_values) if all_values else 0,
             "min_value": min(v for v in all_values if v > 0) if any(v > 0 for v in all_values) else 0,
         }

@@ -2,20 +2,21 @@
 POS API Endpoints
 POS系统集成API接口
 """
+
 import hashlib
 import hmac
 import os
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
-from src.services.pos_service import POSService
 from src.models.order import Order, OrderItem, OrderStatus
 from src.models.store import Store
+from src.services.pos_service import POSService
 
 router = APIRouter(prefix="/pos", tags=["POS"])
 
@@ -306,7 +307,6 @@ async def pos_health_check(
         }
 
 
-
 @router.get("/queue/current")
 async def get_current_queue(
     store_id: str = Query(..., description="门店ID"),
@@ -321,7 +321,7 @@ async def get_current_queue(
     Returns:
         当前排队列表和统计
     """
-    from ..services.queue_service import queue_service, QueueStatus
+    from ..services.queue_service import QueueStatus, queue_service
 
     try:
         # 获取等待中的排队
@@ -346,6 +346,7 @@ async def get_current_queue(
 
 
 # ── POS Webhook ───────────────────────────────────────────────────────────────
+
 
 def _verify_signature(body: bytes, secret: str, signature: str) -> bool:
     """Verify HMAC-SHA256 webhook signature from POS system."""
@@ -383,8 +384,7 @@ async def _upsert_order(session: AsyncSession, store_id: str, payload: Dict[str,
             total_amount=int(payload.get("total_amount", 0)),
             discount_amount=int(payload.get("discount_amount", 0)),
             final_amount=int(payload.get("final_amount", payload.get("total_amount", 0))),
-            order_time=datetime.fromisoformat(payload["order_time"])
-            if payload.get("order_time") else datetime.utcnow(),
+            order_time=datetime.fromisoformat(payload["order_time"]) if payload.get("order_time") else datetime.utcnow(),
             notes=payload.get("notes"),
             order_metadata=payload.get("metadata", {}),
         )
@@ -423,6 +423,7 @@ async def pos_webhook(
     系统ID: Header X-POS-System-ID 用于查找签名密钥
     """
     import structlog
+
     logger = structlog.get_logger()
 
     body = await request.body()
@@ -432,9 +433,8 @@ async def pos_webhook(
     # --- signature verification ---
     if x_pos_system_id:
         from src.models.integration import ExternalSystem
-        result = await db.execute(
-            select(ExternalSystem).where(ExternalSystem.id == x_pos_system_id)
-        )
+
+        result = await db.execute(select(ExternalSystem).where(ExternalSystem.id == x_pos_system_id))
         system = result.scalar_one_or_none()
         if system and x_pos_signature:
             secret = system.webhook_secret or system.api_secret
@@ -466,6 +466,7 @@ async def pos_webhook(
     if event_type == "payment.completed" and payload.get("transaction_id"):
         try:
             from src.services.integration_service import integration_service
+
             await integration_service.create_pos_transaction(
                 session=db,
                 system_id=x_pos_system_id or "unknown",
@@ -489,6 +490,7 @@ async def pos_webhook(
         neural_type, priority = neural_event_map[event_type]
         try:
             from src.services.neural_system import neural_system
+
             await neural_system.emit_event(
                 event_type=neural_type,
                 event_source=f"pos_webhook_{x_pos_system_id or store_id}",
@@ -505,5 +507,3 @@ async def pos_webhook(
         "event_type": event_type,
         "store_id": store_id,
     }
-
-

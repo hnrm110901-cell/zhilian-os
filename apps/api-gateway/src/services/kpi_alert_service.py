@@ -20,25 +20,25 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.services.food_cost_service import FoodCostService
 from src.models.kpi import KPI
+from src.services.food_cost_service import FoodCostService
 
 logger = structlog.get_logger()
 
 # 系统默认阈值（未在 AlertThresholdsPage 配置时的兜底值）
-_DEFAULT_WARNING_PCT  = float(os.getenv("FOOD_COST_WARNING_THRESHOLD",  "32"))
+_DEFAULT_WARNING_PCT = float(os.getenv("FOOD_COST_WARNING_THRESHOLD", "32"))
 _DEFAULT_CRITICAL_PCT = float(os.getenv("FOOD_COST_CRITICAL_THRESHOLD", "35"))
 
 # 默认回望窗口（天）
 _DEFAULT_LOOKBACK_DAYS = int(os.getenv("FOOD_COST_ALERT_LOOKBACK_DAYS", "7"))
 
 # 趋势告警：回望天数和向前预测天数
-_TREND_LOOKBACK_DAYS  = int(os.getenv("FOOD_COST_TREND_LOOKBACK_DAYS", "14"))
-_TREND_FORECAST_DAYS  = int(os.getenv("FOOD_COST_TREND_FORECAST_DAYS", "7"))
+_TREND_LOOKBACK_DAYS = int(os.getenv("FOOD_COST_TREND_LOOKBACK_DAYS", "14"))
+_TREND_FORECAST_DAYS = int(os.getenv("FOOD_COST_TREND_FORECAST_DAYS", "7"))
 
 
 # ── 纯函数：告警级别判断 ──────────────────────────────────────────────────────
+
 
 def classify_alert(
     actual_pct: float,
@@ -74,14 +74,11 @@ def build_alert_message(
     """
     构建企业微信告警文本（Rule 7：含动作 + ¥ + 置信度）。
     """
-    emoji   = "🚨" if status == "critical" else "⚠️"
-    level   = "超标" if status == "critical" else "偏高"
-    excess  = actual_pct - (critical_threshold if status == "critical" else warning_threshold)
+    emoji = "🚨" if status == "critical" else "⚠️"
+    level = "超标" if status == "critical" else "偏高"
+    excess = actual_pct - (critical_threshold if status == "critical" else warning_threshold)
 
-    top_lines = "\n".join(
-        f"  • {ing['name']}: ¥{ing['cost_yuan']:,.0f}"
-        for ing in top_ingredients[:3]
-    ) or "  （暂无数据）"
+    top_lines = "\n".join(f"  • {ing['name']}: ¥{ing['cost_yuan']:,.0f}" for ing in top_ingredients[:3]) or "  （暂无数据）"
 
     return (
         f"{emoji} 食材成本率{level}告警\n\n"
@@ -98,6 +95,7 @@ def build_alert_message(
 # ════════════════════════════════════════════════════════════════════════════════
 # KPIAlertService
 # ════════════════════════════════════════════════════════════════════════════════
+
 
 class KPIAlertService:
     """食材成本率 KPI 告警服务（读取 DB 阈值 → 检查 → 推送企微）"""
@@ -118,11 +116,11 @@ class KPIAlertService:
         )
         kpis = result.scalars().all()
 
-        warnings  = [k.warning_threshold  for k in kpis if k.warning_threshold  is not None]
+        warnings = [k.warning_threshold for k in kpis if k.warning_threshold is not None]
         criticals = [k.critical_threshold for k in kpis if k.critical_threshold is not None]
 
         return {
-            "warning":  min(warnings)  if warnings  else _DEFAULT_WARNING_PCT,
+            "warning": min(warnings) if warnings else _DEFAULT_WARNING_PCT,
             "critical": min(criticals) if criticals else _DEFAULT_CRITICAL_PCT,
         }
 
@@ -131,22 +129,16 @@ class KPIAlertService:
     @staticmethod
     async def _get_active_store_ids(db: AsyncSession) -> List[str]:
         """从 stores 表获取所有激活门店 ID。"""
-        result = await db.execute(
-            text(
-                "SELECT id FROM stores "
-                "WHERE is_active = TRUE "
-                "ORDER BY id"
-            )
-        )
+        result = await db.execute(text("SELECT id FROM stores " "WHERE is_active = TRUE " "ORDER BY id"))
         return [row[0] for row in result.fetchall()]
 
     # ── 检查单店 ─────────────────────────────────────────────────────────────
 
     @staticmethod
     async def check_store(
-        store_id:      str,
-        db:            AsyncSession,
-        thresholds:    Dict[str, float],
+        store_id: str,
+        db: AsyncSession,
+        thresholds: Dict[str, float],
         lookback_days: int = _DEFAULT_LOOKBACK_DAYS,
     ) -> Dict[str, Any]:
         """
@@ -159,38 +151,37 @@ class KPIAlertService:
               status, needs_alert, top_ingredients
             }
         """
-        end_date   = date.today()
+        end_date = date.today()
         start_date = end_date - timedelta(days=lookback_days)
 
         variance = await FoodCostService.get_store_food_cost_variance(
             store_id=store_id, start_date=start_date, end_date=end_date, db=db
         )
 
-        actual_pct  = variance.get("actual_cost_pct",  0.0)
-        actual_yuan = variance.get("actual_cost_yuan",
-                      variance.get("actual_cost_fen",  0) / 100)
-        top_ings    = variance.get("top_ingredients",  [])
+        actual_pct = variance.get("actual_cost_pct", 0.0)
+        actual_yuan = variance.get("actual_cost_yuan", variance.get("actual_cost_fen", 0) / 100)
+        top_ings = variance.get("top_ingredients", [])
 
         w = thresholds["warning"]
         c = thresholds["critical"]
         status = classify_alert(actual_pct, w, c)
 
         return {
-            "store_id":          store_id,
-            "actual_cost_pct":   actual_pct,
-            "actual_cost_yuan":  actual_yuan,
+            "store_id": store_id,
+            "actual_cost_pct": actual_pct,
+            "actual_cost_yuan": actual_yuan,
             "warning_threshold": w,
             "critical_threshold": c,
-            "status":            status,
-            "needs_alert":       status != "ok",
-            "top_ingredients":   top_ings,
+            "status": status,
+            "needs_alert": status != "ok",
+            "top_ingredients": top_ings,
         }
 
     # ── 检查所有门店 ─────────────────────────────────────────────────────────
 
     @staticmethod
     async def run_all_stores(
-        db:            AsyncSession,
+        db: AsyncSession,
         lookback_days: int = _DEFAULT_LOOKBACK_DAYS,
     ) -> Dict[str, Any]:
         """
@@ -200,7 +191,7 @@ class KPIAlertService:
             {total, alert_count, ok_count, alerts: [...]}
         """
         thresholds = await KPIAlertService._get_food_cost_thresholds(db)
-        store_ids  = await KPIAlertService._get_active_store_ids(db)
+        store_ids = await KPIAlertService._get_active_store_ids(db)
 
         alerts: List[Dict[str, Any]] = []
         ok_count = 0
@@ -208,7 +199,9 @@ class KPIAlertService:
         for sid in store_ids:
             try:
                 result = await KPIAlertService.check_store(
-                    store_id=sid, db=db, thresholds=thresholds,
+                    store_id=sid,
+                    db=db,
+                    thresholds=thresholds,
                     lookback_days=lookback_days,
                 )
                 if result["needs_alert"]:
@@ -220,20 +213,22 @@ class KPIAlertService:
 
         logger.info(
             "kpi_food_cost_check_complete",
-            total=len(store_ids), alerts=len(alerts), ok=ok_count,
+            total=len(store_ids),
+            alerts=len(alerts),
+            ok=ok_count,
         )
         return {
-            "total":       len(store_ids),
+            "total": len(store_ids),
             "alert_count": len(alerts),
-            "ok_count":    ok_count,
-            "alerts":      alerts,
+            "ok_count": ok_count,
+            "alerts": alerts,
         }
 
     # ── 发送单店告警 ──────────────────────────────────────────────────────────
 
     @staticmethod
     async def send_alert(
-        check_result:      Dict[str, Any],
+        check_result: Dict[str, Any],
         recipient_user_id: str,
     ) -> Dict[str, Any]:
         """
@@ -242,13 +237,13 @@ class KPIAlertService:
         from src.services.wechat_work_message_service import wechat_work_message_service
 
         message = build_alert_message(
-            store_id          = check_result["store_id"],
-            actual_pct        = check_result["actual_cost_pct"],
-            warning_threshold = check_result["warning_threshold"],
-            critical_threshold= check_result["critical_threshold"],
-            actual_cost_yuan  = check_result["actual_cost_yuan"],
-            top_ingredients   = check_result["top_ingredients"],
-            status            = check_result["status"],
+            store_id=check_result["store_id"],
+            actual_pct=check_result["actual_cost_pct"],
+            warning_threshold=check_result["warning_threshold"],
+            critical_threshold=check_result["critical_threshold"],
+            actual_cost_yuan=check_result["actual_cost_yuan"],
+            top_ingredients=check_result["top_ingredients"],
+            status=check_result["status"],
         )
         return await wechat_work_message_service.send_text_message(
             user_id=recipient_user_id,
@@ -259,7 +254,7 @@ class KPIAlertService:
 
     @staticmethod
     async def run_and_notify(
-        db:            AsyncSession,
+        db: AsyncSession,
         lookback_days: int = _DEFAULT_LOOKBACK_DAYS,
     ) -> Dict[str, Any]:
         """
@@ -268,7 +263,7 @@ class KPIAlertService:
         """
         summary = await KPIAlertService.run_all_stores(db=db, lookback_days=lookback_days)
 
-        sent_count   = 0
+        sent_count = 0
         failed_count = 0
 
         for alert in summary["alerts"]:
@@ -277,9 +272,7 @@ class KPIAlertService:
                 os.getenv("WECHAT_DEFAULT_RECIPIENT", f"store_{alert['store_id']}"),
             )
             try:
-                res = await KPIAlertService.send_alert(
-                    check_result=alert, recipient_user_id=recipient
-                )
+                res = await KPIAlertService.send_alert(check_result=alert, recipient_user_id=recipient)
                 if res.get("success"):
                     sent_count += 1
                     logger.info("kpi_alert_sent", store_id=alert["store_id"], status=alert["status"])
@@ -291,7 +284,7 @@ class KPIAlertService:
 
         return {
             **summary,
-            "sent_count":   sent_count,
+            "sent_count": sent_count,
             "failed_count": failed_count,
         }
 
@@ -308,9 +301,9 @@ class KPIAlertService:
         n = len(values)
         if n < 2:
             return 0.0
-        sx  = n * (n - 1) / 2          # Σx
+        sx = n * (n - 1) / 2  # Σx
         sx2 = n * (n - 1) * (2 * n - 1) / 6  # Σx²
-        sy  = sum(values)
+        sy = sum(values)
         sxy = sum(i * v for i, v in enumerate(values))
         denom = n * sx2 - sx * sx
         if denom == 0:
@@ -319,11 +312,11 @@ class KPIAlertService:
 
     @staticmethod
     async def check_store_trend(
-        store_id:       str,
-        db:             AsyncSession,
-        thresholds:     Dict[str, float],
-        lookback_days:  int = _TREND_LOOKBACK_DAYS,
-        forecast_days:  int = _TREND_FORECAST_DAYS,
+        store_id: str,
+        db: AsyncSession,
+        thresholds: Dict[str, float],
+        lookback_days: int = _TREND_LOOKBACK_DAYS,
+        forecast_days: int = _TREND_FORECAST_DAYS,
     ) -> Dict[str, Any]:
         """
         趋势预测告警：计算近 lookback_days 天成本率线性趋势，
@@ -338,7 +331,7 @@ class KPIAlertService:
               needs_trend_alert, history
             }
         """
-        end_date   = date.today()
+        end_date = date.today()
         history: List[float] = []
 
         for offset in range(lookback_days - 1, -1, -1):
@@ -356,17 +349,17 @@ class KPIAlertService:
 
         if len(history) < 3:
             return {
-                "store_id":         store_id,
-                "trend_status":     "insufficient_data",
+                "store_id": store_id,
+                "trend_status": "insufficient_data",
                 "needs_trend_alert": False,
-                "history":          history,
-                "message":          f"历史数据不足（仅 {len(history)} 天），无法计算趋势",
+                "history": history,
+                "message": f"历史数据不足（仅 {len(history)} 天），无法计算趋势",
             }
 
-        slope   = KPIAlertService._linear_trend(history)
+        slope = KPIAlertService._linear_trend(history)
         current = history[-1]
-        w_thr   = thresholds["warning"]
-        c_thr   = thresholds["critical"]
+        w_thr = thresholds["warning"]
+        c_thr = thresholds["critical"]
 
         # 预测 forecast_days 天后的成本率
         forecasted = current + slope * forecast_days
@@ -378,7 +371,7 @@ class KPIAlertService:
             days = (threshold - current) / slope
             return int(days) if days <= 30 else None  # 超过 30 天不告警
 
-        days_to_warning  = _days_to_threshold(w_thr)
+        days_to_warning = _days_to_threshold(w_thr)
         days_to_critical = _days_to_threshold(c_thr)
 
         # 判断趋势告警级别
@@ -392,27 +385,27 @@ class KPIAlertService:
         needs_alert = trend_status != "ok"
 
         return {
-            "store_id":           store_id,
-            "current_cost_pct":   round(current, 2),
-            "slope_per_day":      round(slope, 4),
-            "forecasted_pct":     round(forecasted, 2),
-            "forecast_days":      forecast_days,
-            "warning_threshold":  w_thr,
+            "store_id": store_id,
+            "current_cost_pct": round(current, 2),
+            "slope_per_day": round(slope, 4),
+            "forecasted_pct": round(forecasted, 2),
+            "forecast_days": forecast_days,
+            "warning_threshold": w_thr,
             "critical_threshold": c_thr,
-            "trend_status":       trend_status,
-            "days_to_warning":    days_to_warning,
-            "days_to_critical":   days_to_critical,
-            "needs_trend_alert":  needs_alert,
-            "history":            [round(v, 2) for v in history],
+            "trend_status": trend_status,
+            "days_to_warning": days_to_warning,
+            "days_to_critical": days_to_critical,
+            "needs_trend_alert": needs_alert,
+            "history": [round(v, 2) for v in history],
         }
 
     @staticmethod
     def _build_trend_alert_message(result: Dict[str, Any]) -> str:
         """构建趋势预警消息（Rule 7：动作 + ¥ + 预测窗口）。"""
-        emoji  = "📈" if result["trend_status"] == "warning_trend" else "🚨"
-        level  = "偏高趋势" if result["trend_status"] == "warning_trend" else "超标趋势"
-        d2w    = result.get("days_to_warning")
-        d2c    = result.get("days_to_critical")
+        emoji = "📈" if result["trend_status"] == "warning_trend" else "🚨"
+        level = "偏高趋势" if result["trend_status"] == "warning_trend" else "超标趋势"
+        d2w = result.get("days_to_warning")
+        d2c = result.get("days_to_critical")
         reach_line = ""
         if d2c is not None:
             reach_line = f"\n预计 {d2c} 天后突破超标阈值 {result['critical_threshold']:.0f}%"
@@ -432,7 +425,7 @@ class KPIAlertService:
 
     @staticmethod
     async def run_trend_alerts(
-        db:            AsyncSession,
+        db: AsyncSession,
         lookback_days: int = _TREND_LOOKBACK_DAYS,
         forecast_days: int = _TREND_FORECAST_DAYS,
     ) -> Dict[str, Any]:
@@ -443,7 +436,7 @@ class KPIAlertService:
             {total, trend_alert_count, ok_count, sent_count, failed_count, results}
         """
         thresholds = await KPIAlertService._get_food_cost_thresholds(db)
-        store_ids  = await KPIAlertService._get_active_store_ids(db)
+        store_ids = await KPIAlertService._get_active_store_ids(db)
 
         results: List[Dict[str, Any]] = []
         ok_count = 0
@@ -451,8 +444,11 @@ class KPIAlertService:
         for sid in store_ids:
             try:
                 r = await KPIAlertService.check_store_trend(
-                    store_id=sid, db=db, thresholds=thresholds,
-                    lookback_days=lookback_days, forecast_days=forecast_days,
+                    store_id=sid,
+                    db=db,
+                    thresholds=thresholds,
+                    lookback_days=lookback_days,
+                    forecast_days=forecast_days,
                 )
                 results.append(r)
                 if not r["needs_trend_alert"]:
@@ -473,9 +469,7 @@ class KPIAlertService:
             )
             try:
                 msg = KPIAlertService._build_trend_alert_message(r)
-                res = await wechat_work_message_service.send_text_message(
-                    user_id=recipient, content=msg
-                )
+                res = await wechat_work_message_service.send_text_message(user_id=recipient, content=msg)
                 if res.get("success"):
                     sent_count += 1
                     logger.info("kpi_trend_alert_sent", store_id=r["store_id"], status=r["trend_status"])
@@ -488,14 +482,16 @@ class KPIAlertService:
         alert_results = [r for r in results if r["needs_trend_alert"]]
         logger.info(
             "kpi_trend_check_complete",
-            total=len(store_ids), alerts=len(alert_results),
-            ok=ok_count, sent=sent_count,
+            total=len(store_ids),
+            alerts=len(alert_results),
+            ok=ok_count,
+            sent=sent_count,
         )
         return {
-            "total":             len(store_ids),
+            "total": len(store_ids),
             "trend_alert_count": len(alert_results),
-            "ok_count":          ok_count,
-            "sent_count":        sent_count,
-            "failed_count":      failed_count,
-            "results":           results,
+            "ok_count": ok_count,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "results": results,
         }

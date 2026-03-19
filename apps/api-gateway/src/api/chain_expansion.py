@@ -9,10 +9,10 @@
 """
 
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user, require_role
 from src.models.user import User, UserRole
@@ -23,18 +23,18 @@ router = APIRouter(prefix="/api/v1/chain", tags=["chain_expansion"])
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+
 class ReplicateIn(BaseModel):
     source_store_id: str = Field(..., description="源门店 ID（已运营，作为模板）")
     target_store_id: str = Field(..., description="目标门店 ID（新店）")
     target_store_name: str = Field(..., description="目标门店名称")
     include_bom: bool = Field(True, description="是否复制 BOM 配方")
     include_inventory: bool = Field(True, description="是否复制食材主档")
-    dish_filter: Optional[List[str]] = Field(
-        None, description="限定菜品编码列表（为空则复制全部）"
-    )
+    dish_filter: Optional[List[str]] = Field(None, description="限定菜品编码列表（为空则复制全部）")
 
 
 # ── 端点 ──────────────────────────────────────────────────────────────────────
+
 
 @router.post("/replicate", status_code=status.HTTP_201_CREATED)
 async def replicate_store_ontology(
@@ -140,12 +140,14 @@ async def bom_diff_two_stores(
         for ing, store_qtys in ingredients.items():
             vals = list(store_qtys.values())
             if len(vals) >= 2 and len(set(vals)) > 1:
-                diffs.append({
-                    "dish_name": dish,
-                    "ingredient": ing,
-                    store_id: store_qtys.get(store_id, "—"),
-                    other_id: store_qtys.get(other_id, "—"),
-                })
+                diffs.append(
+                    {
+                        "dish_name": dish,
+                        "ingredient": ing,
+                        store_id: store_qtys.get(store_id, "—"),
+                        other_id: store_qtys.get(other_id, "—"),
+                    }
+                )
 
     return {
         "store_a": store_id,

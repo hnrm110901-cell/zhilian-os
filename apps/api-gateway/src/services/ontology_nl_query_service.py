@@ -2,6 +2,7 @@
 本体自然语言查询（L3）：自然语言 → 意图识别 → 图谱/推理 → 结构化答案 + 溯源
 使用意图+参数方式，不直接生成 Cypher，避免注入。
 """
+
 from __future__ import annotations
 
 import json
@@ -10,7 +11,6 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-
 from src.ontology import get_ontology_repository
 
 logger = structlog.get_logger()
@@ -41,6 +41,7 @@ async def _parse_intent(question: str) -> Dict[str, Any]:
     """用 LLM 解析意图与参数。"""
     try:
         from src.core.llm import get_llm_client
+
         client = get_llm_client()
         if not client:
             return {"intent": "unknown", "store_id": "", "dish_id": "", "date_start": "", "date_end": ""}
@@ -92,7 +93,10 @@ async def _execute_intent(
 ) -> tuple[List[Any], Dict[str, Any], str]:
     """执行意图，返回 (数据列表, 溯源信息, 可读摘要)。"""
     repo = get_ontology_repository()
-    trace: Dict[str, Any] = {"intent": intent, "params": {"store_id": store_id, "dish_id": dish_id, "date_start": date_start, "date_end": date_end}}
+    trace: Dict[str, Any] = {
+        "intent": intent,
+        "params": {"store_id": store_id, "dish_id": dish_id, "date_start": date_start, "date_end": date_end},
+    }
     ds, de = _default_dates()
     if not date_start:
         date_start = ds
@@ -138,8 +142,11 @@ async def _execute_intent(
     if intent == "waste_report" and store_id:
         from src.core.database import get_db_session
         from src.services.waste_reasoning_service import run_waste_reasoning
+
         async with get_db_session() as session:
-            report = await run_waste_reasoning(session, tenant_id=tenant_id, store_id=store_id, date_start=date_start, date_end=date_end)
+            report = await run_waste_reasoning(
+                session, tenant_id=tenant_id, store_id=store_id, date_start=date_start, date_end=date_end
+            )
         top3 = report.get("top3_root_causes") or []
         trace["service"] = "run_waste_reasoning"
         summary = f"损耗推理 TOP3 根因: " + "; ".join([str(c.get("reason", "")) for c in top3[:3]]) if top3 else "暂无异常根因"
@@ -175,6 +182,7 @@ async def query_ontology_natural_language(
     answer_text = summary
     try:
         from src.core.llm import get_llm_client
+
         client = get_llm_client()
         if client and data and isinstance(data, list) and len(data) <= 20:
             prompt = f"根据以下查询结果，用一两句中文总结回答用户问题。\n用户问题: {question}\n结果摘要: {summary}\n详细条数: {len(data)}。请直接给出简短回答，不要重复问题。"

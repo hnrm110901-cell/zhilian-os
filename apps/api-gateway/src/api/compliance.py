@@ -2,20 +2,22 @@
 合规证照管理 API
 Compliance License API
 """
+
 from datetime import date
-from typing import Optional, List
+from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-
-from src.services.compliance_service import ComplianceService
 from src.agents.compliance_agent import compliance_agent
-from src.models.compliance import LicenseType, LicenseStatus
+from src.models.compliance import LicenseStatus, LicenseType
+from src.services.compliance_service import ComplianceService
 
 router = APIRouter(prefix="/api/v1/compliance", tags=["compliance"])
 _svc = ComplianceService()
 
 
 # ── Request / Response schemas ────────────────────────────────
+
 
 class LicenseCreate(BaseModel):
     store_id: str
@@ -42,6 +44,7 @@ class LicenseUpdate(BaseModel):
 
 # ── CRUD ──────────────────────────────────────────────────────
 
+
 @router.post("/licenses")
 async def create_license(body: LicenseCreate):
     """新增证照记录"""
@@ -55,9 +58,7 @@ async def list_licenses(
     license_type: Optional[LicenseType] = Query(None),
 ):
     """查询证照列表，支持按门店/状态/类型过滤"""
-    return await _svc.list_licenses(
-        store_id=store_id, status=status, license_type=license_type
-    )
+    return await _svc.list_licenses(store_id=store_id, status=status, license_type=license_type)
 
 
 @router.patch("/licenses/{license_id}")
@@ -79,6 +80,7 @@ async def delete_license(license_id: str):
 
 
 # ── Agent 扫描接口 ────────────────────────────────────────────
+
 
 @router.post("/scan/{store_id}")
 async def scan_store(
@@ -104,9 +106,7 @@ async def scan_all_stores(
     """
     触发 ComplianceAgent 扫描全部活跃门店。
     """
-    result = await compliance_agent.execute(
-        "scan_all", {"recipient_ids": recipient_ids}
-    )
+    result = await compliance_agent.execute("scan_all", {"recipient_ids": recipient_ids})
     return result.to_dict()
 
 
@@ -119,6 +119,7 @@ async def compliance_summary(
     """
     all_licenses = await _svc.list_licenses(store_id=store_id)
     from collections import Counter
+
     counts = Counter(l["status"] for l in all_licenses)
     return {
         "store_id": store_id,

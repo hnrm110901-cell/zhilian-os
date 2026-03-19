@@ -2,25 +2,27 @@
 Authentication Service
 处理用户认证相关业务逻辑
 """
-from typing import Optional
-from datetime import timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-import uuid
-from sqlalchemy.exc import SQLAlchemyError
 
-from ..models.user import User, UserRole
+import uuid
+from datetime import timedelta
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.config import settings
+from ..core.database import get_db_session
 from ..core.security import (
-    verify_password,
-    get_password_hash,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    REFRESH_TOKEN_EXPIRE_DAYS,
+    get_password_hash,
+    verify_password,
 )
-from ..core.database import get_db_session
+from ..models.user import User, UserRole
 
 
 class AuthService:

@@ -7,13 +7,13 @@ CDP WeChat Channel — 基于 consumer_id 的企微消息触达（Sprint 2）
 3. 按标签定向推送
 4. 消息发送记录归因到 consumer_id
 """
+
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.consumer_identity import ConsumerIdentity
 from src.models.private_domain import PrivateDomainMember
 
@@ -77,6 +77,7 @@ class CDPWeChatChannel:
         # 调用 WeChatService（延迟导入避免循环）
         try:
             from src.services.wechat_service import wechat_service
+
             if message_type == "text":
                 await wechat_service.send_text_message(content, touser=openid)
             elif message_type == "markdown":
@@ -151,7 +152,11 @@ class CDPWeChatChannel:
             if not consumer_id:
                 continue
             r = await self.send_to_consumer(
-                db, consumer_id, message_type, content, store_id=store_id,
+                db,
+                consumer_id,
+                message_type,
+                content,
+                store_id=store_id,
             )
             if r.get("sent"):
                 sent_count += 1
@@ -219,7 +224,11 @@ class CDPWeChatChannel:
 
         for cid in matched:
             r = await self.send_to_consumer(
-                db, cid, message_type, content, store_id=store_id,
+                db,
+                cid,
+                message_type,
+                content,
+                store_id=store_id,
             )
             if r.get("sent"):
                 sent_count += 1
@@ -245,28 +254,32 @@ class CDPWeChatChannel:
         if store_id:
             where.append(PrivateDomainMember.store_id == store_id)
 
-        total = await db.scalar(
-            select(func.count(PrivateDomainMember.id)).where(and_(*where))
-        ) or 0
+        total = await db.scalar(select(func.count(PrivateDomainMember.id)).where(and_(*where))) or 0
 
-        with_openid = await db.scalar(
-            select(func.count(PrivateDomainMember.id)).where(
-                and_(
-                    *where,
-                    PrivateDomainMember.wechat_openid.isnot(None),
-                    PrivateDomainMember.wechat_openid != "",
+        with_openid = (
+            await db.scalar(
+                select(func.count(PrivateDomainMember.id)).where(
+                    and_(
+                        *where,
+                        PrivateDomainMember.wechat_openid.isnot(None),
+                        PrivateDomainMember.wechat_openid != "",
+                    )
                 )
             )
-        ) or 0
+            or 0
+        )
 
-        with_consumer_id = await db.scalar(
-            select(func.count(PrivateDomainMember.id)).where(
-                and_(
-                    *where,
-                    PrivateDomainMember.consumer_id.isnot(None),
+        with_consumer_id = (
+            await db.scalar(
+                select(func.count(PrivateDomainMember.id)).where(
+                    and_(
+                        *where,
+                        PrivateDomainMember.consumer_id.isnot(None),
+                    )
                 )
             )
-        ) or 0
+            or 0
+        )
 
         return {
             "total_members": total,

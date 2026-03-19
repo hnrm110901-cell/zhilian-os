@@ -4,20 +4,20 @@ Cache Decorators
 
 提供常用的缓存装饰器，简化缓存使用
 """
+
 import functools
 import hashlib
 import json
 import os
 from typing import Any, Callable, Optional
+
 import structlog
 
 logger = structlog.get_logger()
 
 
 def cache_result(
-    key_prefix: str,
-    expire: int = int(os.getenv("CACHE_DEFAULT_EXPIRE", "300")),
-    key_builder: Optional[Callable] = None
+    key_prefix: str, expire: int = int(os.getenv("CACHE_DEFAULT_EXPIRE", "300")), key_builder: Optional[Callable] = None
 ):
     """
     缓存函数结果装饰器
@@ -33,6 +33,7 @@ def cache_result(
             # 查询数据库
             return permissions
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
@@ -66,6 +67,7 @@ def cache_result(
             return result
 
         return wrapper
+
     return decorator
 
 
@@ -81,6 +83,7 @@ def cache_user_permissions(expire: int = int(os.getenv("CACHE_PERMISSIONS_EXPIRE
         async def get_user_permissions(user_id: str):
             return permissions
     """
+
     def key_builder(user_id: str, *args, **kwargs) -> str:
         return f"user:permissions:{user_id}"
 
@@ -99,6 +102,7 @@ def cache_user_info(expire: int = int(os.getenv("CACHE_USER_INFO_EXPIRE", "300")
         async def get_user_info(user_id: str):
             return user_info
     """
+
     def key_builder(user_id: str, *args, **kwargs) -> str:
         return f"user:info:{user_id}"
 
@@ -120,6 +124,7 @@ def invalidate_cache(key_pattern: str):
             # 更新用户角色
             pass
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
@@ -138,6 +143,7 @@ def invalidate_cache(key_pattern: str):
             return result
 
         return wrapper
+
     return decorator
 
 
@@ -177,7 +183,9 @@ class CacheManager:
         """预热用户缓存"""
         from .redis_cache_service import redis_cache
 
-        await redis_cache.set(f"user:permissions:{user_id}", permissions, expire=int(os.getenv("CACHE_PERMISSIONS_EXPIRE", "600")))
+        await redis_cache.set(
+            f"user:permissions:{user_id}", permissions, expire=int(os.getenv("CACHE_PERMISSIONS_EXPIRE", "600"))
+        )
         await redis_cache.set(f"user:info:{user_id}", user_info, expire=int(os.getenv("CACHE_USER_INFO_EXPIRE", "300")))
 
         logger.info("预热用户缓存", user_id=user_id)

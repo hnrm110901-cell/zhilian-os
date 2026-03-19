@@ -12,19 +12,18 @@ AgentOKRService — P1 统一量化日志服务
     await okr_service.record_adoption(db, log_id, adopted=True)
     await okr_service.verify_outcome(db, log_id, actual_outcome_yuan=750.0)
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, and_, func, desc
-from sqlalchemy.ext.asyncio import AsyncSession
-
 import structlog
-
-from src.models.agent_okr import AgentResponseLog, AgentOKRSnapshot
+from sqlalchemy import and_, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.models.agent_okr import AgentOKRSnapshot, AgentResponseLog
 
 logger = structlog.get_logger()
 
@@ -32,44 +31,45 @@ logger = structlog.get_logger()
 
 OKR_TARGETS: Dict[str, Dict[str, Any]] = {
     "business_intel": {
-        "adoption_rate":      0.70,  # 决策建议采纳率 >70%
-        "accuracy_error_pct": 5.0,   # 预测准确度 ±5%以内
-        "latency_seconds":    None,  # 无时效要求
+        "adoption_rate": 0.70,  # 决策建议采纳率 >70%
+        "accuracy_error_pct": 5.0,  # 预测准确度 ±5%以内
+        "latency_seconds": None,  # 无时效要求
     },
     "ops_flow": {
-        "adoption_rate":      0.90,  # 库存预警命中率 >90%
+        "adoption_rate": 0.90,  # 库存预警命中率 >90%
         "accuracy_error_pct": 10.0,
-        "latency_seconds":    300,   # 订单异常响应 <5分钟
+        "latency_seconds": 300,  # 订单异常响应 <5分钟
     },
     "people": {
-        "adoption_rate":      0.60,
+        "adoption_rate": 0.60,
         "accuracy_error_pct": 8.0,
-        "latency_seconds":    None,
+        "latency_seconds": None,
     },
     "marketing": {
-        "adoption_rate":      0.50,
+        "adoption_rate": 0.50,
         "accuracy_error_pct": 15.0,
-        "latency_seconds":    None,
+        "latency_seconds": None,
     },
     "banquet": {
-        "adoption_rate":      0.40,  # 报价转签约率 >40%
+        "adoption_rate": 0.40,  # 报价转签约率 >40%
         "accuracy_error_pct": 10.0,
-        "latency_seconds":    7200,  # 线索跟进 <2小时
+        "latency_seconds": 7200,  # 线索跟进 <2小时
     },
     "dish_rd": {
-        "adoption_rate":      0.70,
+        "adoption_rate": 0.70,
         "accuracy_error_pct": 5.0,
-        "latency_seconds":    None,
+        "latency_seconds": None,
     },
     "supplier": {
-        "adoption_rate":      0.65,
+        "adoption_rate": 0.65,
         "accuracy_error_pct": 10.0,
-        "latency_seconds":    None,
+        "latency_seconds": None,
     },
 }
 
 
 # ── 纯函数 ────────────────────────────────────────────────────────────────────
+
 
 def compute_adoption_rate(adopted: int, rejected: int) -> Optional[float]:
     """采纳率 = adopted / (adopted + rejected)"""
@@ -126,6 +126,7 @@ def build_okr_status_label(met: Optional[bool]) -> str:
 
 # ── Service ───────────────────────────────────────────────────────────────────
 
+
 class AgentOKRService:
 
     async def log_recommendation(
@@ -167,9 +168,7 @@ class AgentOKRService:
         adopted: bool,
     ) -> Dict[str, Any]:
         """记录用户是否接受了 Agent 建议"""
-        result = await db.execute(
-            select(AgentResponseLog).where(AgentResponseLog.id == log_id)
-        )
+        result = await db.execute(select(AgentResponseLog).where(AgentResponseLog.id == log_id))
         log = result.scalar_one_or_none()
         if not log:
             return {"success": False, "message": f"日志 {log_id} 不存在"}
@@ -195,9 +194,7 @@ class AgentOKRService:
         actual_outcome_yuan: float,
     ) -> Dict[str, Any]:
         """验证建议实际效果（采纳后回填）"""
-        result = await db.execute(
-            select(AgentResponseLog).where(AgentResponseLog.id == log_id)
-        )
+        result = await db.execute(select(AgentResponseLog).where(AgentResponseLog.id == log_id))
         log = result.scalar_one_or_none()
         if not log:
             return {"success": False, "message": f"日志 {log_id} 不存在"}
@@ -240,16 +237,10 @@ class AgentOKRService:
             select(
                 AgentResponseLog.agent_name,
                 func.count().label("total"),
-                func.sum(
-                    (AgentResponseLog.status == "adopted").cast(
-                        type_=__import__("sqlalchemy").Integer
-                    )
-                ).label("adopted"),
-                func.sum(
-                    (AgentResponseLog.status == "rejected").cast(
-                        type_=__import__("sqlalchemy").Integer
-                    )
-                ).label("rejected"),
+                func.sum((AgentResponseLog.status == "adopted").cast(type_=__import__("sqlalchemy").Integer)).label("adopted"),
+                func.sum((AgentResponseLog.status == "rejected").cast(type_=__import__("sqlalchemy").Integer)).label(
+                    "rejected"
+                ),
                 func.avg(AgentResponseLog.response_latency_seconds).label("avg_latency"),
                 func.avg(AgentResponseLog.prediction_error_pct).label("avg_error"),
                 func.sum(AgentResponseLog.recommendation_yuan).label("total_yuan"),
@@ -278,23 +269,25 @@ class AgentOKRService:
             okr_latency = check_okr_latency(agent, avg_latency)
 
             targets = OKR_TARGETS.get(agent, {})
-            agents_summary.append({
-                "agent_name": agent,
-                "total_recommendations": int(row.total),
-                "adopted_count": adopted,
-                "rejected_count": rejected,
-                "adoption_rate": adoption_rate,
-                "adoption_rate_pct": round(adoption_rate * 100, 1) if adoption_rate is not None else None,
-                "adoption_target_pct": round(targets.get("adoption_rate", 0) * 100, 0),
-                "okr_adoption": build_okr_status_label(okr_adoption),
-                "avg_prediction_error_pct": avg_error,
-                "accuracy_target_pct": targets.get("accuracy_error_pct"),
-                "okr_accuracy": build_okr_status_label(okr_accuracy),
-                "avg_response_latency_seconds": avg_latency,
-                "latency_target_seconds": targets.get("latency_seconds"),
-                "okr_latency": build_okr_status_label(okr_latency),
-                "total_recommendation_yuan": total_yuan,
-            })
+            agents_summary.append(
+                {
+                    "agent_name": agent,
+                    "total_recommendations": int(row.total),
+                    "adopted_count": adopted,
+                    "rejected_count": rejected,
+                    "adoption_rate": adoption_rate,
+                    "adoption_rate_pct": round(adoption_rate * 100, 1) if adoption_rate is not None else None,
+                    "adoption_target_pct": round(targets.get("adoption_rate", 0) * 100, 0),
+                    "okr_adoption": build_okr_status_label(okr_adoption),
+                    "avg_prediction_error_pct": avg_error,
+                    "accuracy_target_pct": targets.get("accuracy_error_pct"),
+                    "okr_accuracy": build_okr_status_label(okr_accuracy),
+                    "avg_response_latency_seconds": avg_latency,
+                    "latency_target_seconds": targets.get("latency_seconds"),
+                    "okr_latency": build_okr_status_label(okr_latency),
+                    "total_recommendation_yuan": total_yuan,
+                }
+            )
 
             overall_adopted += adopted
             overall_rejected += rejected
@@ -334,10 +327,7 @@ class AgentOKRService:
             conds.append(AgentResponseLog.status == status)
 
         result = await db.execute(
-            select(AgentResponseLog)
-            .where(and_(*conds))
-            .order_by(desc(AgentResponseLog.created_at))
-            .limit(limit)
+            select(AgentResponseLog).where(and_(*conds)).order_by(desc(AgentResponseLog.created_at)).limit(limit)
         )
         logs = result.scalars().all()
         return [_log_to_dict(l) for l in logs]
@@ -359,27 +349,23 @@ class AgentOKRService:
                 AgentResponseLog.agent_name,
                 AgentResponseLog.store_id,
                 func.count().label("total"),
-                func.sum(
-                    (AgentResponseLog.status == "adopted").cast(
-                        type_=__import__("sqlalchemy").Integer
-                    )
-                ).label("adopted"),
-                func.sum(
-                    (AgentResponseLog.status == "rejected").cast(
-                        type_=__import__("sqlalchemy").Integer
-                    )
-                ).label("rejected"),
+                func.sum((AgentResponseLog.status == "adopted").cast(type_=__import__("sqlalchemy").Integer)).label("adopted"),
+                func.sum((AgentResponseLog.status == "rejected").cast(type_=__import__("sqlalchemy").Integer)).label(
+                    "rejected"
+                ),
                 func.avg(AgentResponseLog.response_latency_seconds).label("avg_latency"),
                 func.avg(AgentResponseLog.prediction_error_pct).label("avg_error"),
                 func.avg(AgentResponseLog.confidence).label("avg_conf"),
                 func.sum(AgentResponseLog.recommendation_yuan).label("total_yuan"),
                 func.sum(AgentResponseLog.actual_outcome_yuan).label("actual_yuan"),
             )
-            .where(and_(
-                AgentResponseLog.brand_id == brand_id,
-                AgentResponseLog.created_at >= since,
-                AgentResponseLog.created_at < until,
-            ))
+            .where(
+                and_(
+                    AgentResponseLog.brand_id == brand_id,
+                    AgentResponseLog.created_at >= since,
+                    AgentResponseLog.created_at < until,
+                )
+            )
             .group_by(AgentResponseLog.agent_name, AgentResponseLog.store_id)
         )
 
@@ -414,18 +400,21 @@ class AgentOKRService:
             db.add(snap)
             snapshots_created += 1
 
-        logger.info("okr.snapshot_computed", brand_id=brand_id, period=period_str,
-                    snapshots=snapshots_created)
+        logger.info("okr.snapshot_computed", brand_id=brand_id, period=period_str, snapshots=snapshots_created)
         return {"period": period_str, "snapshots_created": snapshots_created}
 
 
 def _log_to_dict(l: AgentResponseLog) -> Dict:
     return {
-        "id": l.id, "brand_id": l.brand_id, "store_id": l.store_id,
-        "agent_name": l.agent_name, "action_type": l.action_type,
+        "id": l.id,
+        "brand_id": l.brand_id,
+        "store_id": l.store_id,
+        "agent_name": l.agent_name,
+        "action_type": l.action_type,
         "recommendation_summary": l.recommendation_summary,
         "recommendation_yuan": float(l.recommendation_yuan or 0),
-        "confidence": l.confidence, "priority": l.priority,
+        "confidence": l.confidence,
+        "priority": l.priority,
         "status": l.status,
         "responded_at": str(l.responded_at) if l.responded_at else None,
         "response_latency_seconds": l.response_latency_seconds,

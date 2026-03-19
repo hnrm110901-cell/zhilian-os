@@ -10,7 +10,7 @@ const { TextArea } = Input;
 const DOMAINS = ['revenue', 'inventory', 'menu', 'events'];
 
 const VectorIndexPage: React.FC = () => {
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [collections, setCollections] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -40,7 +40,7 @@ const VectorIndexPage: React.FC = () => {
         const res = await apiClient.get('/api/v1/stores');
         const list: any[] = res.stores || res || [];
         setStores(list);
-        if (list.length > 0) setSelectedStore(list[0].store_id || list[0].id || 'STORE001');
+        if (list.length > 0) setSelectedStore(list[0].store_id || list[0].id || '');
       } catch { /* ignore */ }
     };
     loadStores();
@@ -182,7 +182,6 @@ const VectorIndexPage: React.FC = () => {
           <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
         </Space>
       </div>

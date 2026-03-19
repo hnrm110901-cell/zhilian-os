@@ -30,12 +30,13 @@ logger = structlog.get_logger()
 
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 
-_LARGE_TABLE_THRESHOLD = 6          # 6人及以上触发裂变识别
-_NEAR_EXPIRY_STATUSES  = ("critical", "low")  # 临期/低库存状态
-_SCAN_WINDOW_HOURS     = 2          # 周期扫描窗口（小时）
+_LARGE_TABLE_THRESHOLD = 6  # 6人及以上触发裂变识别
+_NEAR_EXPIRY_STATUSES = ("critical", "low")  # 临期/低库存状态
+_SCAN_WINDOW_HOURS = 2  # 周期扫描窗口（小时）
 
 
 # ── 内部 helpers ──────────────────────────────────────────────────────────────
+
 
 async def _mark_signal_routed(
     signal_id: str,
@@ -82,9 +83,11 @@ async def _write_signal(
                 ON CONFLICT (signal_id) DO NOTHING
             """),
             {
-                "sid": sid, "store_id": store_id,
+                "sid": sid,
+                "store_id": store_id,
                 "customer_id": customer_id,
-                "signal_type": signal_type, "description": description,
+                "signal_type": signal_type,
+                "description": description,
                 "severity": severity,
                 "now": datetime.datetime.utcnow(),
             },
@@ -97,6 +100,7 @@ async def _write_signal(
 
 
 # ── 路由①：差评 → 私域修复旅程 ───────────────────────────────────────────────
+
 
 async def route_bad_review(
     store_id: str,
@@ -120,36 +124,35 @@ async def route_bad_review(
     Returns:
         {"routed": bool, "journey_id": str | None, "action": str}
     """
-    logger.info("signal_bus.bad_review", store_id=store_id,
-                signal_id=signal_id, rating=rating)
+    logger.info("signal_bus.bad_review", store_id=store_id, signal_id=signal_id, rating=rating)
 
     if not customer_id:
         await _mark_signal_routed(signal_id, "no_customer_id_skip", db)
-        return {"routed": False, "journey_id": None,
-                "action": "差评无顾客ID，已记录但跳过旅程"}
+        return {"routed": False, "journey_id": None, "action": "差评无顾客ID，已记录但跳过旅程"}
 
     try:
         from .journey_orchestrator import JourneyOrchestrator
+
         orch = JourneyOrchestrator()
         result = await orch.trigger(
-            customer_id, store_id, "dormant_wakeup", db,
+            customer_id,
+            store_id,
+            "dormant_wakeup",
+            db,
         )
         # 差评优先级更高，写入 private_domain_signals 差评类型备注
         journey_id = result.get("journey_id") or result.get("journey_db_id")
         action_desc = f"bad_review_repair_triggered:journey={journey_id}"
         await _mark_signal_routed(signal_id, action_desc, db)
-        logger.info("signal_bus.bad_review.routed",
-                    store_id=store_id, customer_id=customer_id,
-                    journey_id=journey_id)
-        return {"routed": True, "journey_id": journey_id,
-                "action": f"已触发差评修复旅程 ({journey_id})"}
+        logger.info("signal_bus.bad_review.routed", store_id=store_id, customer_id=customer_id, journey_id=journey_id)
+        return {"routed": True, "journey_id": journey_id, "action": f"已触发差评修复旅程 ({journey_id})"}
     except Exception as exc:
-        logger.error("signal_bus.bad_review.failed",
-                     store_id=store_id, error=str(exc))
+        logger.error("signal_bus.bad_review.failed", store_id=store_id, error=str(exc))
         return {"routed": False, "journey_id": None, "action": f"路由失败: {exc}"}
 
 
 # ── 路由②：临期/低库存 → 废料预警推送 ────────────────────────────────────────
+
 
 async def route_near_expiry(
     store_id: str,
@@ -166,8 +169,9 @@ async def route_near_expiry(
 
     # 查询临期/低库存食材
     try:
-        rows = (await db.execute(
-            text("""
+        rows = (
+            await db.execute(
+                text("""
                 SELECT id, name, current_quantity, unit, unit_cost, status
                 FROM inventory_items
                 WHERE store_id = :s
@@ -175,27 +179,28 @@ async def route_near_expiry(
                 ORDER BY unit_cost DESC NULLS LAST
                 LIMIT 20
             """),
-            {"s": store_id},
-        )).fetchall()
+                {"s": store_id},
+            )
+        ).fetchall()
     except Exception as exc:
         logger.warning("signal_bus.near_expiry.query_failed", error=str(exc))
         return {"routed": False, "items_count": 0, "pushed": False, "signal_ids": []}
 
     if not rows:
-        return {"routed": False, "items_count": 0, "pushed": False,
-                "signal_ids": [], "action": "无临期/低库存食材"}
+        return {"routed": False, "items_count": 0, "pushed": False, "signal_ids": [], "action": "无临期/低库存食材"}
 
     signal_ids: List[str] = []
     for row in rows:
-        item_id, name, qty, unit, cost, status = (
-            row[0], row[1], row[2], row[3], row[4], row[5]
-        )
+        item_id, name, qty, unit, cost, status = (row[0], row[1], row[2], row[3], row[4], row[5])
         cost_yuan = round((cost or 0) * qty / 100, 2)
-        desc = (f"【{status.upper()}】{name} 剩余 {qty}{unit or ''}"
-                f"，预估¥{cost_yuan:.2f} 损耗风险")
+        desc = f"【{status.upper()}】{name} 剩余 {qty}{unit or ''}" f"，预估¥{cost_yuan:.2f} 损耗风险"
         severity = "high" if status == "critical" else "medium"
         sid = await _write_signal(
-            store_id, "churn_risk", desc, severity, db,
+            store_id,
+            "churn_risk",
+            desc,
+            severity,
+            db,
         )
         signal_ids.append(sid)
 
@@ -203,6 +208,7 @@ async def route_near_expiry(
     waste_summary: Optional[str] = None
     try:
         from .waste_guard_service import WasteGuardService
+
         svc = WasteGuardService()
         report = await svc.get_store_waste_summary(
             store_id=store_id,
@@ -219,14 +225,9 @@ async def route_near_expiry(
     if push:
         try:
             from .wechat_service import wechat_service as _wechat
-            items_text = "\n".join(
-                f"• {r[1]} {r[2]}{r[3] or ''} [{r[5]}]"
-                for r in rows[:5]
-            )
-            body = (
-                f"【临期/低库存预警】{store_id}\n"
-                f"共 {len(rows)} 个食材需关注：\n{items_text}"
-            )
+
+            items_text = "\n".join(f"• {r[1]} {r[2]}{r[3] or ''} [{r[5]}]" for r in rows[:5])
+            body = f"【临期/低库存预警】{store_id}\n" f"共 {len(rows)} 个食材需关注：\n{items_text}"
             if waste_summary:
                 body += f"\n{waste_summary}"
             body += f"\n建议立即盘点处理"
@@ -236,18 +237,18 @@ async def route_near_expiry(
         except Exception as exc:
             logger.warning("signal_bus.near_expiry.push_failed", error=str(exc))
 
-    logger.info("signal_bus.near_expiry.done",
-                store_id=store_id, items=len(rows), pushed=pushed)
+    logger.info("signal_bus.near_expiry.done", store_id=store_id, items=len(rows), pushed=pushed)
     return {
-        "routed":      True,
+        "routed": True,
         "items_count": len(rows),
-        "pushed":      pushed,
-        "signal_ids":  signal_ids,
-        "action":      f"已生成 {len(rows)} 条临期预警信号，推送: {'成功' if pushed else '跳过'}",
+        "pushed": pushed,
+        "signal_ids": signal_ids,
+        "action": f"已生成 {len(rows)} 条临期预警信号，推送: {'成功' if pushed else '跳过'}",
     }
 
 
 # ── 路由③：大桌预订(≥6人) → 裂变场景识别 ──────────────────────────────────────
+
 
 async def route_large_table_reservation(
     store_id: str,
@@ -264,51 +265,51 @@ async def route_large_table_reservation(
     Returns:
         {"routed": bool, "referral_scene": str, "k_factor": float, "action": str}
     """
-    logger.info("signal_bus.large_table", store_id=store_id,
-                reservation_id=reservation_id, party_size=party_size)
+    logger.info("signal_bus.large_table", store_id=store_id, reservation_id=reservation_id, party_size=party_size)
 
     if party_size < _LARGE_TABLE_THRESHOLD:
-        return {"routed": False, "referral_scene": None, "k_factor": 0.0,
-                "action": f"桌台人数 {party_size} < {_LARGE_TABLE_THRESHOLD}，不触发裂变识别"}
+        return {
+            "routed": False,
+            "referral_scene": None,
+            "k_factor": 0.0,
+            "action": f"桌台人数 {party_size} < {_LARGE_TABLE_THRESHOLD}，不触发裂变识别",
+        }
 
     # 识别裂变场景
     scene, k_factor, suggestion = _classify_referral_scene(party_size, customer_name)
 
     # 写入 viral 信号
-    desc = (
-        f"大桌预订 [{reservation_id}] {customer_name} {party_size}人"
-        f" | 裂变场景: {scene} | K={k_factor}"
-    )
+    desc = f"大桌预订 [{reservation_id}] {customer_name} {party_size}人" f" | 裂变场景: {scene} | K={k_factor}"
     await _write_signal(store_id, "viral", desc, "medium", db)
 
     # 查找是否已有私域会员（通过电话匹配）
     member_id: Optional[str] = None
     try:
-        row = (await db.execute(
-            text("""
+        row = (
+            await db.execute(
+                text("""
                 SELECT customer_id FROM private_domain_members
                 WHERE store_id = :s
                   AND customer_id LIKE :phone_prefix
                 LIMIT 1
             """),
-            {"s": store_id, "phone_prefix": f"%{customer_phone[-4:]}"},
-        )).fetchone()
+                {"s": store_id, "phone_prefix": f"%{customer_phone[-4:]}"},
+            )
+        ).fetchone()
         if row:
             member_id = row[0]
     except Exception as exc:
         logger.warning("signal_bus.large_table.member_lookup_failed", error=str(exc))
 
-    logger.info("signal_bus.large_table.routed",
-                store_id=store_id, scene=scene, k_factor=k_factor,
-                member_id=member_id)
+    logger.info("signal_bus.large_table.routed", store_id=store_id, scene=scene, k_factor=k_factor, member_id=member_id)
 
     return {
-        "routed":        True,
+        "routed": True,
         "referral_scene": scene,
-        "k_factor":      k_factor,
-        "member_id":     member_id,
-        "suggestion":    suggestion,
-        "action":        f"已识别裂变场景【{scene}】，建议: {suggestion}",
+        "k_factor": k_factor,
+        "member_id": member_id,
+        "suggestion": suggestion,
+        "action": f"已识别裂变场景【{scene}】，建议: {suggestion}",
     }
 
 
@@ -346,6 +347,7 @@ def _classify_referral_scene(
 
 # ── 周期扫描入口 ──────────────────────────────────────────────────────────────
 
+
 async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     """
     周期扫描入口（由 Celery Beat 每2小时调用）。
@@ -356,7 +358,7 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
       3. 今日新增大桌预订  → 触发路由③
     """
     results: Dict[str, Any] = {
-        "store_id":   store_id,
+        "store_id": store_id,
         "scanned_at": datetime.datetime.utcnow().isoformat(),
         "bad_review": [],
         "near_expiry": {},
@@ -364,11 +366,11 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     }
 
     # ① 未处理差评信号
-    since = (datetime.datetime.utcnow()
-             - datetime.timedelta(hours=_SCAN_WINDOW_HOURS)).isoformat()
+    since = (datetime.datetime.utcnow() - datetime.timedelta(hours=_SCAN_WINDOW_HOURS)).isoformat()
     try:
-        review_rows = (await db.execute(
-            text("""
+        review_rows = (
+            await db.execute(
+                text("""
                 SELECT signal_id, customer_id,
                        description
                 FROM private_domain_signals
@@ -378,8 +380,9 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
                   AND triggered_at >= :since
                 LIMIT 20
             """),
-            {"s": store_id, "since": since},
-        )).fetchall()
+                {"s": store_id, "since": since},
+            )
+        ).fetchall()
 
         for r in review_rows:
             sig_id, cust_id, desc = r[0], r[1], r[2]
@@ -391,25 +394,29 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
                 except ValueError:
                     pass
             res = await route_bad_review(
-                store_id, sig_id, cust_id, rating, desc or "", db,
+                store_id,
+                sig_id,
+                cust_id,
+                rating,
+                desc or "",
+                db,
             )
             results["bad_review"].append(res)
     except Exception as exc:
-        logger.warning("signal_bus.scan.bad_review_failed",
-                       store_id=store_id, error=str(exc))
+        logger.warning("signal_bus.scan.bad_review_failed", store_id=store_id, error=str(exc))
 
     # ② 临期/低库存
     try:
         results["near_expiry"] = await route_near_expiry(store_id, db, push=True)
     except Exception as exc:
-        logger.warning("signal_bus.scan.near_expiry_failed",
-                       store_id=store_id, error=str(exc))
+        logger.warning("signal_bus.scan.near_expiry_failed", store_id=store_id, error=str(exc))
 
     # ③ 今日新增大桌预订
     today = datetime.date.today().isoformat()
     try:
-        res_rows = (await db.execute(
-            text("""
+        res_rows = (
+            await db.execute(
+                text("""
                 SELECT id, customer_phone, customer_name,
                        party_size, reservation_date::text
                 FROM reservations
@@ -420,11 +427,14 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
                 ORDER BY party_size DESC
                 LIMIT 10
             """),
-            {
-                "s": store_id, "today": today,
-                "threshold": _LARGE_TABLE_THRESHOLD, "since": since,
-            },
-        )).fetchall()
+                {
+                    "s": store_id,
+                    "today": today,
+                    "threshold": _LARGE_TABLE_THRESHOLD,
+                    "since": since,
+                },
+            )
+        ).fetchall()
 
         for row in res_rows:
             res = await route_large_table_reservation(
@@ -438,8 +448,7 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
             )
             results["large_tables"].append(res)
     except Exception as exc:
-        logger.warning("signal_bus.scan.large_table_failed",
-                       store_id=store_id, error=str(exc))
+        logger.warning("signal_bus.scan.large_table_failed", store_id=store_id, error=str(exc))
 
     total_routed = (
         sum(1 for r in results["bad_review"] if r.get("routed"))
@@ -447,6 +456,5 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
         + sum(1 for r in results["large_tables"] if r.get("routed"))
     )
     results["total_routed"] = total_routed
-    logger.info("signal_bus.scan.done",
-                store_id=store_id, total_routed=total_routed)
+    logger.info("signal_bus.scan.done", store_id=store_id, total_routed=total_routed)
     return results

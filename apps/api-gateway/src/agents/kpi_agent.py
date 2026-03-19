@@ -1,12 +1,14 @@
 """
 KPIAgent - 绩效评估Agent (Claude Tool Use 增强)
 """
-from typing import Dict, Any, List, Optional
+
+from typing import Any, Dict, List, Optional
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent, AgentResult
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
 from ..services.decision_validator import DecisionValidator, ValidationResult
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+from .llm_agent import AgentResult, LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -32,10 +34,7 @@ class KPIAgent(LLMEnhancedAgent):
         self.validator = DecisionValidator()
 
     async def evaluate_store_performance(
-        self,
-        store_id: str,
-        period: str = "week",
-        kpi_types: Optional[List[str]] = None
+        self, store_id: str, period: str = "week", kpi_types: Optional[List[str]] = None
     ) -> AgentResult:
         """
         评估门店绩效
@@ -59,17 +58,10 @@ class KPIAgent(LLMEnhancedAgent):
                 f"给出各项KPI得分和排名、优势和劣势分析、与历史对比及改进建议。"
             )
 
-            logger.info(
-                "Evaluating store performance with Tool Use",
-                store_id=store_id,
-                period=period,
-                kpi_types=kpi_types
-            )
+            logger.info("Evaluating store performance with Tool Use", store_id=store_id, period=period, kpi_types=kpi_types)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"period": period, "kpi_types": kpi_types}
+                user_message=user_message, store_id=store_id, context={"period": period, "kpi_types": kpi_types}
             )
 
             if not result.success:
@@ -97,19 +89,19 @@ class KPIAgent(LLMEnhancedAgent):
                 severity=ErrorSeverity.ERROR,
                 category=ErrorCategory.AGENT,
                 exception=e,
-                context={"store_id": store_id, "period": period}
+                context={"store_id": store_id, "period": period},
             )
             return self.format_response(
-                success=False, data=None, message=f"评估失败: {str(e)}",
-                reasoning=f"评估过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"评估失败: {str(e)}",
+                reasoning=f"评估过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
     async def analyze_staff_performance(
-        self,
-        store_id: str,
-        staff_id: Optional[str] = None,
-        period: str = "month"
+        self, store_id: str, staff_id: Optional[str] = None, period: str = "month"
     ) -> AgentResult:
         """分析员工绩效"""
         try:
@@ -127,13 +119,10 @@ class KPIAgent(LLMEnhancedAgent):
                     f"给出团队绩效概况、绩效差异分析、激励建议和培训需求。"
                 )
 
-            logger.info("Analyzing staff performance with Tool Use",
-                        store_id=store_id, staff_id=staff_id, period=period)
+            logger.info("Analyzing staff performance with Tool Use", store_id=store_id, staff_id=staff_id, period=period)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"staff_id": staff_id, "period": period}
+                user_message=user_message, store_id=store_id, context={"staff_id": staff_id, "period": period}
             )
 
             if not result.success:
@@ -156,20 +145,18 @@ class KPIAgent(LLMEnhancedAgent):
             )
 
         except Exception as e:
-            logger.error("Staff performance analysis failed",
-                         store_id=store_id, staff_id=staff_id, error=str(e), exc_info=e)
+            logger.error("Staff performance analysis failed", store_id=store_id, staff_id=staff_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"分析失败: {str(e)}",
-                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
     async def generate_improvement_plan(
-        self,
-        store_id: str,
-        kpi_type: str,
-        target_value: Optional[float] = None,
-        validation_context: Optional[Dict] = None
+        self, store_id: str, kpi_type: str, target_value: Optional[float] = None, validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """生成改进计划"""
         try:
@@ -181,13 +168,10 @@ class KPIAgent(LLMEnhancedAgent):
                 f"给出具体改进措施（优先级排序）、实施步骤和时间表、资源需求、预期效果和风险。"
             )
 
-            logger.info("Generating improvement plan with Tool Use",
-                        store_id=store_id, kpi_type=kpi_type)
+            logger.info("Generating improvement plan with Tool Use", store_id=store_id, kpi_type=kpi_type)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"kpi_type": kpi_type, "target_value": target_value}
+                user_message=user_message, store_id=store_id, context={"kpi_type": kpi_type, "target_value": target_value}
             )
 
             if not result.success:
@@ -198,9 +182,7 @@ class KPIAgent(LLMEnhancedAgent):
             if validation_context:
                 decision = {"action": "improvement_plan", **validation_context.get("decision_overrides", {})}
                 validation = await self.validator.validate_decision(
-                    decision=decision,
-                    context=validation_context,
-                    rules_to_apply=["budget_check"]
+                    decision=decision, context=validation_context, rules_to_apply=["budget_check"]
                 )
                 if validation["result"] == ValidationResult.REJECTED.value:
                     return self.format_response(
@@ -234,20 +216,17 @@ class KPIAgent(LLMEnhancedAgent):
             )
 
         except Exception as e:
-            logger.error("Improvement plan generation failed",
-                         store_id=store_id, kpi_type=kpi_type, error=str(e), exc_info=e)
+            logger.error("Improvement plan generation failed", store_id=store_id, kpi_type=kpi_type, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"生成失败: {str(e)}",
-                reasoning=f"生成过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"生成失败: {str(e)}",
+                reasoning=f"生成过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
-    async def predict_kpi_trend(
-        self,
-        store_id: str,
-        kpi_name: str,
-        time_range: str = "30d"
-    ) -> AgentResult:
+    async def predict_kpi_trend(self, store_id: str, kpi_name: str, time_range: str = "30d") -> AgentResult:
         """预测KPI趋势"""
         try:
             user_message = (
@@ -256,13 +235,10 @@ class KPIAgent(LLMEnhancedAgent):
                 f"给出趋势预测（上升/下降/稳定）、预测值和置信区间、影响因素分析及风险提示和建议。"
             )
 
-            logger.info("Predicting KPI trend with Tool Use",
-                        store_id=store_id, kpi_name=kpi_name, time_range=time_range)
+            logger.info("Predicting KPI trend with Tool Use", store_id=store_id, kpi_name=kpi_name, time_range=time_range)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"kpi_name": kpi_name, "time_range": time_range}
+                user_message=user_message, store_id=store_id, context={"kpi_name": kpi_name, "time_range": time_range}
             )
 
             if not result.success:
@@ -284,10 +260,12 @@ class KPIAgent(LLMEnhancedAgent):
             )
 
         except Exception as e:
-            logger.error("KPI trend prediction failed",
-                         store_id=store_id, kpi_name=kpi_name, error=str(e), exc_info=e)
+            logger.error("KPI trend prediction failed", store_id=store_id, kpi_name=kpi_name, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"预测失败: {str(e)}",
-                reasoning=f"预测过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"预测失败: {str(e)}",
+                reasoning=f"预测过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )

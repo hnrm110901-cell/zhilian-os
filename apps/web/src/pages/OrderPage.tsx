@@ -75,7 +75,7 @@ const OrderPage: React.FC = () => {
   const [addItemsForm] = Form.useForm();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [statsRange, setStatsRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -281,7 +281,7 @@ const OrderPage: React.FC = () => {
           <Select value={storeId} onChange={(v) => setStoreId(v)} style={{ width: 160 }}>
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-            )) : <Option value="STORE001">STORE001</Option>}
+            ))}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={() => {
             if (activeTab === 'overview') loadTodayOverview();

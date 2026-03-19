@@ -20,24 +20,25 @@ Routes (all under /api/v1/onboarding):
   GET  /diagnostic/pdf
   POST /complete
 """
+
 from __future__ import annotations
 
 import io
 import uuid
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db
-from ..models.user import User
 from ..models.onboarding import OnboardingImport, OnboardingRawData, OnboardingTask
+from ..models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/onboarding", tags=["onboarding"])
@@ -47,19 +48,21 @@ router = APIRouter(prefix="/api/v1/onboarding", tags=["onboarding"])
 
 _SCHEMAS: Dict[str, Dict[str, Any]] = {
     "D01": {
-        "name": "菜品主数据", "required_import": True,
+        "name": "菜品主数据",
+        "required_import": True,
         "description": "菜单结构分析、毛利分析、SKU健康度",
         "fields": {
-            "菜名":   {"aliases": ["name", "dish_name", "菜品名称", "品名", "dish", "菜品", "product_name"], "required": True},
-            "分类":   {"aliases": ["category", "菜品分类", "类别", "大类", "cat"], "required": False},
-            "售价":   {"aliases": ["price", "售价", "定价", "价格", "sale_price", "retail_price"], "required": True},
+            "菜名": {"aliases": ["name", "dish_name", "菜品名称", "品名", "dish", "菜品", "product_name"], "required": True},
+            "分类": {"aliases": ["category", "菜品分类", "类别", "大类", "cat"], "required": False},
+            "售价": {"aliases": ["price", "售价", "定价", "价格", "sale_price", "retail_price"], "required": True},
             "成本价": {"aliases": ["cost", "成本", "成本价格", "food_cost", "cost_price"], "required": False},
             "是否在售": {"aliases": ["is_active", "在售", "上架", "active", "status"], "required": False},
             "所属门店": {"aliases": ["store_id", "门店", "门店ID", "门店编号"], "required": False},
         },
     },
     "D02": {
-        "name": "供应商台账", "required_import": False,
+        "name": "供应商台账",
+        "required_import": False,
         "description": "供应链集中度分析、账期风险",
         "fields": {
             "供应商名": {"aliases": ["supplier_name", "名称", "公司名", "供应商", "vendor_name", "company"], "required": True},
@@ -70,100 +73,108 @@ _SCHEMAS: Dict[str, Dict[str, Any]] = {
         },
     },
     "D03": {
-        "name": "门店信息", "required_import": True,
+        "name": "门店信息",
+        "required_import": True,
         "description": "门店坪效分析、翻台率基准",
         "fields": {
-            "门店名":  {"aliases": ["store_name", "名称", "店名", "name"], "required": True},
-            "地址":    {"aliases": ["address", "门店地址", "addr", "位置"], "required": False},
-            "面积":    {"aliases": ["area", "面积(㎡)", "营业面积", "sqm"], "required": False},
-            "桌台数":  {"aliases": ["table_count", "桌数", "tables", "座位数"], "required": False},
+            "门店名": {"aliases": ["store_name", "名称", "店名", "name"], "required": True},
+            "地址": {"aliases": ["address", "门店地址", "addr", "位置"], "required": False},
+            "面积": {"aliases": ["area", "面积(㎡)", "营业面积", "sqm"], "required": False},
+            "桌台数": {"aliases": ["table_count", "桌数", "tables", "座位数"], "required": False},
             "开业日期": {"aliases": ["open_date", "开业时间", "开店日期", "opening_date"], "required": False},
-            "月租金":  {"aliases": ["monthly_rent", "租金", "rent", "月租"], "required": False},
+            "月租金": {"aliases": ["monthly_rent", "租金", "rent", "月租"], "required": False},
         },
     },
     "D04": {
-        "name": "财务月报", "required_import": True,
+        "name": "财务月报",
+        "required_import": True,
         "description": "P&L分析、成本结构诊断、利润率趋势",
         "fields": {
-            "月份":   {"aliases": ["month", "年月", "period", "月度"], "required": True},
-            "营收":   {"aliases": ["revenue", "收入", "营业额", "total_revenue", "销售额"], "required": True},
+            "月份": {"aliases": ["month", "年月", "period", "月度"], "required": True},
+            "营收": {"aliases": ["revenue", "收入", "营业额", "total_revenue", "销售额"], "required": True},
             "食材成本": {"aliases": ["food_cost", "原料成本", "食材", "material_cost"], "required": False},
             "人力成本": {"aliases": ["labor_cost", "人工成本", "工资", "薪资"], "required": False},
-            "租金":   {"aliases": ["rent", "租金成本", "房租", "rental_cost"], "required": False},
-            "水电":   {"aliases": ["utilities", "水电费", "能耗", "utility_cost"], "required": False},
-            "营销":   {"aliases": ["marketing", "营销费用", "推广费", "广告费"], "required": False},
-            "利润":   {"aliases": ["profit", "净利润", "税后利润", "盈利", "net_profit"], "required": False},
+            "租金": {"aliases": ["rent", "租金成本", "房租", "rental_cost"], "required": False},
+            "水电": {"aliases": ["utilities", "水电费", "能耗", "utility_cost"], "required": False},
+            "营销": {"aliases": ["marketing", "营销费用", "推广费", "广告费"], "required": False},
+            "利润": {"aliases": ["profit", "净利润", "税后利润", "盈利", "net_profit"], "required": False},
         },
     },
     "D05": {
-        "name": "会员数据", "required_import": False,
+        "name": "会员数据",
+        "required_import": False,
         "description": "会员活跃度分析、RFM分群、私域Agent启动",
         "fields": {
-            "手机":    {"aliases": ["phone", "手机号", "mobile", "phone_number", "联系方式"], "required": True},
-            "姓名":    {"aliases": ["name", "customer_name", "会员名", "昵称"], "required": False},
-            "性别":    {"aliases": ["gender", "sex"], "required": False},
+            "手机": {"aliases": ["phone", "手机号", "mobile", "phone_number", "联系方式"], "required": True},
+            "姓名": {"aliases": ["name", "customer_name", "会员名", "昵称"], "required": False},
+            "性别": {"aliases": ["gender", "sex"], "required": False},
             "注册日期": {"aliases": ["register_date", "注册时间", "加入日期", "created_at"], "required": False},
             "累计消费": {"aliases": ["total_spend", "累计消费额", "消费总额", "total_amount"], "required": False},
             "最后消费日": {"aliases": ["last_visit", "最后消费", "最近消费", "last_order_date"], "required": False},
-            "标签":    {"aliases": ["tags", "会员标签", "分组", "label"], "required": False},
+            "标签": {"aliases": ["tags", "会员标签", "分组", "label"], "required": False},
         },
     },
     "D06": {
-        "name": "员工花名册", "required_import": False,
+        "name": "员工花名册",
+        "required_import": False,
         "description": "人效分析、排班基线",
         "fields": {
-            "姓名":   {"aliases": ["name", "员工姓名", "staff_name", "emp_name"], "required": True},
-            "手机":   {"aliases": ["phone", "手机号", "mobile", "联系方式", "电话"], "required": False},
-            "岗位":   {"aliases": ["position", "职位", "角色", "role", "job_title"], "required": True},
+            "姓名": {"aliases": ["name", "员工姓名", "staff_name", "emp_name"], "required": True},
+            "手机": {"aliases": ["phone", "手机号", "mobile", "联系方式", "电话"], "required": False},
+            "岗位": {"aliases": ["position", "职位", "角色", "role", "job_title"], "required": True},
             "入职日期": {"aliases": ["hire_date", "入职时间", "入职", "start_date", "join_date"], "required": False},
-            "门店":   {"aliases": ["store_id", "所属门店", "门店ID", "分店"], "required": False},
+            "门店": {"aliases": ["store_id", "所属门店", "门店ID", "分店"], "required": False},
             "是否在职": {"aliases": ["is_active", "在职", "状态", "active"], "required": False},
         },
     },
     "D07": {
-        "name": "库存台账", "required_import": False,
+        "name": "库存台账",
+        "required_import": False,
         "description": "库存周转分析、呆滞预警",
         "fields": {
-            "名称":   {"aliases": ["name", "物料名", "物料名称", "ingredient_name", "item_name"], "required": True},
-            "分类":   {"aliases": ["category", "类别", "品类"], "required": False},
-            "单位":   {"aliases": ["unit", "计量单位"], "required": False},
+            "名称": {"aliases": ["name", "物料名", "物料名称", "ingredient_name", "item_name"], "required": True},
+            "分类": {"aliases": ["category", "类别", "品类"], "required": False},
+            "单位": {"aliases": ["unit", "计量单位"], "required": False},
             "当前库存": {"aliases": ["current_quantity", "库存量", "数量", "current_stock", "qty"], "required": True},
             "安全库存": {"aliases": ["min_quantity", "最低库存", "安全量", "reorder_point"], "required": True},
-            "单价":   {"aliases": ["unit_cost", "成本价", "单价(元)", "price", "cost"], "required": False},
+            "单价": {"aliases": ["unit_cost", "成本价", "单价(元)", "price", "cost"], "required": False},
         },
     },
     "D08": {
-        "name": "历史订单", "required_import": True,
+        "name": "历史订单",
+        "required_import": True,
         "description": "客单价/时段/渠道分析",
         "fields": {
-            "订单ID":  {"aliases": ["id", "order_id", "order_no", "订单号", "单号"], "required": False},
-            "桌号":    {"aliases": ["table_number", "桌台", "table_no", "桌位"], "required": False},
-            "人数":    {"aliases": ["party_size", "就餐人数", "pax"], "required": False},
-            "总额":    {"aliases": ["total_amount", "总金额", "消费金额", "total"], "required": True},
-            "实付":    {"aliases": ["final_amount", "实付金额", "实收", "actual_amount", "paid_amount"], "required": True},
-            "渠道":    {"aliases": ["channel", "下单渠道", "来源", "source"], "required": False},
+            "订单ID": {"aliases": ["id", "order_id", "order_no", "订单号", "单号"], "required": False},
+            "桌号": {"aliases": ["table_number", "桌台", "table_no", "桌位"], "required": False},
+            "人数": {"aliases": ["party_size", "就餐人数", "pax"], "required": False},
+            "总额": {"aliases": ["total_amount", "总金额", "消费金额", "total"], "required": True},
+            "实付": {"aliases": ["final_amount", "实付金额", "实收", "actual_amount", "paid_amount"], "required": True},
+            "渠道": {"aliases": ["channel", "下单渠道", "来源", "source"], "required": False},
             "下单时间": {"aliases": ["order_time", "时间", "created_at", "date_time"], "required": False},
         },
     },
     "D09": {
-        "name": "评价与差评", "required_import": False,
+        "name": "评价与差评",
+        "required_import": False,
         "description": "口碑分析、差评归因",
         "fields": {
-            "平台":    {"aliases": ["platform", "来源平台", "渠道", "source"], "required": False},
-            "评分":    {"aliases": ["rating", "分数", "星级", "score"], "required": False},
+            "平台": {"aliases": ["platform", "来源平台", "渠道", "source"], "required": False},
+            "评分": {"aliases": ["rating", "分数", "星级", "score"], "required": False},
             "评价内容": {"aliases": ["content", "评价", "内容", "review_text", "comment", "评论"], "required": True},
-            "日期":    {"aliases": ["date", "评价日期", "时间", "review_date", "created_at"], "required": False},
-            "门店":    {"aliases": ["store_id", "门店", "分店", "store_name"], "required": False},
+            "日期": {"aliases": ["date", "评价日期", "时间", "review_date", "created_at"], "required": False},
+            "门店": {"aliases": ["store_id", "门店", "分店", "store_name"], "required": False},
             "是否已回复": {"aliases": ["is_replied", "已回复", "replied"], "required": False},
         },
     },
     "D10": {
-        "name": "组织架构", "required_import": False,
+        "name": "组织架构",
+        "required_import": False,
         "description": "权限初始化、多店管理关系",
         "fields": {
-            "部门":    {"aliases": ["department", "部门名称", "dept"], "required": True},
-            "层级":    {"aliases": ["level", "级别", "hierarchy_level"], "required": False},
-            "负责人":   {"aliases": ["manager", "主管", "manager_name", "leader"], "required": False},
+            "部门": {"aliases": ["department", "部门名称", "dept"], "required": True},
+            "层级": {"aliases": ["level", "级别", "hierarchy_level"], "required": False},
+            "负责人": {"aliases": ["manager", "主管", "manager_name", "leader"], "required": False},
             "管辖门店": {"aliases": ["managed_stores", "管辖", "负责门店", "stores"], "required": False},
         },
     },
@@ -175,6 +186,7 @@ _VALID_STEPS = ["connect", "import", "build", "diagnose", "complete"]
 
 
 # ── Column auto-mapping ───────────────────────────────────────────────────────
+
 
 def _auto_map_columns(df_columns: List[str], data_type: str) -> Dict[str, Optional[str]]:
     """
@@ -226,6 +238,7 @@ def _apply_mapping(row: Dict[str, str], mapping: Dict[str, Optional[str]]) -> Di
 
 # ── GET /api/v1/onboarding/status ────────────────────────────────────────────
 
+
 @router.get("/status", summary="获取当前门店的Onboarding进度")
 async def get_onboarding_status(
     store_id: str = Query(...),
@@ -234,15 +247,11 @@ async def get_onboarding_status(
 ):
     """返回4步进度：connect / import / build / diagnose"""
     # Load all tasks for this store
-    tasks_res = await db.execute(
-        select(OnboardingTask).where(OnboardingTask.store_id == store_id)
-    )
+    tasks_res = await db.execute(select(OnboardingTask).where(OnboardingTask.store_id == store_id))
     tasks = {t.step: t for t in tasks_res.scalars().all()}
 
     # Load all import records
-    imports_res = await db.execute(
-        select(OnboardingImport).where(OnboardingImport.store_id == store_id)
-    )
+    imports_res = await db.execute(select(OnboardingImport).where(OnboardingImport.store_id == store_id))
     import_records = {r.data_type: r for r in imports_res.scalars().all()}
 
     def _step_status(step: str) -> str:
@@ -254,18 +263,15 @@ async def get_onboarding_status(
     for dtype, schema in _SCHEMAS.items():
         rec = import_records.get(dtype)
         import_checklist[dtype] = {
-            "name":            schema["name"],
-            "required":        schema["required_import"],
-            "description":     schema["description"],
-            "status":          rec.status if rec else "pending",
-            "row_count":       rec.row_count if rec else 0,
-            "imported_at":     rec.imported_at.isoformat() if rec and rec.imported_at else None,
+            "name": schema["name"],
+            "required": schema["required_import"],
+            "description": schema["description"],
+            "status": rec.status if rec else "pending",
+            "row_count": rec.row_count if rec else 0,
+            "imported_at": rec.imported_at.isoformat() if rec and rec.imported_at else None,
         }
 
-    required_done = all(
-        import_checklist[dt]["status"] == "imported"
-        for dt in _REQUIRED_TYPES
-    )
+    required_done = all(import_checklist[dt]["status"] == "imported" for dt in _REQUIRED_TYPES)
 
     overall = "pending"
     if _step_status("complete") == "completed":
@@ -280,15 +286,15 @@ async def get_onboarding_status(
         "steps": {
             "connect": {
                 "status": _step_status("connect"),
-                "extra":  tasks["connect"].extra if "connect" in tasks else None,
+                "extra": tasks["connect"].extra if "connect" in tasks else None,
             },
             "import": {
-                "status":    _step_status("import"),
+                "status": _step_status("import"),
                 "checklist": import_checklist,
             },
             "build": {
                 "status": _step_status("build"),
-                "extra":  tasks["build"].extra if "build" in tasks else None,
+                "extra": tasks["build"].extra if "build" in tasks else None,
             },
             "diagnose": {
                 "status": _step_status("diagnose"),
@@ -301,6 +307,7 @@ async def get_onboarding_status(
 
 
 # ── POST /api/v1/onboarding/connect/{adapter} ─────────────────────────────────
+
 
 @router.post("/connect/{adapter}", summary="测试SaaS系统连接并启动历史回灌任务")
 async def connect_adapter(
@@ -323,6 +330,7 @@ async def connect_adapter(
 
     # 触发历史数据回灌 Celery 任务（low_priority 队列，不阻塞当前请求）
     from ..core.celery_tasks import pull_historical_backfill
+
     celery_task = pull_historical_backfill.apply_async(
         kwargs={
             "store_id": store_id,
@@ -341,14 +349,15 @@ async def connect_adapter(
 
     return {
         "store_id": store_id,
-        "adapter":  adapter,
-        "status":   "backfill_started",
-        "task_id":  celery_task.id,
-        "message":  f"{adapter} 连接成功。历史数据回灌已在后台启动，可通过 /backfill/progress 查询进度。",
+        "adapter": adapter,
+        "status": "backfill_started",
+        "task_id": celery_task.id,
+        "message": f"{adapter} 连接成功。历史数据回灌已在后台启动，可通过 /backfill/progress 查询进度。",
     }
 
 
 # ── GET /api/v1/onboarding/backfill/progress ──────────────────────────────────
+
 
 @router.get("/backfill/progress", summary="获取历史数据回灌进度")
 async def get_backfill_progress(
@@ -362,15 +371,16 @@ async def get_backfill_progress(
 
     return {
         "store_id": store_id,
-        "status":   task.status,
-        "total":    task.total_records,
+        "status": task.status,
+        "total": task.total_records,
         "imported": task.imported_records,
-        "failed":   task.failed_records,
-        "extra":    task.extra,
+        "failed": task.failed_records,
+        "extra": task.extra,
     }
 
 
 # ── GET /api/v1/onboarding/import/templates ───────────────────────────────────
+
 
 @router.get("/import/templates", summary="获取10种导入模板列表及当前状态")
 async def list_import_templates(
@@ -379,34 +389,35 @@ async def list_import_templates(
     db: AsyncSession = Depends(get_db),
 ):
     """返回 D01-D10 的模板信息、下载链接、当前导入状态"""
-    imports_res = await db.execute(
-        select(OnboardingImport).where(OnboardingImport.store_id == store_id)
-    )
+    imports_res = await db.execute(select(OnboardingImport).where(OnboardingImport.store_id == store_id))
     import_records = {r.data_type: r for r in imports_res.scalars().all()}
 
     templates = []
     for dtype, schema in _SCHEMAS.items():
         rec = import_records.get(dtype)
-        templates.append({
-            "data_type":       dtype,
-            "name":            schema["name"],
-            "description":     schema["description"],
-            "required":        schema["required_import"],
-            "fields":          list(schema["fields"].keys()),
-            "download_url":    f"/api/v1/onboarding/import/{dtype}/template",
-            "status":          rec.status if rec else "pending",
-            "row_count":       rec.row_count if rec else 0,
-            "imported_at":     rec.imported_at.isoformat() if rec and rec.imported_at else None,
-        })
+        templates.append(
+            {
+                "data_type": dtype,
+                "name": schema["name"],
+                "description": schema["description"],
+                "required": schema["required_import"],
+                "fields": list(schema["fields"].keys()),
+                "download_url": f"/api/v1/onboarding/import/{dtype}/template",
+                "status": rec.status if rec else "pending",
+                "row_count": rec.row_count if rec else 0,
+                "imported_at": rec.imported_at.isoformat() if rec and rec.imported_at else None,
+            }
+        )
 
     return {
-        "store_id":  store_id,
+        "store_id": store_id,
         "templates": templates,
         "required_types": sorted(_REQUIRED_TYPES),
     }
 
 
 # ── GET /api/v1/onboarding/import/{type}/template ─────────────────────────────
+
 
 @router.get("/import/{data_type}/template", summary="下载指定类型的Excel模板")
 async def download_import_template(data_type: str):
@@ -433,6 +444,7 @@ async def download_import_template(data_type: str):
 
 
 # ── POST /api/v1/onboarding/import/{type}/preview ─────────────────────────────
+
 
 @router.post("/import/{data_type}/preview", summary="上传Excel → 自动列映射 → 返回预览数据")
 async def preview_import(
@@ -471,24 +483,24 @@ async def preview_import(
         preview_rows.append(mapped_row)
 
     # Save mapping to onboarding_imports (upsert)
-    await _upsert_import(db, store_id, data_type, "previewed",
-                         row_count=len(df), column_mapping=column_mapping)
+    await _upsert_import(db, store_id, data_type, "previewed", row_count=len(df), column_mapping=column_mapping)
     await db.commit()
 
     return {
-        "store_id":        store_id,
-        "data_type":       data_type,
-        "name":            schema["name"],
-        "total_rows":      len(df),
-        "column_mapping":  column_mapping,
+        "store_id": store_id,
+        "data_type": data_type,
+        "name": schema["name"],
+        "total_rows": len(df),
+        "column_mapping": column_mapping,
         "unmapped_columns": unmapped,
         "missing_required_fields": sorted(missing_required),
-        "can_import":      len(missing_required) == 0,
-        "preview_rows":    preview_rows,
+        "can_import": len(missing_required) == 0,
+        "preview_rows": preview_rows,
     }
 
 
 # ── POST /api/v1/onboarding/import/{type}/confirm ─────────────────────────────
+
 
 @router.post("/import/{data_type}/confirm", summary="确认导入（基于预览的列映射关系）")
 async def confirm_import(
@@ -527,9 +539,16 @@ async def confirm_import(
         ok, fail, errors = await _import_to_raw_data(db, store_id, data_type, df, mapping, schema)
 
     # Update import record
-    await _upsert_import(db, store_id, data_type, "imported",
-                         row_count=ok, error_count=fail, column_mapping=mapping,
-                         imported_at=datetime.utcnow())
+    await _upsert_import(
+        db,
+        store_id,
+        data_type,
+        "imported",
+        row_count=ok,
+        error_count=fail,
+        column_mapping=mapping,
+        imported_at=datetime.utcnow(),
+    )
 
     # Mark overall import step as in_progress
     await _upsert_task(db, store_id, "import", "in_progress")
@@ -537,12 +556,12 @@ async def confirm_import(
 
     logger.info("onboarding_import_confirmed", store_id=store_id, data_type=data_type, ok=ok, fail=fail)
     return {
-        "store_id":  store_id,
+        "store_id": store_id,
         "data_type": data_type,
-        "name":      schema["name"],
-        "imported":  ok,
-        "failed":    fail,
-        "errors":    errors[:20],
+        "name": schema["name"],
+        "imported": ok,
+        "failed": fail,
+        "errors": errors[:20],
     }
 
 
@@ -574,17 +593,26 @@ async def _import_to_raw_data(
         if missing:
             fail += 1
             errors.append(f"第{lineno}行: 缺少必填字段 {missing}")
-            db.add(OnboardingRawData(
-                store_id=store_id, data_type=data_type,
-                row_index=lineno, row_data=mapped_row,
-                is_valid=False, error_msg=f"缺少必填字段 {missing}",
-            ))
+            db.add(
+                OnboardingRawData(
+                    store_id=store_id,
+                    data_type=data_type,
+                    row_index=lineno,
+                    row_data=mapped_row,
+                    is_valid=False,
+                    error_msg=f"缺少必填字段 {missing}",
+                )
+            )
             continue
 
-        db.add(OnboardingRawData(
-            store_id=store_id, data_type=data_type,
-            row_index=lineno, row_data=mapped_row,
-        ))
+        db.add(
+            OnboardingRawData(
+                store_id=store_id,
+                data_type=data_type,
+                row_index=lineno,
+                row_data=mapped_row,
+            )
+        )
         ok += 1
 
     return ok, fail, errors
@@ -614,9 +642,10 @@ async def _delegate_to_bulk_import(
 
 
 async def _bulk_import_employees(store_id: str, df: pd.DataFrame) -> tuple[int, int, List[str]]:
+    from sqlalchemy import select
+
     from ..core.database import get_db_session
     from ..models.employee import Employee
-    from sqlalchemy import select
 
     ok, fail, errors = 0, 0, []
     async with get_db_session() as session:
@@ -631,11 +660,17 @@ async def _bulk_import_employees(store_id: str, df: pd.DataFrame) -> tuple[int, 
                 hire_str = str(row.get("入职日期", "")).strip()
                 hire_date = date.fromisoformat(hire_str) if hire_str else None
                 is_active = str(row.get("是否在职", "1")).strip() not in ("0", "false", "否", "离职")
-                session.add(Employee(
-                    id=emp_id, store_id=store_id, name=name,
-                    phone=str(row.get("手机", "")).strip() or None,
-                    position=position, hire_date=hire_date, is_active=is_active,
-                ))
+                session.add(
+                    Employee(
+                        id=emp_id,
+                        store_id=store_id,
+                        name=name,
+                        phone=str(row.get("手机", "")).strip() or None,
+                        position=position,
+                        hire_date=hire_date,
+                        is_active=is_active,
+                    )
+                )
                 ok += 1
             except Exception as e:
                 fail += 1
@@ -667,15 +702,19 @@ async def _bulk_import_inventory(store_id: str, df: pd.DataFrame) -> tuple[int, 
                 else:
                     status = InventoryStatus.NORMAL
                 unit_price = str(row.get("单价", "")).strip()
-                session.add(InventoryItem(
-                    id=f"INV_{uuid.uuid4().hex[:8].upper()}",
-                    store_id=store_id, name=name,
-                    category=str(row.get("分类", "")).strip() or None,
-                    unit=str(row.get("单位", "")).strip() or None,
-                    current_quantity=current_qty, min_quantity=min_qty,
-                    unit_cost=int(float(unit_price) * 100) if unit_price else None,
-                    status=status,
-                ))
+                session.add(
+                    InventoryItem(
+                        id=f"INV_{uuid.uuid4().hex[:8].upper()}",
+                        store_id=store_id,
+                        name=name,
+                        category=str(row.get("分类", "")).strip() or None,
+                        unit=str(row.get("单位", "")).strip() or None,
+                        current_quantity=current_qty,
+                        min_quantity=min_qty,
+                        unit_cost=int(float(unit_price) * 100) if unit_price else None,
+                        status=status,
+                    )
+                )
                 ok += 1
             except Exception as e:
                 fail += 1
@@ -704,15 +743,18 @@ async def _bulk_import_orders(store_id: str, df: pd.DataFrame) -> tuple[int, int
                 order_id = str(row.get("订单ID", "")).strip() or (
                     f"IMP_{order_time.strftime('%Y%m%d')}_{uuid.uuid4().hex[:6].upper()}"
                 )
-                session.add(Order(
-                    id=order_id, store_id=store_id,
-                    table_number=str(row.get("桌号", "")).strip() or None,
-                    status=OrderStatus.COMPLETED.value,
-                    total_amount=total_amount, final_amount=final_amount,
-                    order_time=order_time,
-                    order_metadata={"source": "onboarding_import",
-                                    "channel": str(row.get("渠道", "")).strip() or None},
-                ))
+                session.add(
+                    Order(
+                        id=order_id,
+                        store_id=store_id,
+                        table_number=str(row.get("桌号", "")).strip() or None,
+                        status=OrderStatus.COMPLETED.value,
+                        total_amount=total_amount,
+                        final_amount=final_amount,
+                        order_time=order_time,
+                        order_metadata={"source": "onboarding_import", "channel": str(row.get("渠道", "")).strip() or None},
+                    )
+                )
                 ok += 1
             except Exception as e:
                 fail += 1
@@ -722,6 +764,7 @@ async def _bulk_import_orders(store_id: str, df: pd.DataFrame) -> tuple[int, int
 
 
 # ── POST /api/v1/onboarding/build ─────────────────────────────────────────────
+
 
 @router.post("/build", summary="触发知识库构建Pipeline")
 async def trigger_build(
@@ -749,13 +792,15 @@ async def trigger_build(
             detail=f"请先完成必填数据导入: {', '.join(schemas_needed)}",
         )
 
-    task = await _upsert_task(db, store_id, "build", "in_progress",
-                              extra={"started_at": datetime.utcnow().isoformat(), "stage": "data_cleaning"})
+    task = await _upsert_task(
+        db, store_id, "build", "in_progress", extra={"started_at": datetime.utcnow().isoformat(), "stage": "data_cleaning"}
+    )
     await db.commit()
 
     # Trigger async pipeline (Celery task)
     try:
         from ..core.celery_tasks import run_onboarding_pipeline
+
         run_onboarding_pipeline.delay(store_id=store_id, task_id=str(task.id))
     except Exception:
         # Celery not configured — run synchronously for now
@@ -763,13 +808,14 @@ async def trigger_build(
 
     return {
         "store_id": store_id,
-        "status":   "started",
-        "task_id":  str(task.id),
-        "message":  "知识库构建已启动，请通过 GET /build/progress 查询进度",
+        "status": "started",
+        "task_id": str(task.id),
+        "message": "知识库构建已启动，请通过 GET /build/progress 查询进度",
     }
 
 
 # ── GET /api/v1/onboarding/build/progress ─────────────────────────────────────
+
 
 @router.get("/build/progress", summary="获取知识库构建进度")
 async def get_build_progress(
@@ -782,18 +828,19 @@ async def get_build_progress(
         return {"store_id": store_id, "status": "not_started"}
 
     return {
-        "store_id":    store_id,
-        "status":      task.status,
-        "stage":       task.extra.get("stage") if task.extra else None,
-        "total":       task.total_records,
-        "processed":   task.imported_records,
-        "started_at":  task.extra.get("started_at") if task.extra else None,
-        "updated_at":  task.updated_at.isoformat(),
-        "error":       task.error_message,
+        "store_id": store_id,
+        "status": task.status,
+        "stage": task.extra.get("stage") if task.extra else None,
+        "total": task.total_records,
+        "processed": task.imported_records,
+        "started_at": task.extra.get("started_at") if task.extra else None,
+        "updated_at": task.updated_at.isoformat(),
+        "error": task.error_message,
     }
 
 
 # ── GET /api/v1/onboarding/diagnostic ─────────────────────────────────────────
+
 
 @router.get("/diagnostic", summary="获取AI诊断报告（8模块）")
 async def get_diagnostic(
@@ -817,9 +864,11 @@ async def get_diagnostic(
         # Build is done but diagnose not triggered — run it now
         try:
             from ..services.diagnostic_service import DiagnosticService
+
             report = await DiagnosticService.generate(store_id=store_id, db=db)
-            await _upsert_task(db, store_id, "diagnose", "completed",
-                               extra={"report_generated_at": datetime.utcnow().isoformat()})
+            await _upsert_task(
+                db, store_id, "diagnose", "completed", extra={"report_generated_at": datetime.utcnow().isoformat()}
+            )
             await db.commit()
             return report
         except ImportError:
@@ -834,6 +883,7 @@ async def get_diagnostic(
 
 # ── GET /api/v1/onboarding/diagnostic/pdf ─────────────────────────────────────
 
+
 @router.get("/diagnostic/pdf", summary="下载诊断报告PDF")
 async def download_diagnostic_pdf(
     store_id: str = Query(...),
@@ -842,6 +892,7 @@ async def download_diagnostic_pdf(
 ):
     try:
         from ..services.diagnostic_service import DiagnosticService
+
         pdf_bytes = await DiagnosticService.generate_pdf(store_id=store_id, db=db)
     except ImportError:
         raise HTTPException(status_code=503, detail="PDF生成服务尚未就绪（Phase 2）")
@@ -855,6 +906,7 @@ async def download_diagnostic_pdf(
 
 # ── POST /api/v1/onboarding/complete ──────────────────────────────────────────
 
+
 @router.post("/complete", summary="标记Onboarding完成 → 触发Agent初始化")
 async def complete_onboarding(
     store_id: str = Query(...),
@@ -862,8 +914,7 @@ async def complete_onboarding(
     db: AsyncSession = Depends(get_db),
 ):
     """完成 Onboarding，将诊断报告参数分发给各 Agent 作为初始化配置。"""
-    await _upsert_task(db, store_id, "complete", "completed",
-                       extra={"completed_at": datetime.utcnow().isoformat()})
+    await _upsert_task(db, store_id, "complete", "completed", extra={"completed_at": datetime.utcnow().isoformat()})
     await db.commit()
 
     # 将诊断报告关键参数分发给各 Agent（通过 AgentMemoryBus）
@@ -873,6 +924,7 @@ async def complete_onboarding(
         diagnostic_summary = (diagnostic_task.extra or {}) if diagnostic_task else {}
 
         from ..services.agent_memory_bus import AgentMemoryBus
+
         bus = AgentMemoryBus()
         await bus.publish(
             store_id=store_id,
@@ -894,12 +946,13 @@ async def complete_onboarding(
     logger.info("onboarding_completed", store_id=store_id)
     return {
         "store_id": store_id,
-        "status":   "completed",
-        "message":  "Onboarding完成！各Agent将基于您的历史数据开始工作。",
+        "status": "completed",
+        "message": "Onboarding完成！各Agent将基于您的历史数据开始工作。",
     }
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
+
 
 async def _get_task(db: AsyncSession, store_id: str, step: str) -> Optional[OnboardingTask]:
     res = await db.execute(
@@ -911,9 +964,7 @@ async def _get_task(db: AsyncSession, store_id: str, step: str) -> Optional[Onbo
     return res.scalar_one_or_none()
 
 
-async def _upsert_task(
-    db: AsyncSession, store_id: str, step: str, status: str, **kwargs
-) -> OnboardingTask:
+async def _upsert_task(db: AsyncSession, store_id: str, step: str, status: str, **kwargs) -> OnboardingTask:
     task = await _get_task(db, store_id, step)
     if task:
         task.status = status
@@ -937,8 +988,12 @@ async def _get_import(db: AsyncSession, store_id: str, data_type: str) -> Option
 
 
 async def _upsert_import(
-    db: AsyncSession, store_id: str, data_type: str, status: str,
-    row_count: int = 0, error_count: int = 0,
+    db: AsyncSession,
+    store_id: str,
+    data_type: str,
+    status: str,
+    row_count: int = 0,
+    error_count: int = 0,
     column_mapping: Optional[Dict] = None,
     imported_at: Optional[datetime] = None,
 ) -> OnboardingImport:
@@ -956,9 +1011,13 @@ async def _upsert_import(
             rec.imported_at = imported_at
     else:
         rec = OnboardingImport(
-            store_id=store_id, data_type=data_type, status=status,
-            row_count=row_count, error_count=error_count,
-            column_mapping=column_mapping, imported_at=imported_at,
+            store_id=store_id,
+            data_type=data_type,
+            status=status,
+            row_count=row_count,
+            error_count=error_count,
+            column_mapping=column_mapping,
+            imported_at=imported_at,
         )
         db.add(rec)
     return rec

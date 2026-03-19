@@ -1,0 +1,125 @@
+.container {
+  padding: var(--spacing-lg, 24px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.headerLeft {
+  flex: 1;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* KPI 行 */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 分类概览 */
+.categoryRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.categoryCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.categoryCount {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.categoryLabel {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* 规则名 */
+.ruleNameEnabled {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ruleNameDisabled {
+  font-weight: 400;
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+/* 触发次数 */
+.triggerCount {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* 切换按钮 */
+.toggleOn {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--green, #34c759);
+  color: #fff;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.toggleOn:hover {
+  opacity: 0.8;
+}
+
+.toggleOff {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--border-default, #d0d0d0);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.toggleOff:hover {
+  opacity: 0.7;
+}

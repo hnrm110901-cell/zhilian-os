@@ -5,8 +5,8 @@ pos_sync API 单元测试
   1. PosSyncRequest 校验（adapter 枚举、日期格式）
   2. _sync_pinzhi   — 凭证缺失跳过 / per-store config 优先级
   3. _sync_tiancai  — 凭证缺失跳过 / fetch_orders_by_date 调用（非 query_orders）
-  4. _sync_aoqiwei_supply — 凭证缺失跳过
-  5. _sync_aoqiwei_crm   — 凭证缺失跳过 / 增强逻辑（mock CRM + mock DB）
+  4. _sync_chixingyun — 凭证缺失跳过
+  5. _sync_weishenghuo   — 凭证缺失跳过 / 增强逻辑（mock CRM + mock DB）
   6. _ADAPTER_HANDLERS 完整注册
   7. 动态 import 助手可正确加载类
 """
@@ -55,12 +55,12 @@ from src.api.pos_sync import (
     BackfillResponse,
     _ADAPTER_HANDLERS,
     _pinzhi_adapter_class,
-    _aoqiwei_crm_adapter_class,
-    _aoqiwei_supply_adapter_class,
+    _weishenghuo_adapter_class,
+    _chixingyun_adapter_class,
     _sync_pinzhi,
     _sync_tiancai,
-    _sync_aoqiwei_supply,
-    _sync_aoqiwei_crm,
+    _sync_chixingyun,
+    _sync_weishenghuo,
 )
 
 
@@ -114,12 +114,12 @@ class TestPosSyncRequestValidation:
     def test_valid_adapter_tiancai(self):
         assert PosSyncRequest(adapter="tiancai").adapter == "tiancai"
 
-    def test_valid_adapter_aoqiwei_supply(self):
-        assert PosSyncRequest(adapter="aoqiwei_supply").adapter == "aoqiwei_supply"
+    def test_valid_adapter_chixingyun(self):
+        assert PosSyncRequest(adapter="chixingyun").adapter == "chixingyun"
 
-    def test_valid_adapter_aoqiwei_crm(self):
-        """aoqiwei_crm 必须在合法枚举中"""
-        assert PosSyncRequest(adapter="aoqiwei_crm").adapter == "aoqiwei_crm"
+    def test_valid_adapter_weishenghuo(self):
+        """weishenghuo 必须在合法枚举中"""
+        assert PosSyncRequest(adapter="weishenghuo").adapter == "weishenghuo"
 
     def test_invalid_adapter_raises(self):
         from pydantic import ValidationError
@@ -144,7 +144,7 @@ class TestPosSyncRequestValidation:
 
 class TestAdapterHandlersRegistry:
     def test_all_four_adapters_registered(self):
-        for key in ("pinzhi", "tiancai", "aoqiwei_supply", "aoqiwei_crm"):
+        for key in ("pinzhi", "tiancai", "chixingyun", "weishenghuo"):
             assert key in _ADAPTER_HANDLERS, f"{key} 未在 _ADAPTER_HANDLERS 中注册"
 
     def test_all_handlers_callable(self):
@@ -159,12 +159,12 @@ class TestDynamicImports:
         cls = _pinzhi_adapter_class()
         assert cls.__name__ == "PinzhiAdapter"
 
-    def test_aoqiwei_crm_adapter_class_loads(self):
-        cls = _aoqiwei_crm_adapter_class()
+    def test_weishenghuo_adapter_class_loads(self):
+        cls = _weishenghuo_adapter_class()
         assert cls.__name__ == "AoqiweiCrmAdapter"
 
-    def test_aoqiwei_supply_adapter_class_loads(self):
-        cls = _aoqiwei_supply_adapter_class()
+    def test_chixingyun_adapter_class_loads(self):
+        cls = _chixingyun_adapter_class()
         assert cls.__name__ == "AoqiweiAdapter"
 
 
@@ -333,7 +333,7 @@ class TestSyncTiancai:
         assert pages == [1]
 
 
-# ── _sync_aoqiwei_supply ─────────────────────────────────────────────────────
+# ── _sync_chixingyun ─────────────────────────────────────────────────────
 
 class TestSyncAoqiweiSupply:
     @pytest.mark.asyncio
@@ -341,14 +341,14 @@ class TestSyncAoqiweiSupply:
         monkeypatch.delenv("AOQIWEI_APP_KEY", raising=False)
         monkeypatch.delenv("AOQIWEI_APP_SECRET", raising=False)
 
-        resp = await _sync_aoqiwei_supply("2026-03-13", None)
+        resp = await _sync_chixingyun("2026-03-13", None)
 
         assert resp.success is False
-        assert resp.adapter == "aoqiwei_supply"
+        assert resp.adapter == "chixingyun"
         assert resp.skipped_reason is not None
 
 
-# ── _sync_aoqiwei_crm ─────────────────────────────────────────────────────────
+# ── _sync_weishenghuo ─────────────────────────────────────────────────────────
 
 class TestSyncAoqiweiCrm:
     @pytest.mark.asyncio
@@ -375,10 +375,10 @@ class TestSyncAoqiweiCrm:
         session.__aexit__ = AsyncMock(return_value=None)
 
         with patch("src.api.pos_sync.get_db_session", return_value=session):
-            resp = await _sync_aoqiwei_crm("2026-03-13", None)
+            resp = await _sync_weishenghuo("2026-03-13", None)
 
         assert resp.success is False
-        assert resp.adapter == "aoqiwei_crm"
+        assert resp.adapter == "weishenghuo"
         assert resp.skipped_reason is not None
         assert "AOQIWEI_CRM_APPID" in resp.skipped_reason
 
@@ -438,10 +438,10 @@ class TestSyncAoqiweiCrm:
         mock_crm_cls = MagicMock(return_value=mock_crm)
 
         with patch("src.api.pos_sync.get_db_session", return_value=session), \
-             patch("src.api.pos_sync._aoqiwei_crm_adapter_class", return_value=mock_crm_cls):
-            resp = await _sync_aoqiwei_crm("2026-03-13", None)
+             patch("src.api.pos_sync._weishenghuo_adapter_class", return_value=mock_crm_cls):
+            resp = await _sync_weishenghuo("2026-03-13", None)
 
-        assert resp.adapter == "aoqiwei_crm"
+        assert resp.adapter == "weishenghuo"
         assert resp.success is True
         assert mock_crm.get_member_info.call_count == 2
         assert resp.stores[0].pos_orders == 2    # 增强会员数
@@ -483,8 +483,8 @@ class TestSyncAoqiweiCrm:
         mock_crm.aclose = AsyncMock()
 
         with patch("src.api.pos_sync.get_db_session", return_value=session), \
-             patch("src.api.pos_sync._aoqiwei_crm_adapter_class", return_value=MagicMock(return_value=mock_crm)):
-            resp = await _sync_aoqiwei_crm("2026-03-13", None)
+             patch("src.api.pos_sync._weishenghuo_adapter_class", return_value=MagicMock(return_value=mock_crm)):
+            resp = await _sync_weishenghuo("2026-03-13", None)
 
         assert resp.stores[0].error is not None
         assert "超时" in resp.stores[0].error
@@ -503,8 +503,8 @@ class TestSyncAoqiweiCrm:
         session.__aexit__ = AsyncMock(return_value=None)
 
         with patch("src.api.pos_sync.get_db_session", return_value=session), \
-             patch("src.api.pos_sync._aoqiwei_crm_adapter_class", return_value=MagicMock()):
-            resp = await _sync_aoqiwei_crm("2026-03-13", None)
+             patch("src.api.pos_sync._weishenghuo_adapter_class", return_value=MagicMock()):
+            resp = await _sync_weishenghuo("2026-03-13", None)
 
         assert "note" in resp.totals
         assert resp.totals["stores_processed"] == 0

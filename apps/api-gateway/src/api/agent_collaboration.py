@@ -6,22 +6,21 @@ Phase 4: 智能优化期 (Intelligence Optimization Period)
 """
 
 import os
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.database import get_db
 from src.services.agent_collaboration_optimizer import (
     AgentCollaborationOptimizer,
-    AgentType,
     AgentDecision,
+    AgentType,
     ConflictType,
-    ResolutionStrategy
+    ResolutionStrategy,
 )
-from src.core.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
-
 
 router = APIRouter(prefix="/api/v1/collaboration", tags=["agent_collaboration"])
 
@@ -29,6 +28,7 @@ router = APIRouter(prefix="/api/v1/collaboration", tags=["agent_collaboration"])
 # Request/Response Models
 class AgentTypeEnum(str, Enum):
     """Agent type enum"""
+
     SCHEDULE = "schedule"
     ORDER = "order"
     INVENTORY = "inventory"
@@ -40,6 +40,7 @@ class AgentTypeEnum(str, Enum):
 
 class ResolutionStrategyEnum(str, Enum):
     """Resolution strategy enum"""
+
     PRIORITY_BASED = "priority_based"
     NEGOTIATION = "negotiation"
     OPTIMIZATION = "optimization"
@@ -48,6 +49,7 @@ class ResolutionStrategyEnum(str, Enum):
 
 class SubmitDecisionRequest(BaseModel):
     """Submit agent decision request"""
+
     agent_type: AgentTypeEnum
     decision_id: str
     action: str
@@ -59,18 +61,21 @@ class SubmitDecisionRequest(BaseModel):
 
 class CoordinateRequest(BaseModel):
     """Coordinate decisions request"""
+
     store_id: str
     time_window: int = int(os.getenv("AGENT_COLLAB_TIME_WINDOW", "3600"))  # seconds
 
 
 class ResolveConflictRequest(BaseModel):
     """Resolve conflict request"""
+
     conflict_id: str
     strategy: Optional[ResolutionStrategyEnum] = None
 
 
 class AgentPerformanceRequest(BaseModel):
     """Get agent performance request"""
+
     agent_type: AgentTypeEnum
     start_date: datetime
     end_date: datetime
@@ -78,10 +83,7 @@ class AgentPerformanceRequest(BaseModel):
 
 # API Endpoints
 @router.post("/decision/submit")
-async def submit_decision(
-    request: SubmitDecisionRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def submit_decision(request: SubmitDecisionRequest, db: AsyncSession = Depends(get_db)):
     """
     Submit decision from agent
     提交Agent决策
@@ -100,27 +102,18 @@ async def submit_decision(
             expected_benefit=request.expected_benefit,
             priority=request.priority,
             constraints=request.constraints,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
 
-        result = optimizer.submit_decision(
-            agent_type=AgentType(request.agent_type.value),
-            decision=decision
-        )
+        result = optimizer.submit_decision(agent_type=AgentType(request.agent_type.value), decision=decision)
 
-        return {
-            "success": True,
-            **result
-        }
+        return {"success": True, **result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/coordinate")
-async def coordinate_decisions(
-    request: CoordinateRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def coordinate_decisions(request: CoordinateRequest, db: AsyncSession = Depends(get_db)):
     """
     Coordinate all pending decisions
     协调所有待处理决策
@@ -135,10 +128,7 @@ async def coordinate_decisions(
     try:
         optimizer = AgentCollaborationOptimizer(db)
 
-        result = optimizer.coordinate_decisions(
-            store_id=request.store_id,
-            time_window=request.time_window
-        )
+        result = optimizer.coordinate_decisions(store_id=request.store_id, time_window=request.time_window)
 
         return result
     except Exception as e:
@@ -146,10 +136,7 @@ async def coordinate_decisions(
 
 
 @router.post("/conflict/resolve")
-async def resolve_conflict(
-    request: ResolveConflictRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def resolve_conflict(request: ResolveConflictRequest, db: AsyncSession = Depends(get_db)):
     """
     Resolve specific conflict
     解决特定冲突
@@ -167,10 +154,7 @@ async def resolve_conflict(
         if request.strategy:
             strategy = ResolutionStrategy(request.strategy.value)
 
-        resolution = optimizer.resolve_conflict(
-            conflict_id=request.conflict_id,
-            strategy=strategy
-        )
+        resolution = optimizer.resolve_conflict(conflict_id=request.conflict_id, strategy=strategy)
 
         return {
             "success": True,
@@ -180,7 +164,7 @@ async def resolve_conflict(
             "rejected_decisions": resolution.rejected_decisions,
             "modifications": resolution.modifications,
             "reason": resolution.reason,
-            "resolved_at": resolution.resolved_at.isoformat()
+            "resolved_at": resolution.resolved_at.isoformat(),
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -189,10 +173,7 @@ async def resolve_conflict(
 
 
 @router.get("/status/{store_id}")
-async def get_collaboration_status(
-    store_id: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_collaboration_status(store_id: str, db: AsyncSession = Depends(get_db)):
     """
     Get agent collaboration status
     获取Agent协同状态
@@ -208,19 +189,13 @@ async def get_collaboration_status(
 
         status = optimizer.get_collaboration_status(store_id=store_id)
 
-        return {
-            "success": True,
-            **status
-        }
+        return {"success": True, **status}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/performance")
-async def get_agent_performance(
-    request: AgentPerformanceRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_agent_performance(request: AgentPerformanceRequest, db: AsyncSession = Depends(get_db)):
     """
     Get agent performance metrics
     获取Agent性能指标
@@ -235,14 +210,9 @@ async def get_agent_performance(
         optimizer = AgentCollaborationOptimizer(db)
 
         performance = optimizer.get_agent_performance(
-            agent_type=AgentType(request.agent_type.value),
-            start_date=request.start_date,
-            end_date=request.end_date
+            agent_type=AgentType(request.agent_type.value), start_date=request.start_date, end_date=request.end_date
         )
 
-        return {
-            "success": True,
-            **performance
-        }
+        return {"success": True, **performance}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

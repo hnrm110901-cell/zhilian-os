@@ -30,9 +30,7 @@ def compute_employee_unfavorable_ratio(shift_records: List[Dict[str, Any]]) -> f
         return 0.0
 
     unfavorable = sum(
-        1
-        for record in shift_records
-        if is_unfavorable_shift(record.get("shift_type"), record.get("start_time"))
+        1 for record in shift_records if is_unfavorable_shift(record.get("shift_type"), record.get("start_time"))
     )
     return round(unfavorable / total, 4)
 
@@ -137,9 +135,7 @@ class ShiftFairnessService:
         unfavorable_ratios = []
         for employee_id, records in employee_shifts.items():
             unfavorable_count = sum(
-                1
-                for record in records
-                if is_unfavorable_shift(record.get("shift_type"), record.get("start_time"))
+                1 for record in records if is_unfavorable_shift(record.get("shift_type"), record.get("start_time"))
             )
             ratio = compute_employee_unfavorable_ratio(records)
             employee_stats.append(
@@ -203,10 +199,7 @@ class ShiftFairnessService:
             week_key = f"{iso_year}-W{iso_week:02d}"
             weekly_map[week_key][employee_id] += 1
 
-        ordered_weekly_counts = [
-            dict(weekly_map[key])
-            for key in sorted(weekly_map.keys())
-        ]
+        ordered_weekly_counts = [dict(weekly_map[key]) for key in sorted(weekly_map.keys())]
 
         high_risk_employees = find_consecutive_worst_employees(
             ordered_weekly_counts,
@@ -217,8 +210,5 @@ class ShiftFairnessService:
             "store_id": store_id,
             "lookback_weeks": lookback_weeks,
             "high_risk_employees": high_risk_employees,
-            "weekly_unfavorable_counts": {
-                key: dict(value)
-                for key, value in sorted(weekly_map.items())
-            },
+            "weekly_unfavorable_counts": {key: dict(value) for key, value in sorted(weekly_map.items())},
         }

@@ -11,7 +11,7 @@ import { HealthRing } from '../../design-system/components';
 import apiClient from '../../services/api';
 import styles from './Alerts.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const DIM_LABELS: Record<string, string> = {
   revenue_completion: '营收完成率',

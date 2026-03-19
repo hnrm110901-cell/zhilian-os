@@ -9,18 +9,18 @@ Delta BOM 按 group→brand→region→store→channel 顺序叠加：
 现有 BOMTemplate（scope='store', is_delta=False by server_default）
 自动被识别为 store-level base BOM，无需数据迁移。
 """
+
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Dict, List, Optional
-import inspect
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
 from src.models.bom import BOMItem, BOMTemplate
 from src.models.store import Store
 
@@ -35,6 +35,7 @@ _DELTA_SCOPE_ORDER = ["group", "brand", "region", "store", "channel"]
 @dataclass
 class ResolvedBOMItem:
     """解析后的单行 BOM 食材数据"""
+
     ingredient_id: str
     ingredient_master_id: Optional[str]
     standard_qty: Decimal
@@ -49,6 +50,7 @@ class ResolvedBOMItem:
 @dataclass
 class ResolvedBOM:
     """完整解析结果（继承链叠加后的最终 BOM）"""
+
     dish_id: str
     store_id: str
     channel: Optional[str]
@@ -151,9 +153,7 @@ class BOMResolverService:
         6. 返回 ResolvedBOM
         """
         # 1. 取 Store 信息
-        store_result = await session.execute(
-            select(Store).where(Store.id == store_id)
-        )
+        store_result = await session.execute(select(Store).where(Store.id == store_id))
         store: Optional[Store] = await _maybe_await(store_result.scalar_one_or_none())
         if store is None:
             logger.warning("bom_resolver_store_not_found", store_id=store_id)
@@ -182,10 +182,7 @@ class BOMResolverService:
             return ResolvedBOM(dish_id=str(dish_id), store_id=store_id, channel=channel)
 
         # 4. 初始化 working_items（ingredient_id → ResolvedBOMItem）
-        working_items: Dict[str, ResolvedBOMItem] = {
-            str(item.ingredient_id): _item_to_resolved(item)
-            for item in base.items
-        }
+        working_items: Dict[str, ResolvedBOMItem] = {str(item.ingredient_id): _item_to_resolved(item) for item in base.items}
         source_ids = [str(base.id)]
 
         # 5. 叠加 delta BOMs

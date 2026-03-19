@@ -28,7 +28,7 @@ const { Option } = Select;
 
 const ServicePage: React.FC = () => {
   const [stores, setStores] = useState<any[]>([]);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(6, 'day'), dayjs()]);
   const [loading, setLoading] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -49,7 +49,7 @@ const ServicePage: React.FC = () => {
       const res = await apiClient.get('/api/v1/stores');
       setStores(res?.stores || res || []);
     } catch {
-      // ignore and keep fallback STORE001
+      // ignore
     }
   }, []);
 
@@ -151,7 +151,6 @@ const ServicePage: React.FC = () => {
                     {s.name || s.id || s.store_id}
                   </Option>
                 ))
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
           <RangePicker
             value={range}

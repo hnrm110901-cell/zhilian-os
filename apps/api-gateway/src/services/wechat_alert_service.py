@@ -2,9 +2,11 @@
 企业微信告警服务
 用于发送各类业务告警到企业微信
 """
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+
 import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 from ..core.config import settings
@@ -36,7 +38,7 @@ class WeChatAlertService:
         expected_revenue: float,
         deviation: float,
         analysis: str,
-        recipient_ids: List[str]
+        recipient_ids: List[str],
     ) -> Dict[str, Any]:
         """
         发送营收异常告警
@@ -85,12 +87,7 @@ class WeChatAlertService:
 屯象OS实时监控 | 每15分钟自动检测
 """
 
-            logger.info(
-                "Sending revenue alert",
-                store_id=store_id,
-                deviation=deviation,
-                recipient_count=len(recipient_ids)
-            )
+            logger.info("Sending revenue alert", store_id=store_id, deviation=deviation, recipient_count=len(recipient_ids))
 
             # 发送给所有接收人
             sent_count = 0
@@ -98,60 +95,31 @@ class WeChatAlertService:
 
             for recipient_id in recipient_ids:
                 try:
-                    result = await self.message_service.send_text_message(
-                        user_id=recipient_id,
-                        content=message
-                    )
+                    result = await self.message_service.send_text_message(user_id=recipient_id, content=message)
                     if result.get("success"):
                         sent_count += 1
                     else:
                         failed_count += 1
-                        logger.warning(
-                            "Failed to send revenue alert",
-                            recipient_id=recipient_id,
-                            error=result.get("error")
-                        )
+                        logger.warning("Failed to send revenue alert", recipient_id=recipient_id, error=result.get("error"))
                 except Exception as e:
                     failed_count += 1
-                    logger.error(
-                        "Error sending revenue alert",
-                        recipient_id=recipient_id,
-                        error=str(e)
-                    )
+                    logger.error("Error sending revenue alert", recipient_id=recipient_id, error=str(e))
 
-            logger.info(
-                "Revenue alert sent",
-                store_id=store_id,
-                sent_count=sent_count,
-                failed_count=failed_count
-            )
+            logger.info("Revenue alert sent", store_id=store_id, sent_count=sent_count, failed_count=failed_count)
 
             return {
                 "success": True,
                 "sent_count": sent_count,
                 "failed_count": failed_count,
-                "total_recipients": len(recipient_ids)
+                "total_recipients": len(recipient_ids),
             }
 
         except Exception as e:
-            logger.error(
-                "Revenue alert sending failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Revenue alert sending failed", store_id=store_id, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
     async def send_inventory_alert(
-        self,
-        store_id: str,
-        store_name: str,
-        alert_items: List[Dict[str, Any]],
-        analysis: str,
-        recipient_ids: List[str]
+        self, store_id: str, store_name: str, alert_items: List[Dict[str, Any]], analysis: str, recipient_ids: List[str]
     ) -> Dict[str, Any]:
         """
         发送库存预警
@@ -187,15 +155,11 @@ class WeChatAlertService:
             if high_risk:
                 inventory_list.append("🔴 高风险:")
                 for item in high_risk:
-                    inventory_list.append(
-                        f"  • {item['dish_name']}: 剩余{item['quantity']}份"
-                    )
+                    inventory_list.append(f"  • {item['dish_name']}: 剩余{item['quantity']}份")
             if medium_risk:
                 inventory_list.append("🟡 中风险:")
                 for item in medium_risk:
-                    inventory_list.append(
-                        f"  • {item['dish_name']}: 剩余{item['quantity']}份"
-                    )
+                    inventory_list.append(f"  • {item['dish_name']}: 剩余{item['quantity']}份")
 
             # 构建告警消息
             message = f"""{emoji} 库存预警 [{level}]
@@ -216,10 +180,7 @@ class WeChatAlertService:
 """
 
             logger.info(
-                "Sending inventory alert",
-                store_id=store_id,
-                alert_count=len(alert_items),
-                recipient_count=len(recipient_ids)
+                "Sending inventory alert", store_id=store_id, alert_count=len(alert_items), recipient_count=len(recipient_ids)
             )
 
             # 发送给所有接收人
@@ -228,47 +189,27 @@ class WeChatAlertService:
 
             for recipient_id in recipient_ids:
                 try:
-                    result = await self.message_service.send_text_message(
-                        user_id=recipient_id,
-                        content=message
-                    )
+                    result = await self.message_service.send_text_message(user_id=recipient_id, content=message)
                     if result.get("success"):
                         sent_count += 1
                     else:
                         failed_count += 1
                 except Exception as e:
                     failed_count += 1
-                    logger.error(
-                        "Error sending inventory alert",
-                        recipient_id=recipient_id,
-                        error=str(e)
-                    )
+                    logger.error("Error sending inventory alert", recipient_id=recipient_id, error=str(e))
 
-            logger.info(
-                "Inventory alert sent",
-                store_id=store_id,
-                sent_count=sent_count,
-                failed_count=failed_count
-            )
+            logger.info("Inventory alert sent", store_id=store_id, sent_count=sent_count, failed_count=failed_count)
 
             return {
                 "success": True,
                 "sent_count": sent_count,
                 "failed_count": failed_count,
-                "total_recipients": len(recipient_ids)
+                "total_recipients": len(recipient_ids),
             }
 
         except Exception as e:
-            logger.error(
-                "Inventory alert sending failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Inventory alert sending failed", store_id=store_id, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
     async def send_order_alert(
         self,
@@ -277,7 +218,7 @@ class WeChatAlertService:
         anomaly_type: str,
         anomaly_data: Dict[str, Any],
         analysis: str,
-        recipient_ids: List[str]
+        recipient_ids: List[str],
     ) -> Dict[str, Any]:
         """
         发送订单异常告警
@@ -299,7 +240,7 @@ class WeChatAlertService:
                 "refund_rate": "退单率",
                 "complaint_rate": "投诉率",
                 "timeout_rate": "超时率",
-                "bad_review_rate": "差评率"
+                "bad_review_rate": "差评率",
             }
 
             anomaly_name = anomaly_names.get(anomaly_type, anomaly_type)
@@ -340,10 +281,7 @@ class WeChatAlertService:
 """
 
             logger.info(
-                "Sending order alert",
-                store_id=store_id,
-                anomaly_type=anomaly_type,
-                recipient_count=len(recipient_ids)
+                "Sending order alert", store_id=store_id, anomaly_type=anomaly_type, recipient_count=len(recipient_ids)
             )
 
             # 发送给所有接收人
@@ -352,55 +290,30 @@ class WeChatAlertService:
 
             for recipient_id in recipient_ids:
                 try:
-                    result = await self.message_service.send_text_message(
-                        user_id=recipient_id,
-                        content=message
-                    )
+                    result = await self.message_service.send_text_message(user_id=recipient_id, content=message)
                     if result.get("success"):
                         sent_count += 1
                     else:
                         failed_count += 1
                 except Exception as e:
                     failed_count += 1
-                    logger.error(
-                        "Error sending order alert",
-                        recipient_id=recipient_id,
-                        error=str(e)
-                    )
+                    logger.error("Error sending order alert", recipient_id=recipient_id, error=str(e))
 
-            logger.info(
-                "Order alert sent",
-                store_id=store_id,
-                sent_count=sent_count,
-                failed_count=failed_count
-            )
+            logger.info("Order alert sent", store_id=store_id, sent_count=sent_count, failed_count=failed_count)
 
             return {
                 "success": True,
                 "sent_count": sent_count,
                 "failed_count": failed_count,
-                "total_recipients": len(recipient_ids)
+                "total_recipients": len(recipient_ids),
             }
 
         except Exception as e:
-            logger.error(
-                "Order alert sending failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Order alert sending failed", store_id=store_id, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
     async def send_system_alert(
-        self,
-        alert_type: str,
-        title: str,
-        message: str,
-        severity: str,
-        recipient_ids: List[str]
+        self, alert_type: str, title: str, message: str, severity: str, recipient_ids: List[str]
     ) -> Dict[str, Any]:
         """
         发送系统告警
@@ -417,12 +330,7 @@ class WeChatAlertService:
         """
         try:
             # 严重程度映射
-            severity_emojis = {
-                "critical": "🚨",
-                "error": "❌",
-                "warning": "⚠️",
-                "info": "ℹ️"
-            }
+            severity_emojis = {"critical": "🚨", "error": "❌", "warning": "⚠️", "info": "ℹ️"}
 
             emoji = severity_emojis.get(severity, "📢")
 
@@ -439,12 +347,7 @@ class WeChatAlertService:
 屯象OS系统监控
 """
 
-            logger.info(
-                "Sending system alert",
-                alert_type=alert_type,
-                severity=severity,
-                recipient_count=len(recipient_ids)
-            )
+            logger.info("Sending system alert", alert_type=alert_type, severity=severity, recipient_count=len(recipient_ids))
 
             # 发送给所有接收人
             sent_count = 0
@@ -452,47 +355,27 @@ class WeChatAlertService:
 
             for recipient_id in recipient_ids:
                 try:
-                    result = await self.message_service.send_text_message(
-                        user_id=recipient_id,
-                        content=full_message
-                    )
+                    result = await self.message_service.send_text_message(user_id=recipient_id, content=full_message)
                     if result.get("success"):
                         sent_count += 1
                     else:
                         failed_count += 1
                 except Exception as e:
                     failed_count += 1
-                    logger.error(
-                        "Error sending system alert",
-                        recipient_id=recipient_id,
-                        error=str(e)
-                    )
+                    logger.error("Error sending system alert", recipient_id=recipient_id, error=str(e))
 
-            logger.info(
-                "System alert sent",
-                alert_type=alert_type,
-                sent_count=sent_count,
-                failed_count=failed_count
-            )
+            logger.info("System alert sent", alert_type=alert_type, sent_count=sent_count, failed_count=failed_count)
 
             return {
                 "success": True,
                 "sent_count": sent_count,
                 "failed_count": failed_count,
-                "total_recipients": len(recipient_ids)
+                "total_recipients": len(recipient_ids),
             }
 
         except Exception as e:
-            logger.error(
-                "System alert sending failed",
-                alert_type=alert_type,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("System alert sending failed", alert_type=alert_type, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
     async def send_hardware_alert(
         self,
@@ -519,9 +402,7 @@ class WeChatAlertService:
         """
         try:
             last_hb = (extra or {}).get("last_heartbeat")
-            last_hb_str = (
-                last_hb.strftime("%Y-%m-%d %H:%M:%S") if last_hb else "从未上报"
-            )
+            last_hb_str = last_hb.strftime("%Y-%m-%d %H:%M:%S") if last_hb else "从未上报"
 
             full_message = f"""🚨 硬件离线告警（P1）
 

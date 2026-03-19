@@ -14,7 +14,7 @@ import styles from './MonthlyReportPage.module.css';
 const MonthlyReportPage: React.FC = () => {
   const [loading, setLoading]             = useState(false);
   const [stores, setStores]               = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || 'STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [selectedMonth, setSelectedMonth] = useState(dayjs().subtract(1, 'month'));
   const [report, setReport]               = useState<any>(null);
 
@@ -61,7 +61,7 @@ const MonthlyReportPage: React.FC = () => {
 
   const storeOptions = stores.length > 0
     ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
-    : [{ value: 'STORE001', label: 'STORE001' }];
+    : [];
 
   const statusBadgeType = (s: string): 'critical' | 'warning' | 'success' =>
     s === 'critical' ? 'critical' : s === 'warning' ? 'warning' : 'success';

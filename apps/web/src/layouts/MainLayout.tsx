@@ -65,6 +65,7 @@ import {
   MenuUnfoldOutlined,
   EnvironmentOutlined,
   ShareAltOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -89,6 +90,7 @@ const DOMAIN_TABS: DomainTab[] = [
   { key: 'operations',  label: '门店运营' },
   { key: 'growth',      label: '客户增长' },
   { key: 'supply',      label: '供应链' },
+  { key: 'hr',          label: '人力资源' },
   { key: 'settings',    label: '设置', adminOnly: true },
 ];
 
@@ -253,6 +255,46 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
   ],
 
   // ═══════════════════════════════════════════════════════════
+  // 人力资源 — 业人一体化（替代乐才SaaS）
+  // ═══════════════════════════════════════════════════════════
+  hr: [
+    {
+      groupLabel: '人力概览',
+      items: [
+        { key: '/hr-dashboard',          icon: <DashboardOutlined />,   label: '人力仪表盘' },
+        { key: '/workforce',             icon: <TeamOutlined />,        label: '劳动力管理' },
+        { key: '/employee-roster',       icon: <UserOutlined />,        label: '员工花名册' },
+        { key: '/employee-lifecycle',    icon: <UserOutlined />,        label: '入离职管理' },
+      ],
+    },
+    {
+      groupLabel: '薪酬假勤',
+      items: [
+        { key: '/payroll',               icon: <DollarOutlined />,      label: '薪酬管理' },
+        { key: '/leave-management',      icon: <CalendarOutlined />,    label: '假勤管理' },
+        { key: '/schedule',              icon: <ScheduleOutlined />,    label: '排班管理' },
+        { key: '/attendance-report',     icon: <FileTextOutlined />,    label: '考勤报表' },
+      ],
+    },
+    {
+      groupLabel: '人才发展',
+      items: [
+        { key: '/recruitment',           icon: <UsergroupAddOutlined />,label: '招聘管理' },
+        { key: '/performance-review',    icon: <TrophyOutlined />,      label: '绩效考核' },
+        { key: '/training',              icon: <ReadOutlined />,        label: '培训管理' },
+        { key: '/contract-management',   icon: <FileTextOutlined />,    label: '合同管理' },
+      ],
+    },
+    {
+      groupLabel: '审批中心',
+      items: [
+        { key: '/approval-list',         icon: <CheckCircleOutlined />, label: '审批列表' },
+        { key: '/people-agent',          icon: <RobotOutlined />,       label: '人力AI Agent' },
+      ],
+    },
+  ],
+
+  // ═══════════════════════════════════════════════════════════
   // 设置（合并原"智能体"64项+平台治理 → 14项）— admin only
   // ═══════════════════════════════════════════════════════════
   settings: [
@@ -270,6 +312,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/integrations',        icon: <ApiOutlined />,          label: 'POS集成' },
         { key: '/llm-config',          icon: <SettingOutlined />,      label: 'LLM配置' },
         { key: '/edge-hub',            icon: <WifiOutlined />,         label: 'Edge Hub' },
+        { key: '/im-channels',         icon: <MessageOutlined />,      label: 'IM渠道管理' },
       ],
     },
     {
@@ -430,6 +473,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/isv-dashboard': 'ISV 看板',
   '/platform-analytics': '商业化总览',
   '/webhook-management': 'Webhook',
+  '/im-channels': 'IM渠道管理',
   '/api-billing': 'API 计费',
   '/developer-console': '开发者控制台',
   '/business-events': '事件中心',
@@ -538,11 +582,13 @@ const MainLayout: React.FC = () => {
   const [sidebarFilter, setSidebarFilter] = useState('');
   const [recentPages, setRecentPages] = useState<RecentPage[]>(getRecentPages);
 
-  // 路由变化时同步 domain + 记录最近访问
+  // 路由变化时同步 domain
   const effectiveDomain = ROUTE_TO_DOMAIN[location.pathname] || activeDomain;
-  if (effectiveDomain && effectiveDomain !== activeDomain) {
-    setActiveDomain(effectiveDomain);
-  }
+  React.useEffect(() => {
+    if (effectiveDomain && effectiveDomain !== activeDomain) {
+      setActiveDomain(effectiveDomain);
+    }
+  }, [effectiveDomain]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 记录最近访问页面
   React.useEffect(() => {

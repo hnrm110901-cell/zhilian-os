@@ -11,9 +11,13 @@ Compliance License Model
 - 消防验收合格证
 - 排污许可证
 """
+
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Date, DateTime, Text, Enum as SQLEnum, ForeignKey, Integer
+
+from sqlalchemy import Column, Date, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
@@ -21,24 +25,27 @@ from .base import Base, TimestampMixin
 
 class LicenseType(str, enum.Enum):
     """证照类型"""
-    FOOD_OPERATION = "food_operation"        # 食品经营许可证
-    HEALTH_CERT = "health_cert"              # 健康证（员工）
-    BUSINESS_LICENSE = "business_license"   # 营业执照
-    FIRE_SAFETY = "fire_safety"             # 消防验收合格证
-    SEWAGE_PERMIT = "sewage_permit"         # 排污许可证
-    OTHER = "other"                          # 其他
+
+    FOOD_OPERATION = "food_operation"  # 食品经营许可证
+    HEALTH_CERT = "health_cert"  # 健康证（员工）
+    BUSINESS_LICENSE = "business_license"  # 营业执照
+    FIRE_SAFETY = "fire_safety"  # 消防验收合格证
+    SEWAGE_PERMIT = "sewage_permit"  # 排污许可证
+    OTHER = "other"  # 其他
 
 
 class LicenseStatus(str, enum.Enum):
     """证照状态"""
-    VALID = "valid"           # 有效
+
+    VALID = "valid"  # 有效
     EXPIRE_SOON = "expire_soon"  # 即将到期（30天内）
-    EXPIRED = "expired"       # 已过期
-    UNKNOWN = "unknown"       # 未录入/未知
+    EXPIRED = "expired"  # 已过期
+    UNKNOWN = "unknown"  # 未录入/未知
 
 
 class ComplianceLicense(Base, TimestampMixin):
     """合规证照表"""
+
     __tablename__ = "compliance_licenses"
 
     id = Column(String(36), primary_key=True)
@@ -64,11 +71,7 @@ class ComplianceLicense(Base, TimestampMixin):
     status = Column(SQLEnum(LicenseStatus), default=LicenseStatus.VALID, index=True, comment="当前状态")
 
     # 提醒配置
-    remind_days_before = Column(
-        Integer,
-        default=30,
-        comment="提前多少天提醒（默认30天）"
-    )
+    remind_days_before = Column(Integer, default=30, comment="提前多少天提醒（默认30天）")
     last_reminded_at = Column(DateTime, comment="最近一次提醒时间")
 
     # 备注

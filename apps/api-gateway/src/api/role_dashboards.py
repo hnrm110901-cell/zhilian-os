@@ -6,6 +6,7 @@ Endpoints:
   GET /ceo                      — CEO 多门店驾驶舱
   GET /region                   — 区域负责人仪表盘
 """
+
 from __future__ import annotations
 
 from typing import List, Optional
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/api/v1/dashboards", tags=["role_dashboards"])
 
 @router.get("/ceo")
 async def ceo_dashboard(
-    period:   str           = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     brand_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -35,7 +36,7 @@ async def ceo_dashboard(
 @router.get("/region")
 async def region_dashboard(
     store_ids: str = Query(..., description="逗号分隔门店 ID"),
-    period:    str = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
     """区域负责人仪表盘（BFF）"""

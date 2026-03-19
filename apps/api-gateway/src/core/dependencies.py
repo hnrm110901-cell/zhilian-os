@@ -1,18 +1,20 @@
 """
 FastAPI dependencies for authentication and authorization
 """
-from typing import Optional, List
-from types import SimpleNamespace
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from .security import decode_access_token
+from types import SimpleNamespace
+from typing import List, Optional
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.user import User, UserRole
 from .config import settings
 from .database import get_db
-from .permissions import Permission, has_permission, has_any_permission
-from ..models.user import User, UserRole
+from .permissions import Permission, has_any_permission, has_permission
+from .security import decode_access_token
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
@@ -139,6 +141,18 @@ def require_all_permissions(*required_permissions: Permission):
         return current_user
 
     return permission_checker
+
+
+async def validate_store_brand(store_id: str, current_user: User) -> None:
+    """验证门店属于当前用户的品牌"""
+    if not current_user.brand_id:
+        return  # ADMIN 无品牌限制
+    from ..services.store_service import store_service
+    store = await store_service.get_store(store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="门店不存在")
+    if store.brand_id and store.brand_id != current_user.brand_id:
+        raise HTTPException(status_code=403, detail="无权访问该门店")
 
 
 async def get_current_tenant(

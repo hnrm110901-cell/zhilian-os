@@ -30,15 +30,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import structlog
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.reservation import Reservation, ReservationStatus, ReservationType
 from src.models.banquet_lifecycle import (
-    BanquetStage,
-    BanquetStageHistory,
-    STAGE_TRANSITIONS,
     INITIAL_STAGE,
     ROOM_LOCK_TIMEOUT_DAYS,
+    STAGE_TRANSITIONS,
+    BanquetStage,
+    BanquetStageHistory,
 )
+from src.models.reservation import Reservation, ReservationStatus, ReservationType
 from src.services.auspicious_date_service import AuspiciousDateService
 
 logger = structlog.get_logger()
@@ -46,11 +45,13 @@ logger = structlog.get_logger()
 
 class StageTransitionError(ValueError):
     """阶段转换不合法时抛出。"""
+
     pass
 
 
 class RoomConflictError(ValueError):
     """锁台冲突时抛出（容量超限 / 时间重叠）。"""
+
     pass
 
 
@@ -73,8 +74,8 @@ class BanquetLifecycleService:
     async def initialize_stage(
         self,
         reservation_id: str,
-        operator:       str = "system",
-        reason:         str = "宴会预约创建，进入销售漏斗",
+        operator: str = "system",
+        reason: str = "宴会预约创建，进入销售漏斗",
     ) -> Reservation:
         """
         初始化宴会预约的销售阶段（设为 lead）。
@@ -86,9 +87,7 @@ class BanquetLifecycleService:
         if reservation.reservation_type != ReservationType.BANQUET:
             raise StageTransitionError(f"预约 {reservation_id} 不是宴会类型，无法初始化阶段")
         if reservation.banquet_stage:
-            raise StageTransitionError(
-                f"预约 {reservation_id} 已有阶段 {reservation.banquet_stage}，请使用 advance_stage"
-            )
+            raise StageTransitionError(f"预约 {reservation_id} 已有阶段 {reservation.banquet_stage}，请使用 advance_stage")
 
         return await self._apply_stage_change(
             reservation=reservation,
@@ -101,11 +100,11 @@ class BanquetLifecycleService:
     async def advance_stage(
         self,
         reservation_id: str,
-        to_stage:       BanquetStage,
-        operator:       str                   = "system",
-        reason:         Optional[str]         = None,
-        metadata:       Optional[Dict[str, Any]] = None,
-        store_id:       str                   = "",
+        to_stage: BanquetStage,
+        operator: str = "system",
+        reason: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        store_id: str = "",
     ) -> Reservation:
         """
         推进宴会预约到指定阶段。
@@ -123,7 +122,7 @@ class BanquetLifecycleService:
             RoomConflictError:    锁台时资源冲突
         """
         reservation = await self._get_reservation(reservation_id)
-        from_stage  = reservation.banquet_stage
+        from_stage = reservation.banquet_stage
 
         # 1. 校验转换合法性
         self._validate_transition(from_stage, to_stage.value)
@@ -163,13 +162,13 @@ class BanquetLifecycleService:
             释放的预约 ID 列表
         """
         cutoff = datetime.utcnow() - timedelta(days=ROOM_LOCK_TIMEOUT_DAYS)
-        stmt   = select(Reservation).where(
+        stmt = select(Reservation).where(
             and_(
                 Reservation.banquet_stage == BanquetStage.ROOM_LOCK.value,
                 Reservation.room_locked_at <= cutoff,
             )
         )
-        rows     = (await self.db.execute(stmt)).scalars().all()
+        rows = (await self.db.execute(stmt)).scalars().all()
         released = []
 
         for r in rows:
@@ -192,7 +191,7 @@ class BanquetLifecycleService:
 
     async def get_pipeline(
         self,
-        store_id:       str,
+        store_id: str,
         event_date_gte: Optional[date] = None,
         event_date_lte: Optional[date] = None,
     ) -> Dict[str, Any]:
@@ -213,9 +212,9 @@ class BanquetLifecycleService:
         """
         stmt = select(Reservation).where(
             and_(
-                Reservation.store_id         == store_id,
+                Reservation.store_id == store_id,
                 Reservation.reservation_type == ReservationType.BANQUET,
-                Reservation.banquet_stage    != None,  # noqa: E711
+                Reservation.banquet_stage != None,  # noqa: E711
             )
         )
         if event_date_gte:
@@ -223,7 +222,7 @@ class BanquetLifecycleService:
         if event_date_lte:
             stmt = stmt.where(Reservation.reservation_date <= event_date_lte)
 
-        rows      = (await self.db.execute(stmt)).scalars().all()
+        rows = (await self.db.execute(stmt)).scalars().all()
         stages: Dict[str, List] = {s.value: [] for s in BanquetStage}
         total_rev = 0.0
 
@@ -231,23 +230,25 @@ class BanquetLifecycleService:
             stage = r.banquet_stage or BanquetStage.LEAD.value
             entry = self._reservation_summary(r)
             stages.setdefault(stage, []).append(entry)
-            if r.banquet_stage in (BanquetStage.SIGNED.value,
-                                    BanquetStage.PREPARATION.value,
-                                    BanquetStage.SERVICE.value,
-                                    BanquetStage.COMPLETED.value):
+            if r.banquet_stage in (
+                BanquetStage.SIGNED.value,
+                BanquetStage.PREPARATION.value,
+                BanquetStage.SERVICE.value,
+                BanquetStage.COMPLETED.value,
+            ):
                 total_rev += float(r.estimated_budget or 0) / 100  # 分→元
 
         return {
-            "store_id":               store_id,
-            "stages":                 stages,
-            "stage_counts":           {k: len(v) for k, v in stages.items()},
-            "total_banquets":         len(rows),
+            "store_id": store_id,
+            "stages": stages,
+            "stage_counts": {k: len(v) for k, v in stages.items()},
+            "total_banquets": len(rows),
             "total_confirmed_revenue": round(total_rev, 2),
         }
 
     async def get_funnel_stats(
         self,
-        store_id:  str,
+        store_id: str,
         days_back: int = 90,
     ) -> Dict[str, Any]:
         """
@@ -261,31 +262,29 @@ class BanquetLifecycleService:
             }
         """
         since = date.today() - timedelta(days=days_back)
-        stmt  = (
+        stmt = (
             select(
                 Reservation.banquet_stage,
                 func.count(Reservation.id).label("cnt"),
             )
             .where(
                 and_(
-                    Reservation.store_id         == store_id,
+                    Reservation.store_id == store_id,
                     Reservation.reservation_type == ReservationType.BANQUET,
                     Reservation.reservation_date >= since,
                 )
             )
             .group_by(Reservation.banquet_stage)
         )
-        rows   = (await self.db.execute(stmt)).all()
+        rows = (await self.db.execute(stmt)).all()
         counts = {r[0]: r[1] for r in rows if r[0]}
 
         # 转化率（相邻阶段比值）
-        ordered_stages = [s.value for s in BanquetStage if s not in (
-            BanquetStage.CANCELLED, BanquetStage.COMPLETED
-        )]
+        ordered_stages = [s.value for s in BanquetStage if s not in (BanquetStage.CANCELLED, BanquetStage.COMPLETED)]
         conversion_rates: Dict[str, float] = {}
         for i in range(len(ordered_stages) - 1):
-            fr  = ordered_stages[i]
-            to  = ordered_stages[i + 1]
+            fr = ordered_stages[i]
+            to = ordered_stages[i + 1]
             cnt = counts.get(fr, 0)
             nxt = counts.get(to, 0)
             if cnt > 0:
@@ -295,22 +294,22 @@ class BanquetLifecycleService:
         avg_days_to_signed = await self._calc_avg_days_to_signed(store_id, since)
 
         return {
-            "store_id":             store_id,
-            "days_back":            days_back,
-            "stage_counts":         counts,
-            "conversion_rates":     conversion_rates,
-            "avg_days_to_signed":   avg_days_to_signed,
-            "total_leads":          counts.get(BanquetStage.LEAD.value, 0),
-            "total_completed":      counts.get(BanquetStage.COMPLETED.value, 0),
+            "store_id": store_id,
+            "days_back": days_back,
+            "stage_counts": counts,
+            "conversion_rates": conversion_rates,
+            "avg_days_to_signed": avg_days_to_signed,
+            "total_leads": counts.get(BanquetStage.LEAD.value, 0),
+            "total_completed": counts.get(BanquetStage.COMPLETED.value, 0),
         }
 
     # ── 销控日历 ──────────────────────────────────────────────────────────────
 
     async def get_availability_calendar(
         self,
-        store_id:    str,
-        year:        int,
-        month:       int,
+        store_id: str,
+        year: int,
+        month: int,
         max_capacity: int = 200,
     ) -> Dict[str, Any]:
         """
@@ -325,9 +324,9 @@ class BanquetLifecycleService:
         - is_auspicious:    是否为好日子
         """
         auspicious_svc = AuspiciousDateService()
-        days_in_month  = monthrange(year, month)[1]
-        month_start    = date(year, month, 1)
-        month_end      = date(year, month, days_in_month)
+        days_in_month = monthrange(year, month)[1]
+        month_start = date(year, month, 1)
+        month_end = date(year, month, days_in_month)
 
         # 查询当月所有 BANQUET 预约（已锁台及之后阶段）
         stmt = select(
@@ -337,17 +336,19 @@ class BanquetLifecycleService:
             Reservation.room_name,
         ).where(
             and_(
-                Reservation.store_id         == store_id,
+                Reservation.store_id == store_id,
                 Reservation.reservation_type == ReservationType.BANQUET,
                 Reservation.reservation_date >= month_start,
                 Reservation.reservation_date <= month_end,
-                Reservation.banquet_stage.in_([
-                    BanquetStage.ROOM_LOCK.value,
-                    BanquetStage.SIGNED.value,
-                    BanquetStage.PREPARATION.value,
-                    BanquetStage.SERVICE.value,
-                    BanquetStage.COMPLETED.value,
-                ]),
+                Reservation.banquet_stage.in_(
+                    [
+                        BanquetStage.ROOM_LOCK.value,
+                        BanquetStage.SIGNED.value,
+                        BanquetStage.PREPARATION.value,
+                        BanquetStage.SERVICE.value,
+                        BanquetStage.COMPLETED.value,
+                    ]
+                ),
             )
         )
         rows = (await self.db.execute(stmt)).all()
@@ -367,29 +368,31 @@ class BanquetLifecycleService:
         # 构造日历
         calendar = []
         for day_num in range(1, days_in_month + 1):
-            d        = date(year, month, day_num)
-            info     = day_map.get(d, {"confirmed": 0, "locked": 0, "total_guests": 0})
-            ausp     = auspicious_svc.get_info(d)
-            guests   = info["total_guests"]
-            calendar.append({
-                "date":             d.isoformat(),
-                "weekday":          ["周一","周二","周三","周四","周五","周六","周日"][d.weekday()],
-                "confirmed_count":  info["confirmed"],
-                "locked_count":     info["locked"],
-                "total_guests":     guests,
-                "available":        guests < max_capacity,
-                "capacity_pct":     round(guests / max_capacity * 100, 1) if max_capacity > 0 else 0,
-                "demand_factor":    ausp.demand_factor,
-                "is_auspicious":    ausp.is_auspicious,
-                "auspicious_label": ausp.label if ausp.is_auspicious else None,
-            })
+            d = date(year, month, day_num)
+            info = day_map.get(d, {"confirmed": 0, "locked": 0, "total_guests": 0})
+            ausp = auspicious_svc.get_info(d)
+            guests = info["total_guests"]
+            calendar.append(
+                {
+                    "date": d.isoformat(),
+                    "weekday": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][d.weekday()],
+                    "confirmed_count": info["confirmed"],
+                    "locked_count": info["locked"],
+                    "total_guests": guests,
+                    "available": guests < max_capacity,
+                    "capacity_pct": round(guests / max_capacity * 100, 1) if max_capacity > 0 else 0,
+                    "demand_factor": ausp.demand_factor,
+                    "is_auspicious": ausp.is_auspicious,
+                    "auspicious_label": ausp.label if ausp.is_auspicious else None,
+                }
+            )
 
         return {
-            "store_id":     store_id,
-            "year":         year,
-            "month":        month,
+            "store_id": store_id,
+            "year": year,
+            "month": month,
             "max_capacity": max_capacity,
-            "calendar":     calendar,
+            "calendar": calendar,
             "auspicious_days": sum(1 for d in calendar if d["is_auspicious"]),
             "fully_booked_days": sum(1 for d in calendar if not d["available"]),
         }
@@ -407,13 +410,13 @@ class BanquetLifecycleService:
         rows = (await self.db.execute(stmt)).scalars().all()
         return [
             {
-                "id":           r.id,
-                "from_stage":   r.from_stage,
-                "to_stage":     r.to_stage,
-                "changed_by":   r.changed_by,
-                "changed_at":   r.changed_at.isoformat() if r.changed_at else None,
-                "reason":       r.reason,
-                "metadata":     r.metadata_,
+                "id": r.id,
+                "from_stage": r.from_stage,
+                "to_stage": r.to_stage,
+                "changed_by": r.changed_by,
+                "changed_at": r.changed_at.isoformat() if r.changed_at else None,
+                "reason": r.reason,
+                "metadata": r.metadata_,
             }
             for r in rows
         ]
@@ -421,8 +424,8 @@ class BanquetLifecycleService:
     # ── Private helpers ───────────────────────────────────────────────────────
 
     async def _get_reservation(self, reservation_id: str) -> Reservation:
-        stmt  = select(Reservation).where(Reservation.id == reservation_id)
-        r     = (await self.db.execute(stmt)).scalar_one_or_none()
+        stmt = select(Reservation).where(Reservation.id == reservation_id)
+        r = (await self.db.execute(stmt)).scalar_one_or_none()
         if not r:
             raise ValueError(f"预约不存在：{reservation_id}")
         return r
@@ -433,9 +436,7 @@ class BanquetLifecycleService:
         if from_stage is None:
             # 初始化：仅允许 → lead
             if to_stage != BanquetStage.LEAD.value:
-                raise StageTransitionError(
-                    f"初始化只能设为 lead，不能设为 {to_stage}"
-                )
+                raise StageTransitionError(f"初始化只能设为 lead，不能设为 {to_stage}")
             return
 
         allowed = STAGE_TRANSITIONS.get(from_stage, [])
@@ -448,7 +449,7 @@ class BanquetLifecycleService:
     async def _check_room_lock_conflict(
         self,
         reservation: Reservation,
-        store_id:    str,
+        store_id: str,
     ) -> None:
         """
         锁台前检查场地容量冲突（同日同场地已有锁台/签约宴会）。
@@ -457,37 +458,39 @@ class BanquetLifecycleService:
 
         stmt = select(Reservation).where(
             and_(
-                Reservation.store_id         == store_id,
+                Reservation.store_id == store_id,
                 Reservation.reservation_type == ReservationType.BANQUET,
                 Reservation.reservation_date == reservation.reservation_date,
-                Reservation.id               != reservation.id,
-                Reservation.banquet_stage.in_([
-                    BanquetStage.ROOM_LOCK.value,
-                    BanquetStage.SIGNED.value,
-                    BanquetStage.PREPARATION.value,
-                ]),
+                Reservation.id != reservation.id,
+                Reservation.banquet_stage.in_(
+                    [
+                        BanquetStage.ROOM_LOCK.value,
+                        BanquetStage.SIGNED.value,
+                        BanquetStage.PREPARATION.value,
+                    ]
+                ),
             )
         )
         existing = (await self.db.execute(stmt)).scalars().all()
         banquets_to_check = [
             {
-                "reservation_id":   r.id,
-                "party_size":       r.party_size,
+                "reservation_id": r.id,
+                "party_size": r.party_size,
                 "reservation_time": str(r.reservation_time) if r.reservation_time else None,
-                "venue":            r.room_name,
+                "venue": r.room_name,
             }
             for r in existing
-        ] + [{
-            "reservation_id":   reservation.id,
-            "party_size":       reservation.party_size,
-            "reservation_time": str(reservation.reservation_time) if reservation.reservation_time else None,
-            "venue":            reservation.room_name,
-        }]
+        ] + [
+            {
+                "reservation_id": reservation.id,
+                "party_size": reservation.party_size,
+                "reservation_time": str(reservation.reservation_time) if reservation.reservation_time else None,
+                "venue": reservation.room_name,
+            }
+        ]
 
         max_cap = int(os.getenv("BANQUET_MAX_CAPACITY", "200"))
-        result  = banquet_planning_engine.check_resource_conflicts(
-            banquets=banquets_to_check, max_capacity=max_cap
-        )
+        result = banquet_planning_engine.check_resource_conflicts(banquets=banquets_to_check, max_capacity=max_cap)
         if result["has_conflict"]:
             conflicts_str = "; ".join(c["description"] for c in result["conflicts"])
             raise RoomConflictError(f"锁台冲突检测到资源冲突：{conflicts_str}")
@@ -495,17 +498,17 @@ class BanquetLifecycleService:
     async def _apply_stage_change(
         self,
         reservation: Reservation,
-        from_stage:  Optional[str],
-        to_stage:    str,
-        operator:    str,
-        reason:      str,
-        metadata:    Optional[Dict[str, Any]] = None,
+        from_stage: Optional[str],
+        to_stage: str,
+        operator: str,
+        reason: str,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Reservation:
         """原子性更新 Reservation.banquet_stage + 追加 BanquetStageHistory。"""
         now = datetime.utcnow()
 
         # 更新 Reservation 字段
-        reservation.banquet_stage            = to_stage
+        reservation.banquet_stage = to_stage
         reservation.banquet_stage_updated_at = now
 
         # 阶段专属时间戳
@@ -534,21 +537,21 @@ class BanquetLifecycleService:
     async def _trigger_beo_on_signed(
         self,
         reservation: Reservation,
-        operator:    str,
+        operator: str,
     ) -> None:
         """签约后自动生成/刷新 BEO 单（非致命）。"""
         try:
             from src.services.banquet_planning_engine import banquet_planning_engine
 
             banquet_dict = {
-                "reservation_id":   reservation.id,
-                "customer_name":    reservation.customer_name,
-                "customer_phone":   reservation.customer_phone,
-                "party_size":       reservation.party_size,
+                "reservation_id": reservation.id,
+                "customer_name": reservation.customer_name,
+                "customer_phone": reservation.customer_phone,
+                "party_size": reservation.party_size,
                 "reservation_time": str(reservation.reservation_time) if reservation.reservation_time else None,
                 "estimated_budget": float(reservation.estimated_budget or 0) / 100,
-                "venue":            reservation.room_name,
-                "event_type":       "婚宴",
+                "venue": reservation.room_name,
+                "event_type": "婚宴",
                 "special_requests": reservation.special_requests,
             }
             beo = banquet_planning_engine.generate_beo(
@@ -557,13 +560,12 @@ class BanquetLifecycleService:
                 plan_date=reservation.reservation_date,
                 operator=operator,
             )
-            await banquet_planning_engine.save_beo(
-                beo=beo, banquet=banquet_dict, db=self.db, operator=operator
-            )
+            await banquet_planning_engine.save_beo(beo=beo, banquet=banquet_dict, db=self.db, operator=operator)
 
             # Bridge 2: BEO采购清单→自动采购建议（含企微通知厨房）
             try:
                 from src.services.lifecycle_bridge import trigger_procurement_from_beo
+
                 await trigger_procurement_from_beo(
                     session=self.db,
                     reservation_id=str(reservation.id),
@@ -585,37 +587,31 @@ class BanquetLifecycleService:
     async def _calc_avg_days_to_signed(
         self,
         store_id: str,
-        since:    date,
+        since: date,
     ) -> Optional[float]:
         """计算从 lead 到 signed 的平均天数（利用 stage_history 时间戳）。"""
         try:
-            lead_stmt = (
-                select(
-                    BanquetStageHistory.reservation_id,
-                    BanquetStageHistory.changed_at,
-                )
-                .where(
-                    and_(
-                        BanquetStageHistory.store_id  == store_id,
-                        BanquetStageHistory.to_stage  == BanquetStage.LEAD.value,
-                        BanquetStageHistory.changed_at >= datetime.combine(since, datetime.min.time()),
-                    )
+            lead_stmt = select(
+                BanquetStageHistory.reservation_id,
+                BanquetStageHistory.changed_at,
+            ).where(
+                and_(
+                    BanquetStageHistory.store_id == store_id,
+                    BanquetStageHistory.to_stage == BanquetStage.LEAD.value,
+                    BanquetStageHistory.changed_at >= datetime.combine(since, datetime.min.time()),
                 )
             )
-            signed_stmt = (
-                select(
-                    BanquetStageHistory.reservation_id,
-                    BanquetStageHistory.changed_at,
-                )
-                .where(
-                    and_(
-                        BanquetStageHistory.store_id  == store_id,
-                        BanquetStageHistory.to_stage  == BanquetStage.SIGNED.value,
-                        BanquetStageHistory.changed_at >= datetime.combine(since, datetime.min.time()),
-                    )
+            signed_stmt = select(
+                BanquetStageHistory.reservation_id,
+                BanquetStageHistory.changed_at,
+            ).where(
+                and_(
+                    BanquetStageHistory.store_id == store_id,
+                    BanquetStageHistory.to_stage == BanquetStage.SIGNED.value,
+                    BanquetStageHistory.changed_at >= datetime.combine(since, datetime.min.time()),
                 )
             )
-            leads   = {r[0]: r[1] for r in (await self.db.execute(lead_stmt)).all()}
+            leads = {r[0]: r[1] for r in (await self.db.execute(lead_stmt)).all()}
             signeds = {r[0]: r[1] for r in (await self.db.execute(signed_stmt)).all()}
 
             diffs = []
@@ -632,14 +628,14 @@ class BanquetLifecycleService:
     @staticmethod
     def _reservation_summary(r: Reservation) -> Dict[str, Any]:
         return {
-            "reservation_id":    r.id,
-            "customer_name":     r.customer_name,
-            "customer_phone":    r.customer_phone,
-            "reservation_date":  r.reservation_date.isoformat() if r.reservation_date else None,
-            "party_size":        r.party_size,
-            "estimated_budget":  round(float(r.estimated_budget or 0) / 100, 2),
-            "room_name":         r.room_name,
-            "banquet_stage":     r.banquet_stage,
-            "room_locked_at":    r.room_locked_at.isoformat() if r.room_locked_at else None,
-            "signed_at":         r.signed_at.isoformat() if r.signed_at else None,
+            "reservation_id": r.id,
+            "customer_name": r.customer_name,
+            "customer_phone": r.customer_phone,
+            "reservation_date": r.reservation_date.isoformat() if r.reservation_date else None,
+            "party_size": r.party_size,
+            "estimated_budget": round(float(r.estimated_budget or 0) / 100, 2),
+            "room_name": r.room_name,
+            "banquet_stage": r.banquet_stage,
+            "room_locked_at": r.room_locked_at.isoformat() if r.room_locked_at else None,
+            "signed_at": r.signed_at.isoformat() if r.signed_at else None,
         }

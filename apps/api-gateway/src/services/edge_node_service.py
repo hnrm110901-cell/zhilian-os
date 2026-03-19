@@ -3,19 +3,22 @@
 支持边缘计算和弱网环境下的降级运行
 确保门店在网络中断时仍能正常运营
 """
+
+import json
 import os
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-import structlog
 from enum import Enum
-import json
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 logger = structlog.get_logger()
 
 
 class OperationMode(str, Enum):
     """运行模式"""
+
     ONLINE = "online"  # 在线模式 (云端LLM)
     OFFLINE = "offline"  # 离线模式 (本地规则)
     HYBRID = "hybrid"  # 混合模式 (优先云端，降级本地)
@@ -23,6 +26,7 @@ class OperationMode(str, Enum):
 
 class NetworkStatus(str, Enum):
     """网络状态"""
+
     CONNECTED = "connected"  # 已连接
     DISCONNECTED = "disconnected"  # 已断开
     UNSTABLE = "unstable"  # 不稳定
@@ -44,20 +48,11 @@ class EdgeNodeService:
             "inventory_alert": {
                 "low_stock_threshold": 0.2,  # 库存低于20%预警
                 "critical_threshold": 0.1,  # 库存低于10%严重预警
-                "auto_order_threshold": 0.15  # 库存低于15%自动下单
+                "auto_order_threshold": 0.15,  # 库存低于15%自动下单
             },
-            "revenue_anomaly": {
-                "deviation_threshold": 0.3,  # 偏差超过30%预警
-                "comparison_days": 7  # 对比最近7天平均值
-            },
-            "order_timeout": {
-                "warning_minutes": 20,  # 20分钟预警
-                "critical_minutes": 30  # 30分钟严重预警
-            },
-            "schedule": {
-                "min_staff_ratio": 0.8,  # 最低人员配置比例
-                "peak_hour_buffer": 1.2  # 高峰时段人员缓冲
-            }
+            "revenue_anomaly": {"deviation_threshold": 0.3, "comparison_days": 7},  # 偏差超过30%预警  # 对比最近7天平均值
+            "order_timeout": {"warning_minutes": 20, "critical_minutes": 30},  # 20分钟预警  # 30分钟严重预警
+            "schedule": {"min_staff_ratio": 0.8, "peak_hour_buffer": 1.2},  # 最低人员配置比例  # 高峰时段人员缓冲
         }
 
     async def check_network_status(self) -> NetworkStatus:
@@ -69,6 +64,7 @@ class EdgeNodeService:
         """
         try:
             import socket
+
             cloud_host = os.getenv("CLOUD_API_HOST", "8.8.8.8")
             cloud_port = int(os.getenv("CLOUD_API_PORT", "53"))
             sock = socket.create_connection((cloud_host, cloud_port), timeout=3)
@@ -99,17 +95,13 @@ class EdgeNodeService:
             old_mode = self.mode
             self.mode = target_mode
 
-            logger.info(
-                "mode_switched",
-                old_mode=old_mode.value,
-                new_mode=target_mode.value
-            )
+            logger.info("mode_switched", old_mode=old_mode.value, new_mode=target_mode.value)
 
             return {
                 "success": True,
                 "old_mode": old_mode.value,
                 "new_mode": target_mode.value,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
@@ -145,11 +137,7 @@ class EdgeNodeService:
         except Exception as e:
             logger.error("handle_network_change_failed", error=str(e))
 
-    async def process_decision_offline(
-        self,
-        decision_type: str,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def process_decision_offline(self, decision_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         离线模式下处理决策
 
@@ -179,18 +167,14 @@ class EdgeNodeService:
                 return {
                     "success": False,
                     "error": f"Unsupported decision type in offline mode: {decision_type}",
-                    "mode": "offline"
+                    "mode": "offline",
                 }
 
         except Exception as e:
             logger.error("process_decision_offline_failed", error=str(e))
             raise
 
-    async def _offline_inventory_alert(
-        self,
-        context: Dict[str, Any],
-        rules: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _offline_inventory_alert(self, context: Dict[str, Any], rules: Dict[str, Any]) -> Dict[str, Any]:
         """离线模式库存预警"""
         current_stock = context.get("current_stock", 0)
         max_stock = context.get("max_stock", 100)
@@ -216,14 +200,10 @@ class EdgeNodeService:
             "alert_level": alert_level,
             "action": action,
             "stock_ratio": round(stock_ratio, 2),
-            "recommendation": f"库存比例{stock_ratio*100:.1f}%，建议{action}"
+            "recommendation": f"库存比例{stock_ratio*100:.1f}%，建议{action}",
         }
 
-    async def _offline_revenue_anomaly(
-        self,
-        context: Dict[str, Any],
-        rules: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _offline_revenue_anomaly(self, context: Dict[str, Any], rules: Dict[str, Any]) -> Dict[str, Any]:
         """离线模式营收异常检测"""
         current_revenue = context.get("current_revenue", 0)
         average_revenue = context.get("average_revenue", 0)
@@ -250,14 +230,10 @@ class EdgeNodeService:
             "alert_level": alert_level,
             "action": action,
             "deviation": round(deviation, 2),
-            "recommendation": f"营收偏差{deviation*100:.1f}%，建议{action}"
+            "recommendation": f"营收偏差{deviation*100:.1f}%，建议{action}",
         }
 
-    async def _offline_order_timeout(
-        self,
-        context: Dict[str, Any],
-        rules: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _offline_order_timeout(self, context: Dict[str, Any], rules: Dict[str, Any]) -> Dict[str, Any]:
         """离线模式订单超时检测"""
         wait_time = context.get("wait_time_minutes", 0)
 
@@ -278,14 +254,10 @@ class EdgeNodeService:
             "alert_level": alert_level,
             "action": action,
             "wait_time": wait_time,
-            "recommendation": f"等待时间{wait_time}分钟，建议{action}"
+            "recommendation": f"等待时间{wait_time}分钟，建议{action}",
         }
 
-    async def _offline_schedule_check(
-        self,
-        context: Dict[str, Any],
-        rules: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _offline_schedule_check(self, context: Dict[str, Any], rules: Dict[str, Any]) -> Dict[str, Any]:
         """离线模式排班检查"""
         current_staff = context.get("current_staff", 0)
         required_staff = context.get("required_staff", 0)
@@ -317,7 +289,7 @@ class EdgeNodeService:
             "alert_level": alert_level,
             "action": action,
             "staff_ratio": round(staff_ratio, 2),
-            "recommendation": f"人员配置{staff_ratio*100:.1f}%，建议{action}"
+            "recommendation": f"人员配置{staff_ratio*100:.1f}%，建议{action}",
         }
 
     async def cache_data(self, key: str, data: Any, ttl: int = int(os.getenv("EDGE_CACHE_TTL", "3600"))):
@@ -330,11 +302,7 @@ class EdgeNodeService:
             ttl: 过期时间（秒）
         """
         try:
-            self.local_cache[key] = {
-                "data": data,
-                "timestamp": datetime.utcnow(),
-                "ttl": ttl
-            }
+            self.local_cache[key] = {"data": data, "timestamp": datetime.utcnow(), "ttl": ttl}
 
             logger.debug("data_cached", key=key, ttl=ttl)
 
@@ -383,11 +351,7 @@ class EdgeNodeService:
             operation["sync_id"] = str(uuid.uuid4())
             self.pending_sync_queue.append(operation)
 
-            logger.info(
-                "operation_queued_for_sync",
-                sync_id=operation["sync_id"],
-                operation_type=operation.get("type")
-            )
+            logger.info("operation_queued_for_sync", sync_id=operation["sync_id"], operation_type=operation.get("type"))
 
         except Exception as e:
             logger.error("queue_for_sync_failed", error=str(e))
@@ -401,11 +365,7 @@ class EdgeNodeService:
         """
         try:
             if not self.pending_sync_queue:
-                return {
-                    "success": True,
-                    "synced_count": 0,
-                    "message": "No data to sync"
-                }
+                return {"success": True, "synced_count": 0, "message": "No data to sync"}
 
             synced_count = 0
             failed_count = 0
@@ -415,12 +375,10 @@ class EdgeNodeService:
                 try:
                     cloud_url = os.getenv("CLOUD_SYNC_URL", "http://localhost:8000/api/v1/sync")
                     import urllib.request
+
                     data = json.dumps(operation, default=str).encode("utf-8")
                     req = urllib.request.Request(
-                        cloud_url,
-                        data=data,
-                        headers={"Content-Type": "application/json"},
-                        method="POST"
+                        cloud_url, data=data, headers={"Content-Type": "application/json"}, method="POST"
                     )
                     with urllib.request.urlopen(req, timeout=10) as resp:
                         if resp.status in (200, 201, 204):
@@ -428,35 +386,21 @@ class EdgeNodeService:
                             self.pending_sync_queue.remove(operation)
                         else:
                             failed_count += 1
-                            failed_operations.append({
-                                "sync_id": operation["sync_id"],
-                                "error": f"HTTP {resp.status}"
-                            })
+                            failed_operations.append({"sync_id": operation["sync_id"], "error": f"HTTP {resp.status}"})
 
-                    logger.info(
-                        "operation_synced",
-                        sync_id=operation["sync_id"],
-                        operation_type=operation.get("type")
-                    )
+                    logger.info("operation_synced", sync_id=operation["sync_id"], operation_type=operation.get("type"))
 
                 except Exception as e:
                     failed_count += 1
-                    failed_operations.append({
-                        "sync_id": operation["sync_id"],
-                        "error": str(e)
-                    })
-                    logger.error(
-                        "operation_sync_failed",
-                        sync_id=operation["sync_id"],
-                        error=str(e)
-                    )
+                    failed_operations.append({"sync_id": operation["sync_id"], "error": str(e)})
+                    logger.error("operation_sync_failed", sync_id=operation["sync_id"], error=str(e))
 
             return {
                 "success": True,
                 "synced_count": synced_count,
                 "failed_count": failed_count,
                 "failed_operations": failed_operations,
-                "remaining_queue_size": len(self.pending_sync_queue)
+                "remaining_queue_size": len(self.pending_sync_queue),
             }
 
         except Exception as e:
@@ -476,15 +420,15 @@ class EdgeNodeService:
             "cache_size": len(self.local_cache),
             "pending_sync_count": len(self.pending_sync_queue),
             "offline_rules_loaded": len(self.offline_rules),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
     # ── v2.0：离线基础查询（断网可用）─────────────────────────────────────────
 
     async def query_revenue_offline(
         self,
-        store_id:  str,
-        date_str:  Optional[str] = None,
+        store_id: str,
+        date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         离线查询营业额（断网时返回本地缓存数据）。
@@ -499,18 +443,18 @@ class EdgeNodeService:
             {"store_id", "date", "revenue_yuan", "is_estimate", "source", "cached_at"}
         """
         target_date = date_str or datetime.utcnow().strftime("%Y-%m-%d")
-        cache_key   = f"revenue:{store_id}:{target_date}"
+        cache_key = f"revenue:{store_id}:{target_date}"
 
         cached = await self.get_cached_data(cache_key)
         if cached:
             return {
-                "store_id":    store_id,
-                "date":        target_date,
+                "store_id": store_id,
+                "date": target_date,
                 "revenue_yuan": cached.get("revenue_yuan", 0.0),
                 "is_estimate": cached.get("is_estimate", False),
-                "source":      "local_cache",
-                "cached_at":   cached.get("cached_at", "unknown"),
-                "mode":        "offline",
+                "source": "local_cache",
+                "cached_at": cached.get("cached_at", "unknown"),
+                "mode": "offline",
             }
 
         # 回退：读取历史均值缓存（写入时 key 为 revenue_avg:{store_id}）
@@ -525,13 +469,13 @@ class EdgeNodeService:
             estimated=est_revenue,
         )
         return {
-            "store_id":    store_id,
-            "date":        target_date,
+            "store_id": store_id,
+            "date": target_date,
             "revenue_yuan": est_revenue,
             "is_estimate": True,
-            "source":      "historical_avg",
-            "cached_at":   None,
-            "mode":        "offline",
+            "source": "historical_avg",
+            "cached_at": None,
+            "mode": "offline",
         }
 
     async def query_inventory_offline(
@@ -549,62 +493,70 @@ class EdgeNodeService:
              "out_of_stock_count", "snapshot_at", "source", "mode"}
         """
         cache_key = f"inventory_snapshot:{store_id}"
-        cached    = await self.get_cached_data(cache_key)
+        cached = await self.get_cached_data(cache_key)
 
         if cached:
             items = cached.get("items", [])
-            low_stock     = sum(1 for i in items if i.get("status") in ("low", "critical"))
-            out_of_stock  = sum(1 for i in items if i.get("status") == "out_of_stock")
+            low_stock = sum(1 for i in items if i.get("status") in ("low", "critical"))
+            out_of_stock = sum(1 for i in items if i.get("status") == "out_of_stock")
             return {
-                "store_id":        store_id,
-                "items":           items,
-                "item_count":      len(items),
+                "store_id": store_id,
+                "items": items,
+                "item_count": len(items),
                 "low_stock_count": low_stock,
                 "out_of_stock_count": out_of_stock,
-                "snapshot_at":     cached.get("snapshot_at", "unknown"),
-                "source":          "local_cache",
-                "mode":            "offline",
+                "snapshot_at": cached.get("snapshot_at", "unknown"),
+                "source": "local_cache",
+                "mode": "offline",
             }
 
         logger.warning("query_inventory_offline.no_cache", store_id=store_id)
         return {
-            "store_id":        store_id,
-            "items":           [],
-            "item_count":      0,
+            "store_id": store_id,
+            "items": [],
+            "item_count": 0,
             "low_stock_count": 0,
             "out_of_stock_count": 0,
-            "snapshot_at":     None,
-            "source":          "no_cache",
-            "mode":            "offline",
+            "snapshot_at": None,
+            "source": "no_cache",
+            "mode": "offline",
         }
 
     async def update_revenue_cache(
         self,
-        store_id:     str,
-        date_str:     str,
+        store_id: str,
+        date_str: str,
         revenue_yuan: float,
-        ttl:          int = 86400 * 3,   # 保留3天
+        ttl: int = 86400 * 3,  # 保留3天
     ) -> None:
         """在线时主动写入营业额缓存（供离线时使用）。"""
         cache_key = f"revenue:{store_id}:{date_str}"
-        await self.cache_data(cache_key, {
-            "revenue_yuan": revenue_yuan,
-            "is_estimate":  False,
-            "cached_at":    datetime.utcnow().isoformat(),
-        }, ttl=ttl)
+        await self.cache_data(
+            cache_key,
+            {
+                "revenue_yuan": revenue_yuan,
+                "is_estimate": False,
+                "cached_at": datetime.utcnow().isoformat(),
+            },
+            ttl=ttl,
+        )
 
     async def update_inventory_cache(
         self,
-        store_id:     str,
-        items:        List[Dict[str, Any]],
-        ttl:          int = 3600 * 4,    # 4小时内有效
+        store_id: str,
+        items: List[Dict[str, Any]],
+        ttl: int = 3600 * 4,  # 4小时内有效
     ) -> None:
         """在线时主动写入库存快照缓存（供离线时使用）。"""
         cache_key = f"inventory_snapshot:{store_id}"
-        await self.cache_data(cache_key, {
-            "items":       items,
-            "snapshot_at": datetime.utcnow().isoformat(),
-        }, ttl=ttl)
+        await self.cache_data(
+            cache_key,
+            {
+                "items": items,
+                "snapshot_at": datetime.utcnow().isoformat(),
+            },
+            ttl=ttl,
+        )
 
 
 # 全局实例

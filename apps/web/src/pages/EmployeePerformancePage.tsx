@@ -46,7 +46,7 @@ function rateTag(r: number | null | undefined) {
 
 const EmployeePerformancePage: React.FC = () => {
   const [stores, setStores]           = useState<any[]>([]);
-  const [storeId, setStoreId]         = useState('STORE001');
+  const [storeId, setStoreId]         = useState(localStorage.getItem('store_id') || '');
   const [period, setPeriod]           = useState<Dayjs>(dayjs().subtract(1, 'month'));
   const [loading, setLoading]         = useState(false);
   const [computing, setComputing]     = useState(false);
@@ -231,7 +231,6 @@ const EmployeePerformancePage: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.id || s.store_id} value={s.id || s.store_id}>{s.name}</Option>)
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
           <DatePicker
             picker="month"

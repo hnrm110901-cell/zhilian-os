@@ -118,8 +118,8 @@ const OpsMonitoringPage: React.FC = () => {
       })
       .catch(() => {
         // fallback：使用示例门店ID
-        setStoreIds(['STORE001', 'STORE002', 'STORE003']);
-        setSelectedStore('STORE001');
+        setStoreIds([]);
+        setSelectedStore('');
       });
   }, []);
 

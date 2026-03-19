@@ -18,7 +18,7 @@ const ModelMarketplacePage: React.FC = () => {
   const [purchaseSubmitting, setPurchaseSubmitting] = useState(false);
   const [contributeSubmitting, setContributeSubmitting] = useState(false);
   const [selectedModel, setSelectedModel] = useState<any>(null);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [contributeForm] = Form.useForm();
 
@@ -144,7 +144,6 @@ const ModelMarketplacePage: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 180 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
         </Space>
         <Space>

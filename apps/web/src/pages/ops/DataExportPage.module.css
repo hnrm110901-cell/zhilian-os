@@ -1,0 +1,169 @@
+/* DataExportPage.module.css */
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+}
+
+.header p {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0 0 12px;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.templateCard {
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 2px solid transparent;
+  padding: 20px 12px !important;
+}
+
+.templateCard:hover {
+  border-color: var(--accent, #FF6B2C);
+}
+
+.templateCardActive {
+  border-color: var(--accent, #FF6B2C);
+  background: color-mix(in srgb, var(--accent, #FF6B2C) 5%, transparent);
+}
+
+.templateIcon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.templateName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.filterBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--bg-raised, #f9fafb);
+  border-radius: 10px;
+  border: 1px solid var(--border-default, #e5e7eb);
+}
+
+.filterLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.filterInput {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: #fff;
+  outline: none;
+  font-family: inherit;
+}
+
+.filterInput:focus {
+  border-color: var(--accent, #FF6B2C);
+}
+
+.filterSelect {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: #fff;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.exportBtn {
+  height: 34px;
+  padding: 0 18px;
+  background: var(--accent, #FF6B2C);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-left: auto;
+}
+
+.exportBtn:hover {
+  opacity: 0.85;
+}
+
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.downloadBtn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--accent, #FF6B2C);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent, #FF6B2C);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.downloadBtn:hover {
+  background: var(--accent, #FF6B2C);
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .cardGrid { grid-template-columns: repeat(2, 1fr); }
+  .filterBar { flex-direction: column; align-items: stretch; }
+}

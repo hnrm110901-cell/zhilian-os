@@ -1,28 +1,27 @@
 """
 易订HTTP客户端 - YiDing HTTP Client
 
-处理与易订API的HTTP通信,包括:
-- 请求签名和认证
-- 自动重试机制
-- 错误处理
-- 日志记录
+基于真实易订开放API（https://open.zhidianfan.com/yidingopen/）
+认证方式：appid + secret → access_token
 """
 
 import asyncio
-import hashlib
 import os
-import secrets
+import ssl
 import time
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 import aiohttp
 import structlog
-from aiohttp import ClientSession, ClientTimeout, ClientError
+from aiohttp import ClientSession, ClientTimeout, ClientError, TCPConnector
 
 from .types import YiDingConfig
 
 logger = structlog.get_logger()
+
+# 默认基础URL
+DEFAULT_BASE_URL = "https://open.zhidianfan.com/yidingopen/"
 
 
 class YiDingAPIError(Exception):
@@ -31,50 +30,62 @@ class YiDingAPIError(Exception):
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        error_code: Optional[str] = None,
+        error_code: Optional[int] = None,
         response_data: Optional[Dict[str, Any]] = None
     ):
         super().__init__(message)
         self.message = message
-        self.status_code = status_code
         self.error_code = error_code
         self.response_data = response_data
 
 
 class YiDingClient:
-    """易订HTTP客户端"""
+    """
+    易订HTTP客户端
+
+    认证流程：
+    1. GET /auth/token?appid=xxx&secret=xxx → access_token
+    2. 后续请求通过 access_token 参数传递
+    """
 
     def __init__(self, config: YiDingConfig):
-        """
-        初始化易订客户端
-
-        Args:
-            config: 易订配置
-        """
         self.config = config
-        self.base_url = config["base_url"]
-        self.app_id = config["app_id"]
-        self.app_secret = config["app_secret"]
+        self.base_url = config.get("base_url", DEFAULT_BASE_URL)
+        if not self.base_url.endswith("/"):
+            self.base_url += "/"
+        self.appid = config["appid"]
+        self.secret = config["secret"]
+        self.hotel_id = config.get("hotel_id")
         self.timeout = config.get("timeout", int(os.getenv("YIDING_TIMEOUT", "10")))
         self.max_retries = config.get("max_retries", int(os.getenv("YIDING_MAX_RETRIES", "3")))
 
-        self.logger = logger.bind(
-            adapter="yiding",
-            app_id=self.app_id
-        )
+        self.logger = logger.bind(adapter="yiding", appid=self.appid)
 
         self._session: Optional[ClientSession] = None
+        self._access_token: Optional[str] = None
+        self._token_time: float = 0
+        self._business_name: Optional[str] = None
 
     async def _get_session(self) -> ClientSession:
         """获取或创建HTTP会话"""
         if self._session is None or self._session.closed:
             timeout = ClientTimeout(total=self.timeout)
+            # 尝试使用certifi证书，如不可用则跳过SSL验证
+            ssl_context: Any = None
+            try:
+                import certifi
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+            connector = TCPConnector(ssl=ssl_context)
             self._session = ClientSession(
                 timeout=timeout,
+                connector=connector,
                 headers={
                     "Content-Type": "application/json",
-                    "User-Agent": "ZhilianOS/1.0"
+                    "User-Agent": "TunxiangOS/1.0"
                 }
             )
         return self._session
@@ -84,70 +95,91 @@ class YiDingClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    def _generate_signature(self, timestamp: str, nonce: str) -> str:
+    async def get_token(self) -> str:
         """
-        生成请求签名
+        获取access_token
 
-        签名算法: SHA256(app_id + timestamp + nonce + app_secret)
-
-        Args:
-            timestamp: 时间戳
-            nonce: 随机字符串
+        GET /auth/token?appid=xxx&secret=xxx
 
         Returns:
-            签名字符串
+            access_token字符串
+
+        Raises:
+            YiDingAPIError: 认证失败
         """
-        sign_string = f"{self.app_id}{timestamp}{nonce}{self.app_secret}"
-        return hashlib.sha256(sign_string.encode()).hexdigest()
+        # Token有效期内复用（假设1小时有效，提前5分钟刷新）
+        if self._access_token and (time.time() - self._token_time) < 3300:
+            return self._access_token
 
-    def _generate_nonce(self) -> str:
-        """生成随机字符串"""
-        return secrets.token_hex(int(os.getenv("YIDING_NONCE_LENGTH", "16")))
+        session = await self._get_session()
+        url = urljoin(self.base_url, "auth/token")
 
-    def _get_auth_headers(self) -> Dict[str, str]:
-        """
-        获取认证请求头
+        self.logger.info("yiding_get_token", url=url)
 
-        Returns:
-            包含认证信息的请求头
-        """
-        timestamp = str(int(time.time() * 1000))
-        nonce = self._generate_nonce()
-        signature = self._generate_signature(timestamp, nonce)
+        try:
+            async with session.get(
+                url,
+                params={"appid": self.appid, "secret": self.secret}
+            ) as response:
+                data = await response.json()
 
-        return {
-            "X-YiDing-AppId": self.app_id,
-            "X-YiDing-Timestamp": timestamp,
-            "X-YiDing-Nonce": nonce,
-            "X-YiDing-Signature": signature
-        }
+                if data.get("error_code") != 0:
+                    error_msg = data.get("error_msg", "认证失败")
+                    self.logger.error(
+                        "yiding_token_failed",
+                        error_code=data.get("error_code"),
+                        error_msg=error_msg
+                    )
+                    raise YiDingAPIError(
+                        message=f"易订认证失败: {error_msg}",
+                        error_code=data.get("error_code"),
+                        response_data=data
+                    )
+
+                token_data = data.get("data", {})
+                self._access_token = token_data.get("access_token")
+                self._business_name = token_data.get("business_name")
+                self._token_time = time.time()
+
+                self.logger.info(
+                    "yiding_token_ok",
+                    business_name=self._business_name
+                )
+
+                return self._access_token
+
+        except (ClientError, asyncio.TimeoutError) as e:
+            raise YiDingAPIError(f"易订认证请求失败: {str(e)}")
 
     async def _request(
         self,
         method: str,
         path: str,
+        params: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        need_token: bool = True,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        发送HTTP请求(带重试)
+        发送HTTP请求（带token和重试）
 
-        Args:
-            method: HTTP方法
-            path: API路径
-            **kwargs: 其他请求参数
-
-        Returns:
-            响应数据
-
-        Raises:
-            YiDingAPIError: API调用失败
+        易订API约定：
+        - GET请求：access_token放query params
+        - POST/PUT请求：access_token放JSON body
+        - 响应：error_code=0表示成功
         """
-        url = urljoin(self.base_url, path)
         session = await self._get_session()
+        url = urljoin(self.base_url, path)
 
-        # 添加认证头
-        headers = kwargs.pop("headers", {})
-        headers.update(self._get_auth_headers())
+        # 获取token并注入
+        if need_token:
+            token = await self.get_token()
+            if method.upper() == "GET":
+                params = params or {}
+                params["access_token"] = token
+            else:
+                json = json or {}
+                json["access_token"] = token
 
         last_error = None
 
@@ -160,63 +192,57 @@ class YiDingClient:
                     attempt=attempt + 1
                 )
 
+                request_kwargs = {**kwargs}
+                if params:
+                    request_kwargs["params"] = params
+                if json:
+                    request_kwargs["json"] = json
+
                 async with session.request(
                     method,
                     url,
-                    headers=headers,
-                    **kwargs
+                    **request_kwargs
                 ) as response:
-                    # 记录响应
-                    self.logger.info(
-                        "yiding_api_response",
-                        status=response.status,
-                        url=url
-                    )
-
-                    # 读取响应体
                     try:
                         data = await response.json()
                     except Exception:
-                        data = {"text": await response.text()}
-
-                    # 检查HTTP状态码
-                    if response.status >= 400:
-                        error_message = data.get("message", "易订API调用失败")
-                        error_code = data.get("code")
-
-                        self.logger.error(
-                            "yiding_api_error",
-                            status=response.status,
-                            error_code=error_code,
-                            message=error_message
+                        text = await response.text()
+                        raise YiDingAPIError(
+                            f"易订API返回非JSON: {text[:200]}"
                         )
+
+                    self.logger.info(
+                        "yiding_api_response",
+                        status=response.status,
+                        error_code=data.get("error_code")
+                    )
+
+                    # 检查业务错误码
+                    error_code = data.get("error_code")
+                    if error_code is not None and int(error_code) != 0:
+                        error_msg = data.get("error_msg", "未知错误")
+
+                        # token过期，清除后重试
+                        if int(error_code) in (-2, -3):
+                            self._access_token = None
+                            self._token_time = 0
+                            if attempt < self.max_retries - 1:
+                                self.logger.warning(
+                                    "yiding_token_expired_retry",
+                                    attempt=attempt + 1
+                                )
+                                continue
 
                         raise YiDingAPIError(
-                            message=error_message,
-                            status_code=response.status,
-                            error_code=error_code,
-                            response_data=data
-                        )
-
-                    # 检查业务状态码
-                    if not data.get("success", True):
-                        error_message = data.get("message", "业务处理失败")
-                        error_code = data.get("code")
-
-                        self.logger.error(
-                            "yiding_business_error",
-                            error_code=error_code,
-                            message=error_message
-                        )
-
-                        raise YiDingAPIError(
-                            message=error_message,
-                            error_code=error_code,
+                            message=f"易订API错误: {error_msg}",
+                            error_code=int(error_code),
                             response_data=data
                         )
 
                     return data
 
+            except YiDingAPIError:
+                raise
             except (ClientError, asyncio.TimeoutError) as e:
                 last_error = e
                 self.logger.warning(
@@ -224,14 +250,11 @@ class YiDingClient:
                     attempt=attempt + 1,
                     error=str(e)
                 )
-
-                # 如果不是最后一次尝试,等待后重试
                 if attempt < self.max_retries - 1:
-                    wait_time = int(os.getenv("YIDING_RETRY_BACKOFF_BASE", "2")) ** attempt  # 指数退避
+                    wait_time = 2 ** attempt
                     await asyncio.sleep(wait_time)
                     continue
 
-        # 所有重试都失败
         error_msg = f"易订API调用失败,已重试{self.max_retries}次: {str(last_error)}"
         self.logger.error("yiding_request_exhausted", error=error_msg)
         raise YiDingAPIError(error_msg)
@@ -242,17 +265,7 @@ class YiDingClient:
         params: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        发送GET请求
-
-        Args:
-            path: API路径
-            params: 查询参数
-            **kwargs: 其他请求参数
-
-        Returns:
-            响应数据
-        """
+        """GET请求"""
         return await self._request("GET", path, params=params, **kwargs)
 
     async def post(
@@ -261,17 +274,7 @@ class YiDingClient:
         json: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        发送POST请求
-
-        Args:
-            path: API路径
-            json: JSON请求体
-            **kwargs: 其他请求参数
-
-        Returns:
-            响应数据
-        """
+        """POST请求"""
         return await self._request("POST", path, json=json, **kwargs)
 
     async def put(
@@ -280,45 +283,18 @@ class YiDingClient:
         json: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        发送PUT请求
-
-        Args:
-            path: API路径
-            json: JSON请求体
-            **kwargs: 其他请求参数
-
-        Returns:
-            响应数据
-        """
+        """PUT请求"""
         return await self._request("PUT", path, json=json, **kwargs)
-
-    async def delete(
-        self,
-        path: str,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        发送DELETE请求
-
-        Args:
-            path: API路径
-            **kwargs: 其他请求参数
-
-        Returns:
-            响应数据
-        """
-        return await self._request("DELETE", path, **kwargs)
 
     async def ping(self) -> bool:
         """
-        健康检查
+        健康检查（通过获取token验证连通性）
 
         Returns:
             是否健康
         """
         try:
-            await self.get("/api/health")
+            await self.get_token()
             return True
         except Exception as e:
             self.logger.error("yiding_health_check_failed", error=str(e))

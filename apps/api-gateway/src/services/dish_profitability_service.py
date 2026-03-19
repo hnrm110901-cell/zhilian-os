@@ -15,6 +15,7 @@ BCG 四象限菜单工程：
   gross_profit      = revenue_yuan − food_cost_yuan
   gross_profit_margin = gross_profit / revenue_yuan × 100
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -29,28 +30,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 BCG_QUADRANTS = ("star", "cash_cow", "question_mark", "dog")
 
 BCG_LABELS = {
-    "star":          "明星菜",
-    "cash_cow":      "金牛菜",
+    "star": "明星菜",
+    "cash_cow": "金牛菜",
     "question_mark": "问题菜",
-    "dog":           "瘦狗菜",
+    "dog": "瘦狗菜",
 }
 
 BCG_ACTIONS = {
-    "star":          "主推爆款，保持曝光，维持食材成本稳定",
-    "cash_cow":      "分析成本结构，适度提价或压缩食材成本，保量增利",
+    "star": "主推爆款，保持曝光，维持食材成本稳定",
+    "cash_cow": "分析成本结构，适度提价或压缩食材成本，保量增利",
     "question_mark": "加强推广（搭配套餐/促销），提升点单率",
-    "dog":           "评估保留价值，逐步缩减份量或考虑下架",
+    "dog": "评估保留价值，逐步缩减份量或考虑下架",
 }
 
 BCG_COLORS = {
-    "star":          "#52c41a",
-    "cash_cow":      "#1677ff",
+    "star": "#52c41a",
+    "cash_cow": "#1677ff",
     "question_mark": "#fa8c16",
-    "dog":           "#ff4d4f",
+    "dog": "#ff4d4f",
 }
 
 
 # ── 内部工具 ──────────────────────────────────────────────────────────────────
+
 
 def _safe_float(val) -> Optional[float]:
     if val is None:
@@ -77,6 +79,7 @@ def _prev_period(period: str) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 # 纯函数层
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def compute_food_cost_rate(revenue: float, food_cost: float) -> float:
     """food_cost / revenue × 100。revenue = 0 → 0.0。"""
@@ -130,8 +133,8 @@ def classify_bcg_quadrant(popularity_pct: float, profit_pct: float) -> str:
       low  pop + high profit → question_mark
       low  pop + low  profit → dog
     """
-    high_pop    = popularity_pct >= 50.0
-    high_profit = profit_pct    >= 50.0
+    high_pop = popularity_pct >= 50.0
+    high_profit = profit_pct >= 50.0
     if high_pop and high_profit:
         return "star"
     if high_pop and not high_profit:
@@ -150,7 +153,7 @@ def generate_dish_insight(
     revenue_yuan: float,
 ) -> str:
     """生成菜品分析描述（≤150字）。"""
-    label  = BCG_LABELS.get(bcg_quadrant, bcg_quadrant)
+    label = BCG_LABELS.get(bcg_quadrant, bcg_quadrant)
     action = BCG_ACTIONS.get(bcg_quadrant, "")
     parts = [
         f"【{label}】{dish_name}：",
@@ -177,86 +180,93 @@ def build_dish_records(
     # 计算衍生指标
     dishes: List[Dict[str, Any]] = []
     for d in raw_dishes:
-        rev  = _to_float(d.get("revenue_yuan"))
-        fc   = _to_float(d.get("food_cost_yuan"))
-        cnt  = int(d.get("order_count", 0))
-        dishes.append({
-            "dish_id":            d.get("dish_id", ""),
-            "dish_name":          d.get("dish_name", ""),
-            "category":           d.get("category", ""),
-            "order_count":        cnt,
-            "revenue_yuan":       rev,
-            "food_cost_yuan":     fc,
-            "avg_selling_price":  compute_avg_selling_price(rev, cnt),
-            "food_cost_rate":     compute_food_cost_rate(rev, fc),
-            "gross_profit_yuan":  compute_gross_profit(rev, fc),
-            "gross_profit_margin": compute_gross_profit_margin(rev, fc),
-        })
+        rev = _to_float(d.get("revenue_yuan"))
+        fc = _to_float(d.get("food_cost_yuan"))
+        cnt = int(d.get("order_count", 0))
+        dishes.append(
+            {
+                "dish_id": d.get("dish_id", ""),
+                "dish_name": d.get("dish_name", ""),
+                "category": d.get("category", ""),
+                "order_count": cnt,
+                "revenue_yuan": rev,
+                "food_cost_yuan": fc,
+                "avg_selling_price": compute_avg_selling_price(rev, cnt),
+                "food_cost_rate": compute_food_cost_rate(rev, fc),
+                "gross_profit_yuan": compute_gross_profit(rev, fc),
+                "gross_profit_margin": compute_gross_profit_margin(rev, fc),
+            }
+        )
 
-    all_counts   = [d["order_count"]        for d in dishes]
-    all_margins  = [d["gross_profit_margin"] for d in dishes]
+    all_counts = [d["order_count"] for d in dishes]
+    all_margins = [d["gross_profit_margin"] for d in dishes]
 
     results: List[Dict[str, Any]] = []
     for d in dishes:
-        pop_rank  = compute_rank(d["order_count"],        all_counts,  higher_is_better=True)
+        pop_rank = compute_rank(d["order_count"], all_counts, higher_is_better=True)
         prof_rank = compute_rank(d["gross_profit_margin"], all_margins, higher_is_better=True)
-        pop_pct   = compute_percentile(d["order_count"],        all_counts,  higher_is_better=True)
-        prof_pct  = compute_percentile(d["gross_profit_margin"], all_margins, higher_is_better=True)
-        quadrant  = classify_bcg_quadrant(pop_pct, prof_pct)
+        pop_pct = compute_percentile(d["order_count"], all_counts, higher_is_better=True)
+        prof_pct = compute_percentile(d["gross_profit_margin"], all_margins, higher_is_better=True)
+        quadrant = classify_bcg_quadrant(pop_pct, prof_pct)
 
-        results.append({
-            "store_id":            store_id,
-            "period":              period,
-            "dish_id":             d["dish_id"],
-            "dish_name":           d["dish_name"],
-            "category":            d["category"],
-            "order_count":         d["order_count"],
-            "avg_selling_price":   round(d["avg_selling_price"], 2),
-            "revenue_yuan":        round(d["revenue_yuan"], 2),
-            "food_cost_yuan":      round(d["food_cost_yuan"], 2),
-            "food_cost_rate":      round(d["food_cost_rate"], 2),
-            "gross_profit_yuan":   round(d["gross_profit_yuan"], 2),
-            "gross_profit_margin": round(d["gross_profit_margin"], 2),
-            "popularity_rank":     pop_rank,
-            "profitability_rank":  prof_rank,
-            "popularity_percentile": pop_pct,
-            "profit_percentile":   prof_pct,
-            "bcg_quadrant":        quadrant,
-            "insight":             generate_dish_insight(
-                d["dish_name"], quadrant,
-                d["food_cost_rate"], d["gross_profit_margin"],
-                d["order_count"], d["revenue_yuan"],
-            ),
-        })
+        results.append(
+            {
+                "store_id": store_id,
+                "period": period,
+                "dish_id": d["dish_id"],
+                "dish_name": d["dish_name"],
+                "category": d["category"],
+                "order_count": d["order_count"],
+                "avg_selling_price": round(d["avg_selling_price"], 2),
+                "revenue_yuan": round(d["revenue_yuan"], 2),
+                "food_cost_yuan": round(d["food_cost_yuan"], 2),
+                "food_cost_rate": round(d["food_cost_rate"], 2),
+                "gross_profit_yuan": round(d["gross_profit_yuan"], 2),
+                "gross_profit_margin": round(d["gross_profit_margin"], 2),
+                "popularity_rank": pop_rank,
+                "profitability_rank": prof_rank,
+                "popularity_percentile": pop_pct,
+                "profit_percentile": prof_pct,
+                "bcg_quadrant": quadrant,
+                "insight": generate_dish_insight(
+                    d["dish_name"],
+                    quadrant,
+                    d["food_cost_rate"],
+                    d["gross_profit_margin"],
+                    d["order_count"],
+                    d["revenue_yuan"],
+                ),
+            }
+        )
     return results
 
 
 def summarize_bcg(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     """统计 BCG 四象限分布及每象限的收入/毛利贡献。"""
-    summary: Dict[str, Any] = {q: {"count": 0, "revenue_yuan": 0.0, "gross_profit_yuan": 0.0}
-                                for q in BCG_QUADRANTS}
+    summary: Dict[str, Any] = {q: {"count": 0, "revenue_yuan": 0.0, "gross_profit_yuan": 0.0} for q in BCG_QUADRANTS}
     total_rev = 0.0
     for r in records:
         q = r.get("bcg_quadrant", "dog")
         if q not in summary:
             q = "dog"
-        summary[q]["count"]            += 1
-        summary[q]["revenue_yuan"]     += r.get("revenue_yuan", 0)
+        summary[q]["count"] += 1
+        summary[q]["revenue_yuan"] += r.get("revenue_yuan", 0)
         summary[q]["gross_profit_yuan"] += r.get("gross_profit_yuan", 0)
         total_rev += r.get("revenue_yuan", 0)
 
     for q in BCG_QUADRANTS:
         rev = summary[q]["revenue_yuan"]
         summary[q]["revenue_share_pct"] = round(rev / total_rev * 100, 1) if total_rev > 0 else 0.0
-        summary[q]["label"]  = BCG_LABELS[q]
+        summary[q]["label"] = BCG_LABELS[q]
         summary[q]["action"] = BCG_ACTIONS[q]
-        summary[q]["color"]  = BCG_COLORS[q]
+        summary[q]["color"] = BCG_COLORS[q]
     return summary
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DB 函数层
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 async def _upsert_dish_record(db: AsyncSession, rec: Dict[str, Any]) -> None:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -294,15 +304,24 @@ async def _upsert_dish_record(db: AsyncSession, rec: Dict[str, Any]) -> None:
                 updated_at            = EXCLUDED.updated_at
         """),
         {
-            "sid": rec["store_id"], "period": rec["period"],
-            "did": rec["dish_id"], "dname": rec["dish_name"], "cat": rec["category"],
-            "cnt": rec["order_count"], "asp": rec["avg_selling_price"],
-            "rev": rec["revenue_yuan"], "fc": rec["food_cost_yuan"],
-            "fcr": rec["food_cost_rate"], "gp": rec["gross_profit_yuan"],
+            "sid": rec["store_id"],
+            "period": rec["period"],
+            "did": rec["dish_id"],
+            "dname": rec["dish_name"],
+            "cat": rec["category"],
+            "cnt": rec["order_count"],
+            "asp": rec["avg_selling_price"],
+            "rev": rec["revenue_yuan"],
+            "fc": rec["food_cost_yuan"],
+            "fcr": rec["food_cost_rate"],
+            "gp": rec["gross_profit_yuan"],
             "gpm": rec["gross_profit_margin"],
-            "pop_rank": rec["popularity_rank"], "prof_rank": rec["profitability_rank"],
-            "pop_pct": rec["popularity_percentile"], "prof_pct": rec["profit_percentile"],
-            "bcg": rec["bcg_quadrant"], "now": now,
+            "pop_rank": rec["popularity_rank"],
+            "prof_rank": rec["profitability_rank"],
+            "pop_pct": rec["popularity_percentile"],
+            "prof_pct": rec["profit_percentile"],
+            "bcg": rec["bcg_quadrant"],
+            "now": now,
         },
     )
 
@@ -338,11 +357,11 @@ async def _fetch_raw_dish_sales(
     )
     return [
         {
-            "dish_id":       r[0],
-            "dish_name":     r[1],
-            "category":      r[2],
-            "order_count":   int(r[3]),
-            "revenue_yuan":  _to_float(r[4]),
+            "dish_id": r[0],
+            "dish_name": r[1],
+            "category": r[2],
+            "order_count": int(r[3]),
+            "revenue_yuan": _to_float(r[4]),
             "food_cost_yuan": _to_float(r[5]),
         }
         for r in rows.fetchall()
@@ -368,11 +387,11 @@ async def compute_dish_profitability(
 
     bcg_summary = summarize_bcg(records)
     return {
-        "store_id":   store_id,
-        "period":     period,
+        "store_id": store_id,
+        "period": period,
         "dish_count": len(records),
         "bcg_summary": bcg_summary,
-        "records":    records,
+        "records": records,
     }
 
 
@@ -424,23 +443,23 @@ async def get_dish_profitability(
 
 def _row_to_dict(r) -> Dict[str, Any]:
     return {
-        "dish_id":             r[0],
-        "dish_name":           r[1],
-        "category":            r[2],
-        "order_count":         r[3],
-        "avg_selling_price":   _safe_float(r[4]),
-        "revenue_yuan":        _safe_float(r[5]),
-        "food_cost_yuan":      _safe_float(r[6]),
-        "food_cost_rate":      _safe_float(r[7]),
-        "gross_profit_yuan":   _safe_float(r[8]),
+        "dish_id": r[0],
+        "dish_name": r[1],
+        "category": r[2],
+        "order_count": r[3],
+        "avg_selling_price": _safe_float(r[4]),
+        "revenue_yuan": _safe_float(r[5]),
+        "food_cost_yuan": _safe_float(r[6]),
+        "food_cost_rate": _safe_float(r[7]),
+        "gross_profit_yuan": _safe_float(r[8]),
         "gross_profit_margin": _safe_float(r[9]),
-        "popularity_rank":     r[10],
-        "profitability_rank":  r[11],
+        "popularity_rank": r[10],
+        "profitability_rank": r[11],
         "popularity_percentile": _safe_float(r[12]),
-        "profit_percentile":   _safe_float(r[13]),
-        "bcg_quadrant":        r[14],
-        "bcg_label":           BCG_LABELS.get(r[14], r[14]),
-        "bcg_action":          BCG_ACTIONS.get(r[14], ""),
+        "profit_percentile": _safe_float(r[13]),
+        "bcg_quadrant": r[14],
+        "bcg_label": BCG_LABELS.get(r[14], r[14]),
+        "bcg_action": BCG_ACTIONS.get(r[14], ""),
     }
 
 
@@ -472,15 +491,15 @@ async def get_bcg_summary(
         rev = _to_float(r[2])
         total_rev += rev
         raw[q] = {
-            "quadrant":         q,
-            "label":            BCG_LABELS.get(q, q),
-            "action":           BCG_ACTIONS.get(q, ""),
-            "color":            BCG_COLORS.get(q, "#8c8c8c"),
-            "dish_count":       int(r[1]),
-            "revenue_yuan":     round(rev, 2),
+            "quadrant": q,
+            "label": BCG_LABELS.get(q, q),
+            "action": BCG_ACTIONS.get(q, ""),
+            "color": BCG_COLORS.get(q, "#8c8c8c"),
+            "dish_count": int(r[1]),
+            "revenue_yuan": round(rev, 2),
             "gross_profit_yuan": round(_to_float(r[3]), 2),
-            "avg_gpm":          round(_to_float(r[4]), 2),
-            "avg_fcr":          round(_to_float(r[5]), 2),
+            "avg_gpm": round(_to_float(r[4]), 2),
+            "avg_fcr": round(_to_float(r[5]), 2),
         }
 
     for q, v in raw.items():
@@ -490,14 +509,20 @@ async def get_bcg_summary(
     for q in BCG_QUADRANTS:
         if q not in raw:
             raw[q] = {
-                "quadrant": q, "label": BCG_LABELS[q], "action": BCG_ACTIONS[q],
-                "color": BCG_COLORS[q], "dish_count": 0,
-                "revenue_yuan": 0.0, "gross_profit_yuan": 0.0,
-                "avg_gpm": 0.0, "avg_fcr": 0.0, "revenue_share_pct": 0.0,
+                "quadrant": q,
+                "label": BCG_LABELS[q],
+                "action": BCG_ACTIONS[q],
+                "color": BCG_COLORS[q],
+                "dish_count": 0,
+                "revenue_yuan": 0.0,
+                "gross_profit_yuan": 0.0,
+                "avg_gpm": 0.0,
+                "avg_fcr": 0.0,
+                "revenue_share_pct": 0.0,
             }
     return {
-        "store_id":    store_id,
-        "period":      period,
+        "store_id": store_id,
+        "period": period,
         "total_revenue": round(total_rev, 2),
         "by_quadrant": [raw[q] for q in BCG_QUADRANTS],
     }
@@ -511,10 +536,18 @@ async def get_top_dishes(
     limit: int = 10,
 ) -> List[Dict[str, Any]]:
     """按指定指标排序返回 Top N 菜品。"""
-    safe_metric = metric if metric in (
-        "gross_profit_yuan", "revenue_yuan", "order_count",
-        "gross_profit_margin", "food_cost_rate",
-    ) else "gross_profit_yuan"
+    safe_metric = (
+        metric
+        if metric
+        in (
+            "gross_profit_yuan",
+            "revenue_yuan",
+            "order_count",
+            "gross_profit_margin",
+            "food_cost_rate",
+        )
+        else "gross_profit_yuan"
+    )
     order = "ASC" if safe_metric == "food_cost_rate" else "DESC"
 
     rows = await db.execute(
@@ -557,16 +590,16 @@ async def get_dish_trend(
     )
     records = [
         {
-            "period":              r[0],
-            "order_count":         r[1],
-            "revenue_yuan":        _safe_float(r[2]),
-            "food_cost_rate":      _safe_float(r[3]),
-            "gross_profit_yuan":   _safe_float(r[4]),
+            "period": r[0],
+            "order_count": r[1],
+            "revenue_yuan": _safe_float(r[2]),
+            "food_cost_rate": _safe_float(r[3]),
+            "gross_profit_yuan": _safe_float(r[4]),
             "gross_profit_margin": _safe_float(r[5]),
-            "bcg_quadrant":        r[6],
-            "bcg_label":           BCG_LABELS.get(r[6], r[6]),
-            "popularity_rank":     r[7],
-            "profitability_rank":  r[8],
+            "bcg_quadrant": r[6],
+            "bcg_label": BCG_LABELS.get(r[6], r[6]),
+            "popularity_rank": r[7],
+            "profitability_rank": r[8],
         }
         for r in rows.fetchall()
     ]
@@ -597,13 +630,13 @@ async def get_category_summary(
     )
     return [
         {
-            "category":       r[0] or "其他",
-            "dish_count":     int(r[1]),
-            "total_orders":   int(r[2]),
-            "total_revenue":  round(_to_float(r[3]), 2),
-            "total_gp":       round(_to_float(r[4]), 2),
-            "avg_gpm":        round(_to_float(r[5]), 2),
-            "avg_fcr":        round(_to_float(r[6]), 2),
+            "category": r[0] or "其他",
+            "dish_count": int(r[1]),
+            "total_orders": int(r[2]),
+            "total_revenue": round(_to_float(r[3]), 2),
+            "total_gp": round(_to_float(r[4]), 2),
+            "avg_gpm": round(_to_float(r[5]), 2),
+            "avg_fcr": round(_to_float(r[6]), 2),
         }
         for r in rows.fetchall()
     ]

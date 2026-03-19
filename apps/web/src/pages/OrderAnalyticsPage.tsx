@@ -16,7 +16,7 @@ const { RangePicker } = DatePicker;
 const OrderAnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [granularity, setGranularity] = useState<'hour' | 'day'>('hour');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs(), dayjs()]);
   const [trendData, setTrendData] = useState<any>(null);
@@ -111,7 +111,6 @@ const OrderAnalyticsPage: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.id || s.store_id} value={s.id || s.store_id}>{s.name}</Option>)
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
           <RangePicker
             value={dateRange}

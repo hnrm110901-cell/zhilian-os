@@ -9,21 +9,24 @@ Sprint 2 KPI: RFM 偏差 < 5%
 3. 同步更新 ConsumerIdentity + PrivateDomainMember 两侧 RFM
 4. 偏差校验：对比 CDP RFM 与旧 RFM 的差异率
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import select, update, func, text as _text, and_
+from sqlalchemy import and_, func, select
+from sqlalchemy import text as _text
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.consumer_identity import ConsumerIdentity
-from src.models.private_domain import PrivateDomainMember
 from src.models.order import Order
+from src.models.private_domain import PrivateDomainMember
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数：RFM 评分逻辑 ─────────────────────────────────────────
+
 
 def score_recency(days: int) -> int:
     """R评分：距最近消费天数 → 1-5（越近越高）"""
@@ -198,7 +201,8 @@ class CDPRFMService:
         await db.flush()
         logger.info(
             "CDP RFM recalculated: consumers=%d members=%d",
-            consumers_updated, members_updated,
+            consumers_updated,
+            members_updated,
         )
         return {
             "consumers_updated": consumers_updated,
@@ -380,16 +384,15 @@ class CDPRFMService:
                     continue
 
                 consumer_id = await identity_resolution_service.resolve(
-                    db, phone,
+                    db,
+                    phone,
                     store_id=sid,
                     wechat_openid=openid,
                     source="private_domain_backfill",
                 )
 
                 await db.execute(
-                    update(PrivateDomainMember)
-                    .where(PrivateDomainMember.id == member_id)
-                    .values(consumer_id=consumer_id)
+                    update(PrivateDomainMember).where(PrivateDomainMember.id == member_id).values(consumer_id=consumer_id)
                 )
                 linked += 1
             except Exception as e:
@@ -399,7 +402,9 @@ class CDPRFMService:
         await db.flush()
         logger.info(
             "CDP member backfill: total=%d linked=%d failed=%d",
-            total, linked, failed,
+            total,
+            linked,
+            failed,
         )
         return {"total": total, "linked": linked, "failed": failed}
 

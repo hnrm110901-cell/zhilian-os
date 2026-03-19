@@ -2,17 +2,18 @@
 客户自助预订服务
 公开H5页面使用，通过手机号+验证码认证
 """
-import uuid
+
 import secrets
-from datetime import date, time, datetime, timedelta
-from typing import Optional, List, Dict, Any
+import uuid
+from datetime import date, datetime, time, timedelta
+from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.reservation import Reservation, ReservationStatus, ReservationType
-from ..models.reservation_channel import ReservationChannel, ChannelType
+from ..models.reservation_channel import ChannelType, ReservationChannel
 from ..models.store import Store
 
 logger = structlog.get_logger()
@@ -31,6 +32,7 @@ class PublicReservationService:
     async def _get_redis(self):
         if self._redis is None:
             from .redis_cache_service import RedisCacheService
+
             cache = RedisCacheService()
             await cache.initialize()
             self._redis = cache._redis
@@ -58,9 +60,7 @@ class PublicReservationService:
 
     async def get_public_stores(self, session: AsyncSession) -> List[Dict[str, Any]]:
         """获取门店列表（仅公开信息：名称/地址）"""
-        result = await session.execute(
-            select(Store).where(Store.is_active == True)
-        )
+        result = await session.execute(select(Store).where(Store.is_active == True))
         stores = result.scalars().all()
         return [
             {
@@ -87,12 +87,14 @@ class PublicReservationService:
                 and_(
                     Reservation.store_id == store_id,
                     Reservation.reservation_date == target_date,
-                    Reservation.status.in_([
-                        ReservationStatus.PENDING,
-                        ReservationStatus.CONFIRMED,
-                        ReservationStatus.ARRIVED,
-                        ReservationStatus.SEATED,
-                    ]),
+                    Reservation.status.in_(
+                        [
+                            ReservationStatus.PENDING,
+                            ReservationStatus.CONFIRMED,
+                            ReservationStatus.ARRIVED,
+                            ReservationStatus.SEATED,
+                        ]
+                    ),
                 )
             )
         )
@@ -114,12 +116,14 @@ class PublicReservationService:
                     time_str = f"{h:02d}:{m:02d}"
                     booked = booked_by_time.get(time_str, 0)
                     available = max(0, capacity_per_slot - booked)
-                    slots.append({
-                        "time": time_str,
-                        "meal_period": meal,
-                        "booked": booked,
-                        "available": available,
-                    })
+                    slots.append(
+                        {
+                            "time": time_str,
+                            "meal_period": meal,
+                            "booked": booked,
+                            "available": available,
+                        }
+                    )
 
         # 桌型信息
         table_types = [
@@ -181,10 +185,7 @@ class PublicReservationService:
         await session.commit()
         await session.refresh(reservation)
 
-        logger.info("public_reservation_created",
-                     reservation_id=reservation_id,
-                     store_id=store_id,
-                     phone=phone[-4:])
+        logger.info("public_reservation_created", reservation_id=reservation_id, store_id=store_id, phone=phone[-4:])
         return reservation
 
     # ── 查询我的预订 ──
@@ -232,8 +233,7 @@ class PublicReservationService:
         await session.commit()
         await session.refresh(reservation)
 
-        logger.info("public_reservation_cancelled",
-                     reservation_id=reservation_id, phone=phone[-4:])
+        logger.info("public_reservation_cancelled", reservation_id=reservation_id, phone=phone[-4:])
         return reservation
 
 

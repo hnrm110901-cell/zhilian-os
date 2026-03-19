@@ -4,9 +4,10 @@ QR 扫码登录服务
 桌面端生成 QR 码 → 手机扫码 → 企业微信内确认 → 桌面端轮询登录。
 QR 会话存储在 Redis，TTL 300s，状态机：pending → scanned → confirmed / expired。
 """
+
+import json
 import logging
 import uuid
-import json
 from typing import Optional
 
 from ..core.config import settings
@@ -36,6 +37,7 @@ class QRLoginService:
         """懒加载 Redis 连接"""
         if self._redis is None:
             from .redis_cache_service import RedisCacheService
+
             cache = RedisCacheService()
             await cache.initialize()
             self._redis = cache._redis
@@ -172,6 +174,7 @@ class QRLoginService:
         corp_id = getattr(settings, "WECHAT_WORK_CORP_ID", None) or ""
         if corp_id:
             import urllib.parse
+
             encoded = urllib.parse.quote(confirm_url, safe="")
             return (
                 f"https://open.weixin.qq.com/connect/oauth2/authorize"
@@ -186,9 +189,7 @@ class QRLoginService:
         # 开发环境：直接返回确认页 URL
         return confirm_url
 
-    async def _update_status(
-        self, qr_id: str, expected: str, new_status: str
-    ) -> bool:
+    async def _update_status(self, qr_id: str, expected: str, new_status: str) -> bool:
         """原子性更新 QR 会话状态"""
         redis = await self._get_redis()
         session_key = f"{_QR_SESSION_PREFIX}{qr_id}"

@@ -27,7 +27,7 @@ const PHASE_CONFIG: Record<string, { label: string; color: string; antColor: str
   exit:    { label: '退出', color: '#C53030', antColor: 'red' },
 };
 
-const DEFAULT_STORE = 'S001';
+const DEFAULT_STORE = localStorage.getItem('store_id') || '';
 const DEFAULT_PERIOD = dayjs().subtract(1, 'month').format('YYYY-MM');
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────

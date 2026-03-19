@@ -1,5 +1,5 @@
 /* ═══ 屯象OS Design System · CSS Variables ═══ */
-/* v3 设计系统 — 亮色优先 + Mint #0AAF9A */
+/* v4 Apple Aesthetics — 亮色优先 + Mint #0AAF9A */
 /* 注意: 大部分变量由 injectTokens() 在运行时注入 */
 /* 此文件仅定义 CSS-only 场景的 fallback */
 
@@ -15,14 +15,32 @@
   --warning-color: #F2994A;
   --error-color:   #EB5757;
   --info-color:    #2D9CDB;
+
+  /* ── Apple-style 圆角体系 ── */
+  --radius-xs:   6px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+  --radius-2xl:  24px;
+  --radius-full: 9999px;
+
+  /* ── 过渡动效 ── */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-slow:   400ms;
+  --transition-base: 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ── 亮色主题（默认） ── */
 [data-theme='light'] {
-  /* 背景层 */
+  /* 背景层 — 更温和的灰底 */
   --bg-primary:    #FFFFFF;
   --bg-secondary:  #FAFAFA;
-  --bg-tertiary:   #F5F6F8;
+  --bg-tertiary:   #F2F4F7;
   --bg-elevated:   #FFFFFF;
 
   /* 文字层 */
@@ -31,75 +49,76 @@
   --text-tertiary:  #9CA3AF;
   --text-disabled:  #D1D5DB;
 
-  /* 边框 & 分割线 */
-  --border-color:  #E5E7EB;
-  --border-light:  #F3F4F6;
-  --divider-color: #F3F4F6;
+  /* 边框 & 分割线 — 更轻薄 */
+  --border-color:  rgba(0,0,0,0.06);
+  --border-light:  rgba(0,0,0,0.04);
+  --divider-color: rgba(0,0,0,0.04);
 
   /* 语义别名 */
-  --bg:             #F5F6F8;
+  --bg:             #F2F4F7;
   --surface:        #FFFFFF;
-  --surface-hover:  #F9FAFB;
-  --border:         #E5E7EB;
+  --surface-hover:  rgba(0,0,0,0.025);
+  --border:         rgba(0,0,0,0.06);
   --accent:         #0AAF9A;
-  --accent-soft:    rgba(10,175,154,0.08);
+  --accent-soft:    rgba(10,175,154,0.07);
   --accent-hover:   #099987;
   --accent-active:  #078070;
-  --accent-bg:      #E6F7F5;
+  --accent-bg:      rgba(10,175,154,0.06);
   --green:          #16A34A;
   --red:            #DC2626;
   --yellow:         #D97706;
   --blue:           #2563EB;
 
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
-  --shadow-xl: 0 8px 24px rgba(0,0,0,0.12);
+  /* 阴影 — Apple 风格多层阴影 */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.03);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
 
   /* ── 导航 & 侧边栏专用 token ── */
-  --nav-bg:               #FFFFFF;
-  --nav-border:           #E5E7EB;
-  --nav-shadow:           0 1px 0 #E5E7EB;
-  --sidebar-bg:           #FFFFFF;
-  --sidebar-border:       #E5E7EB;
+  --nav-bg:               rgba(255,255,255,0.82);
+  --nav-border:           rgba(0,0,0,0.06);
+  --nav-shadow:           0 1px 3px rgba(0,0,0,0.04);
+  --sidebar-bg:           rgba(255,255,255,0.6);
+  --sidebar-border:       rgba(0,0,0,0.04);
 
   /* 标签页 */
   --tab-inactive:         #6B7280;
   --tab-hover-color:      #1D2939;
-  --tab-hover-bg:         #F5F6F8;
+  --tab-hover-bg:         rgba(0,0,0,0.04);
 
   /* 搜索框 */
-  --search-bg:            #F5F6F8;
-  --search-border:        #E5E7EB;
+  --search-bg:            rgba(0,0,0,0.03);
+  --search-border:        rgba(0,0,0,0.06);
   --search-text:          #9CA3AF;
-  --search-kbd-bg:        #EEF0F4;
+  --search-kbd-bg:        rgba(0,0,0,0.04);
   --search-kbd-text:      #9CA3AF;
 
   /* 图标按钮 */
   --icon-btn-color:       #6B7280;
-  --icon-btn-hover-bg:    #F5F6F8;
+  --icon-btn-hover-bg:    rgba(0,0,0,0.04);
   --icon-btn-active-color:#1D2939;
 
   /* 侧边栏条目 */
   --sidebar-item-color:   #4B5563;
   --sidebar-group-color:  #9CA3AF;
   --sidebar-toggle-color: #C8CDD6;
-  --sidebar-item-hover-bg:#F5F6F8;
+  --sidebar-item-hover-bg:rgba(0,0,0,0.04);
 
   /* 面包屑 */
   --breadcrumb-color:     #9CA3AF;
   --breadcrumb-current:   #1D2939;
 
   /* 内容区 */
-  --content-outer-bg:     #F5F6F8;
+  --content-outer-bg:     #F2F4F7;
   --content-inner-bg:     #FFFFFF;
-  --content-inner-border: #E5E7EB;
-  --content-inner-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --content-inner-border: rgba(0,0,0,0.04);
+  --content-inner-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
 
   /* 页脚 */
   --footer-color:         #D1D5DB;
-  --footer-border:        #F3F4F6;
+  --footer-border:        rgba(0,0,0,0.04);
 }
 
 /* ── 深色主题 ── */
@@ -114,35 +133,36 @@
   --text-tertiary:  rgba(255,255,255,0.38);
   --text-disabled:  rgba(255,255,255,0.08);
 
-  --border-color: rgba(255,255,255,0.10);
-  --border-light: rgba(255,255,255,0.08);
-  --divider-color: rgba(255,255,255,0.08);
+  --border-color: rgba(255,255,255,0.08);
+  --border-light: rgba(255,255,255,0.05);
+  --divider-color: rgba(255,255,255,0.05);
 
   --bg:             #0B1A20;
   --surface:        #0D2029;
-  --surface-hover:  #132830;
-  --border:         rgba(255,255,255,0.08);
+  --surface-hover:  rgba(255,255,255,0.04);
+  --border:         rgba(255,255,255,0.06);
   --accent:         #0AAF9A;
-  --accent-soft:    rgba(10,175,154,0.15);
+  --accent-soft:    rgba(10,175,154,0.12);
   --accent-hover:   #26C9B4;
   --accent-active:  #4DD3C2;
-  --accent-bg:      rgba(10,175,154,0.10);
+  --accent-bg:      rgba(10,175,154,0.08);
   --green:          #34D399;
   --red:            #F87171;
   --yellow:         #FBBF24;
   --blue:           #60A5FA;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 2px 8px rgba(0,0,0,0.4);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.5);
-  --shadow-xl: 0 8px 24px rgba(0,0,0,0.6);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.15);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.25);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
 
   /* ── 导航 & 侧边栏专用 token ── */
-  --nav-bg:               #0B1A20;
-  --nav-border:           rgba(255,255,255,0.08);
+  --nav-bg:               rgba(11,26,32,0.82);
+  --nav-border:           rgba(255,255,255,0.06);
   --nav-shadow:           none;
-  --sidebar-bg:           #0B1A20;
-  --sidebar-border:       rgba(255,255,255,0.08);
+  --sidebar-bg:           rgba(11,26,32,0.6);
+  --sidebar-border:       rgba(255,255,255,0.05);
 
   /* 标签页 */
   --tab-inactive:         rgba(255,255,255,0.50);
@@ -151,14 +171,14 @@
 
   /* 搜索框 */
   --search-bg:            rgba(255,255,255,0.06);
-  --search-border:        rgba(255,255,255,0.10);
+  --search-border:        rgba(255,255,255,0.08);
   --search-text:          rgba(255,255,255,0.50);
-  --search-kbd-bg:        rgba(255,255,255,0.08);
+  --search-kbd-bg:        rgba(255,255,255,0.06);
   --search-kbd-text:      rgba(255,255,255,0.38);
 
   /* 图标按钮 */
   --icon-btn-color:       rgba(255,255,255,0.50);
-  --icon-btn-hover-bg:    rgba(255,255,255,0.08);
+  --icon-btn-hover-bg:    rgba(255,255,255,0.06);
   --icon-btn-active-color:rgba(255,255,255,0.92);
 
   /* 侧边栏条目 */
@@ -174,10 +194,10 @@
   /* 内容区 */
   --content-outer-bg:     #091518;
   --content-inner-bg:     #0D2029;
-  --content-inner-border: rgba(255,255,255,0.08);
+  --content-inner-border: rgba(255,255,255,0.05);
   --content-inner-shadow: 0 1px 3px rgba(0,0,0,0.2);
 
   /* 页脚 */
   --footer-color:         rgba(255,255,255,0.25);
-  --footer-border:        rgba(255,255,255,0.06);
+  --footer-border:        rgba(255,255,255,0.05);
 }

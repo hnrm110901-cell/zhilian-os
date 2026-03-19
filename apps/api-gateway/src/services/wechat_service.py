@@ -9,13 +9,15 @@ INFRA-002 增强：
 - 发送失败写入告警队列（Redis List）
 - retry_failed_messages()：从告警队列批量重试
 """
-from typing import Dict, Any, List, Optional
-import json
+
 import hashlib
-import httpx
+import json
 import os
-import structlog
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import httpx
+import structlog
 
 from ..core.config import settings
 
@@ -36,7 +38,6 @@ TEMPLATES: Dict[str, Any] = {
         f"申请时间：{data.get('created_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}\n"
         f"---\n请尽快审批处理"
     ),
-
     "anomaly_alert": lambda data: (
         f"【异常告警】\n"
         f"门店：{data.get('store_name', data.get('store_id', ''))}\n"
@@ -46,7 +47,6 @@ TEMPLATES: Dict[str, Any] = {
         f"发生时间：{data.get('occurred_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}\n"
         f"---\n请及时处理"
     ),
-
     "shift_report": lambda data: (
         f"【班次报表】\n"
         f"门店：{data.get('store_name', data.get('store_id', ''))}\n"
@@ -57,11 +57,10 @@ TEMPLATES: Dict[str, Any] = {
         f"平均客单价：¥{data.get('avg_order_value', 0):.2f}\n"
         f"---\n班次已结束，数据已汇总"
     ),
-
     "daily_forecast": lambda data: (
         f"【备料建议】明日 {data.get('target_date', '')}\n"
         f"门店：{data.get('store_name', data.get('store_id', ''))}\n"
-        + (f"⚠️ {data.get('note', '')}\n" if data.get('note') else "")
+        + (f"⚠️ {data.get('note', '')}\n" if data.get("note") else "")
         + f"预估营收：¥{data.get('estimated_revenue', 0):.0f}\n"
         f"置信度：{data.get('confidence', 'low')}\n"
         f"预测依据：{data.get('basis', 'rule_based')}\n"
@@ -361,8 +360,8 @@ class WeChatService:
 
     async def _process_text_message(self, user_id: str, content: str) -> Dict[str, Any]:
         """处理文本消息，调用Agent"""
-        from .message_router import message_router
         from .agent_service import AgentService
+        from .message_router import message_router
 
         # 使用消息路由器识别意图
         agent_type, action, params = message_router.route_message(content, user_id)
@@ -382,7 +381,7 @@ class WeChatService:
                 {
                     "action": action,
                     "params": params,
-                }
+                },
             )
 
             # 格式化响应
@@ -421,12 +420,12 @@ class WeChatService:
 
     async def send_decision_card(
         self,
-        title:         str,
-        description:   str,
-        action_url:    str,
-        btntxt:        str = "立即审批",
-        to_user_id:    Optional[str] = None,
-        message_id:    Optional[str] = None,
+        title: str,
+        description: str,
+        action_url: str,
+        btntxt: str = "立即审批",
+        to_user_id: Optional[str] = None,
+        message_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         发送决策型 textcard 消息（含¥影响+置信度+一键操作按钮）。
@@ -448,9 +447,7 @@ class WeChatService:
         import json as _json
 
         if not message_id:
-            message_id = hashlib.md5(
-                f"decision_card:{to_user_id}:{title}:{description[:50]}".encode()
-            ).hexdigest()
+            message_id = hashlib.md5(f"decision_card:{to_user_id}:{title}:{description[:50]}".encode()).hexdigest()
 
         if await self._is_duplicate(message_id):
             logger.info(
@@ -484,8 +481,7 @@ class WeChatService:
             )
             await self._enqueue_failed_message(
                 template="decision_card",
-                data={"title": title, "description": description, "action_url": action_url,
-                      "btntxt": btntxt},
+                data={"title": title, "description": description, "action_url": action_url, "btntxt": btntxt},
                 to_user_id=to_user_id or "@all",
                 message_id=message_id,
                 error=str(e),
@@ -514,9 +510,7 @@ class WeChatService:
             发送结果字典
         """
         if template not in TEMPLATES:
-            raise ValueError(
-                f"未知模板: '{template}'。可用模板: {list(TEMPLATES.keys())}"
-            )
+            raise ValueError(f"未知模板: '{template}'。可用模板: {list(TEMPLATES.keys())}")
 
         # 生成去重 ID
         if not message_id:

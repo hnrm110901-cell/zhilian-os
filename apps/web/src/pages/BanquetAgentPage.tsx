@@ -10,7 +10,7 @@ import AgentWorkspaceTemplate from '../components/AgentWorkspaceTemplate';
 
 const { Text } = Typography;
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 type LeadStage =
   | 'new'

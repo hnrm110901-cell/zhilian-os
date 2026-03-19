@@ -24,11 +24,11 @@ Journey Orchestrator
 
 from __future__ import annotations
 
-import json
 import inspect
+import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -47,25 +47,28 @@ async def _maybe_await(value: Any) -> Any:
 
 # ── 数据类 ────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class JourneyStep:
     """旅程中的单个步骤。"""
+
     step_id: str
-    delay_minutes: int              # 0 = T+0，1440 = T+1d，4320 = T+3d
-    channel: str                    # "wxwork" / "miniapp" / "sms"
-    template_id: str                # 消息模板 ID
+    delay_minutes: int  # 0 = T+0，1440 = T+1d，4320 = T+3d
+    channel: str  # "wxwork" / "miniapp" / "sms"
+    template_id: str  # 消息模板 ID
     condition: Optional[Dict] = None  # {"event_not_exist": "order_pay"}
-    action: Optional[Dict] = None    # {"issue_coupon": "new_member_coupon"}
+    action: Optional[Dict] = None  # {"issue_coupon": "new_member_coupon"}
 
 
 @dataclass
 class JourneyDefinition:
     """完整的旅程定义。"""
+
     journey_id: str
     name: str
-    trigger_events: List[str]        # 触发该旅程的事件名称列表
+    trigger_events: List[str]  # 触发该旅程的事件名称列表
     steps: List[JourneyStep]
-    success_metrics: List[str]       # ["order_pay"]
+    success_metrics: List[str]  # ["order_pay"]
 
 
 # ── 内置旅程定义 ──────────────────────────────────────────────────────────────
@@ -85,14 +88,14 @@ BUILTIN_JOURNEYS: Dict[str, JourneyDefinition] = {
             ),
             JourneyStep(
                 step_id="profile_prompt",
-                delay_minutes=1440,           # T+1d
+                delay_minutes=1440,  # T+1d
                 channel="wxwork",
                 template_id="journey_profile_prompt",
                 condition={"event_not_exist": "order_pay"},
             ),
             JourneyStep(
                 step_id="first_visit_offer",
-                delay_minutes=4320,           # T+3d
+                delay_minutes=4320,  # T+3d
                 channel="wxwork",
                 template_id="journey_first_visit_offer",
                 condition={"event_not_exist": "order_pay"},
@@ -108,14 +111,14 @@ BUILTIN_JOURNEYS: Dict[str, JourneyDefinition] = {
         steps=[
             JourneyStep(
                 step_id="menu_recommend",
-                delay_minutes=360,            # T+6h
+                delay_minutes=360,  # T+6h
                 channel="wxwork",
                 template_id="journey_menu_recommend",
                 condition={"event_not_exist": "order_pay"},
             ),
             JourneyStep(
                 step_id="first_order_coupon",
-                delay_minutes=1440,           # T+1d
+                delay_minutes=1440,  # T+1d
                 channel="wxwork",
                 template_id="journey_first_order_coupon",
                 condition={"event_not_exist": "order_pay"},
@@ -137,7 +140,7 @@ BUILTIN_JOURNEYS: Dict[str, JourneyDefinition] = {
             ),
             JourneyStep(
                 step_id="comeback_coupon",
-                delay_minutes=2880,           # T+2d
+                delay_minutes=2880,  # T+2d
                 channel="wxwork",
                 template_id="journey_comeback_coupon",
                 action={"issue_coupon": "comeback_coupon"},
@@ -194,6 +197,7 @@ BUILTIN_JOURNEYS: Dict[str, JourneyDefinition] = {
 
 # ── 纯函数 ────────────────────────────────────────────────────────────────────
 
+
 def evaluate_condition(
     condition: Optional[Dict],
     orders_since_journey: int,
@@ -237,31 +241,22 @@ def format_journey_message(
     各模板内容可由门店配置后台覆盖（未来扩展点）。
     """
     _TEMPLATES: Dict[str, str] = {
-        "journey_welcome":
-            "欢迎加入！您已获得新会员专属优惠券，下次到店出示即可使用 🎉",
-        "journey_profile_prompt":
-            "您好！完善个人信息（生日/口味偏好）后可享受专属推荐，点击填写",
-        "journey_first_visit_offer":
-            "专属首单优惠限时领取，到店下单立减 ¥30，有效期3天，欢迎光临",
-        "journey_menu_recommend":
-            "为您精选当季招牌菜，点击查看今日推荐 👨‍🍳",
-        "journey_first_order_coupon":
-            "首单专属折扣券已发放，7天内有效，欢迎携友到店体验",
-        "journey_seasonal_content":
-            "时隔许久，我们想念您了！近期新品上线，欢迎回来品鉴 🍜",
-        "journey_comeback_coupon":
-            "专属回归礼遇券已送达，凭此券到店享受85折优惠，期待再见",
-        "journey_proactive_remind":
-            "根据您的消费节奏，这两天可能会想吃点好的。今日有新鲜食材到店，欢迎来尝鲜",
-        "birthday_wish":
-            "生日快乐！感谢一路陪伴，您的专属生日礼包已准备好，到店出示即可兑换",
-        "anniversary_wish":
-            "感谢一年来的陪伴！您已是我们的老朋友，专属周年礼已送达，欢迎到店领取",
+        "journey_welcome": "欢迎加入！您已获得新会员专属优惠券，下次到店出示即可使用 🎉",
+        "journey_profile_prompt": "您好！完善个人信息（生日/口味偏好）后可享受专属推荐，点击填写",
+        "journey_first_visit_offer": "专属首单优惠限时领取，到店下单立减 ¥30，有效期3天，欢迎光临",
+        "journey_menu_recommend": "为您精选当季招牌菜，点击查看今日推荐 👨‍🍳",
+        "journey_first_order_coupon": "首单专属折扣券已发放，7天内有效，欢迎携友到店体验",
+        "journey_seasonal_content": "时隔许久，我们想念您了！近期新品上线，欢迎回来品鉴 🍜",
+        "journey_comeback_coupon": "专属回归礼遇券已送达，凭此券到店享受85折优惠，期待再见",
+        "journey_proactive_remind": "根据您的消费节奏，这两天可能会想吃点好的。今日有新鲜食材到店，欢迎来尝鲜",
+        "birthday_wish": "生日快乐！感谢一路陪伴，您的专属生日礼包已准备好，到店出示即可兑换",
+        "anniversary_wish": "感谢一年来的陪伴！您已是我们的老朋友，专属周年礼已送达，欢迎到店领取",
     }
     return _TEMPLATES.get(template_id, f"您有一条来自门店的消息，欢迎到店")
 
 
 # ── 服务类 ────────────────────────────────────────────────────────────────────
+
 
 class JourneyOrchestrator:
     """
@@ -312,26 +307,31 @@ class JourneyOrchestrator:
         now = datetime.utcnow()
         unique_journey_id = f"{journey_id}:{customer_id}:{now.strftime('%Y%m%d%H%M%S')}"
 
+        # 计算第一步的预期执行时间（用于 catch-up dispatcher）
+        first_step_delay = definition.steps[0].delay_minutes if definition.steps else 0
+        next_action_at = now + timedelta(minutes=first_step_delay)
+
         await db.execute(
             text("""
                 INSERT INTO private_domain_journeys
                     (id, journey_id, store_id, customer_id, journey_type,
                      status, current_step, total_steps,
-                     started_at, step_history, created_at, updated_at)
+                     started_at, next_action_at, step_history, created_at, updated_at)
                 VALUES
                     (:id, :journey_id, :store_id, :customer_id, :journey_type,
                      'running', 0, :total_steps,
-                     :started_at, '[]'::json, NOW(), NOW())
+                     :started_at, :next_action_at, '[]'::json, NOW(), NOW())
                 ON CONFLICT (journey_id) DO NOTHING
             """),
             {
-                "id":          journey_db_id,
-                "journey_id":  unique_journey_id,
-                "store_id":    store_id,
+                "id": journey_db_id,
+                "journey_id": unique_journey_id,
+                "store_id": store_id,
                 "customer_id": customer_id,
                 "journey_type": journey_id,
                 "total_steps": len(definition.steps),
-                "started_at":  now,
+                "started_at": now,
+                "next_action_at": next_action_at,
             },
         )
         await db.commit()
@@ -340,6 +340,7 @@ class JourneyOrchestrator:
         steps_scheduled = 0
         try:
             from src.core.celery_tasks import execute_journey_step  # noqa: PLC0415
+
             for idx, step in enumerate(definition.steps):
                 execute_journey_step.apply_async(
                     args=[journey_db_id, idx, wechat_user_id],
@@ -362,10 +363,10 @@ class JourneyOrchestrator:
             steps_scheduled=steps_scheduled,
         )
         return {
-            "journey_db_id":   journey_db_id,
-            "journey_id":      journey_id,
+            "journey_db_id": journey_db_id,
+            "journey_id": journey_id,
             "steps_scheduled": steps_scheduled,
-            "total_steps":     len(definition.steps),
+            "total_steps": len(definition.steps),
         }
 
     async def execute_step(
@@ -429,80 +430,86 @@ class JourneyOrchestrator:
         step = definition.steps[step_index]
 
         # 4. 条件检查（旅程开始后的新订单数）
-        orders_since = await self._count_orders_since(
-            journey.customer_id, journey.store_id, journey.started_at, db
-        )
+        orders_since = await self._count_orders_since(journey.customer_id, journey.store_id, journey.started_at, db)
         should_execute = evaluate_condition(step.condition, orders_since)
 
         if not should_execute:
             step_result: Dict[str, Any] = {
-                "step_id":        step.step_id,
-                "executed":       False,
+                "step_id": step.step_id,
+                "executed": False,
                 "skipped_reason": "条件不满足（用户已完成目标行为）",
             }
         else:
             # 5. 频控检查
             can_send = True
             if freq_cap_engine:
-                can_send = await freq_cap_engine.can_send(
-                    journey.customer_id, journey.store_id, step.channel
-                )
+                can_send = await freq_cap_engine.can_send(journey.customer_id, journey.store_id, step.channel)
 
             if not can_send:
                 step_result = {
-                    "step_id":        step.step_id,
-                    "executed":       False,
+                    "step_id": step.step_id,
+                    "executed": False,
                     "skipped_reason": "频控限制",
                 }
             else:
                 # 6. 查询会员画像（供 JourneyNarrator 个性化生成）
-                member_profile = await self._get_member_profile(
-                    journey.customer_id, journey.store_id, db
-                )
+                member_profile = await self._get_member_profile(journey.customer_id, journey.store_id, db)
                 # 7. 发送消息
                 msg_result = await self._send_message(
-                    step, journey.customer_id, journey.store_id,
-                    wechat_user_id, wechat_service,
-                    profile=member_profile, narrator=narrator,
+                    step,
+                    journey.customer_id,
+                    journey.store_id,
+                    wechat_user_id,
+                    wechat_service,
+                    profile=member_profile,
+                    narrator=narrator,
                 )
                 if freq_cap_engine and msg_result.get("sent"):
-                    await freq_cap_engine.record_send(
-                        journey.customer_id, journey.store_id, step.channel
-                    )
+                    await freq_cap_engine.record_send(journey.customer_id, journey.store_id, step.channel)
                 step_result = {
-                    "step_id":  step.step_id,
+                    "step_id": step.step_id,
                     "executed": True,
-                    "sent":     msg_result.get("sent", False),
-                    "channel":  step.channel,
-                    "action":   step.action,
+                    "sent": msg_result.get("sent", False),
+                    "channel": step.channel,
+                    "action": step.action,
                 }
 
         # 8. 更新 DB
         existing_history: List = list(journey.step_history or [])
-        existing_history.append({
-            "step_index":  step_index,
-            "executed_at": datetime.utcnow().isoformat(),
-            **step_result,
-        })
-        is_last   = step_index >= len(definition.steps) - 1
+        existing_history.append(
+            {
+                "step_index": step_index,
+                "executed_at": datetime.utcnow().isoformat(),
+                **step_result,
+            }
+        )
+        is_last = step_index >= len(definition.steps) - 1
         new_status = "completed" if is_last else "running"
+
+        # 计算下一步的预期执行时间（用于 catch-up dispatcher）
+        next_action_at = None
+        if not is_last:
+            next_step = definition.steps[step_index + 1]
+            next_action_at = datetime.utcnow() + timedelta(minutes=next_step.delay_minutes)
 
         await db.execute(
             text("""
                 UPDATE private_domain_journeys
-                SET current_step  = :step,
-                    step_history  = :history::json,
-                    status        = :status,
-                    completed_at  = :completed_at,
-                    updated_at    = NOW()
+                SET current_step   = :step,
+                    step_history   = :history::json,
+                    status         = :status,
+                    next_action_at = :next_action_at,
+                    completed_at   = :completed_at,
+                    updated_at     = NOW()
                 WHERE id = :id
             """),
             {
-                "step":         step_index + 1,
-                "history":      json.dumps(existing_history),
-                "status":       new_status,
+                "step": step_index + 1,
+                "history": json.dumps(existing_history),
+                "status": new_status,
+                "next_action_at": next_action_at,
                 "completed_at": datetime.utcnow() if is_last else None,
-                "id":           journey_db_id,
+                "id": journey_db_id,
             },
         )
         await db.commit()
@@ -580,9 +587,7 @@ class JourneyOrchestrator:
             content = format_journey_message(step.template_id, store_id, customer_id)
 
         try:
-            await wechat_service.send_text_message(
-                content=content, touser=wechat_user_id
-            )
+            await wechat_service.send_text_message(content=content, touser=wechat_user_id)
             return {"sent": True}
         except Exception as exc:
             logger.warning(
@@ -612,6 +617,7 @@ class JourneyOrchestrator:
         # 1. 尝试 Redis 缓存
         try:
             from src.services.member_context_store import get_context_store
+
             ctx_store = await get_context_store()
             if ctx_store:
                 cached = await ctx_store.get(store_id, customer_id)
@@ -649,17 +655,22 @@ class JourneyOrchestrator:
 
             # 3. 写透到 Redis（异步，失败不影响主流程）
             try:
-                from src.services.member_context_store import get_context_store
                 from src.services.journey_narrator import classify_maslow_level
+                from src.services.member_context_store import get_context_store
+
                 ctx_store = await get_context_store()
                 if ctx_store:
-                    await ctx_store.set(store_id, customer_id, {
-                        "frequency":       profile.frequency,
-                        "monetary":        profile.monetary,
-                        "recency_days":    profile.recency_days,
-                        "lifecycle_state": profile.lifecycle_state,
-                        "maslow_level":    classify_maslow_level(profile),
-                    })
+                    await ctx_store.set(
+                        store_id,
+                        customer_id,
+                        {
+                            "frequency": profile.frequency,
+                            "monetary": profile.monetary,
+                            "recency_days": profile.recency_days,
+                            "lifecycle_state": profile.lifecycle_state,
+                            "maslow_level": classify_maslow_level(profile),
+                        },
+                    )
             except Exception as exc:
                 logger.debug("journey.ctx_cache_write_failed", store_id=store_id, customer_id=customer_id, error=str(exc))
 

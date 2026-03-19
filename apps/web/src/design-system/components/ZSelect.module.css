@@ -7,11 +7,11 @@
 .trigger {
   width: 100%;
   height: 40px;
-  padding: 0 36px 0 12px;
+  padding: 0 36px 0 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 15px;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 14px;
   color: var(--text-primary);
   font-family: inherit;
   cursor: pointer;
@@ -19,14 +19,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: all 200ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1));
   outline: none;
 }
 
 .trigger:focus,
 .trigger.open {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px rgba(10,175,154,0.06);
 }
 
 .placeholder { color: var(--text-tertiary); }
@@ -39,42 +39,44 @@
   color: var(--text-tertiary);
   font-size: 11px;
   pointer-events: none;
-  transition: transform 150ms ease;
+  transition: transform 200ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 .arrow.open { transform: translateY(-50%) rotate(180deg); }
 
 .dropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-lg);
   z-index: 500;
-  max-height: 240px;
+  max-height: 260px;
   overflow-y: auto;
-  animation: dropIn 120ms ease;
+  padding: 4px;
+  animation: dropIn 200ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 @keyframes dropIn {
-  from { opacity: 0; transform: translateY(-4px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 .option {
-  padding: 10px 12px;
-  font-size: 14px;
+  padding: 9px 12px;
+  font-size: 13px;
   color: var(--text-primary);
   cursor: pointer;
   transition: background 100ms ease;
   display: flex;
   align-items: center;
   gap: 8px;
+  border-radius: var(--radius-xs, 6px);
 }
 
 .option:hover    { background: var(--surface-hover); }
 .option.selected { color: var(--accent); font-weight: 600; }
-.option.selected::after { content: '✓'; margin-left: auto; }
+.option.selected::after { content: '\2713'; margin-left: auto; font-size: 12px; }

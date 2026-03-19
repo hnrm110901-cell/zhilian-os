@@ -1,0 +1,16 @@
+.page {
+  padding: 24px;
+}
+
+.page h2 {
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.preview {
+  margin: 8px 0 16px;
+  padding: 8px 12px;
+  background: rgba(255, 107, 44, 0.08);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+}

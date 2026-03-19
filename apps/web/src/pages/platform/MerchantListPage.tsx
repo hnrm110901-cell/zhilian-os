@@ -14,9 +14,40 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../services/api';
 import {
   CUISINE_LABELS, INDUSTRY_LABELS, CUISINE_OPTIONS,
+  type MerchantSummary, type PlatformStats,
 } from './merchant-constants';
-import type { MerchantSummary, PlatformStats } from './merchant-constants';
 import styles from './MerchantListPage.module.css';
+
+// ── 种子客户 mock 数据（后端未启动时降级展示） ────────────────────────────────
+const SEED_MERCHANTS: MerchantSummary[] = [
+  {
+    brand_id: 'BRD_CZYZ0001', brand_name: '尝在一起', cuisine_type: 'hunan',
+    status: 'active', avg_ticket_yuan: 80,
+    group_id: 'GRP_CZYZ0001', group_name: '尝在一起餐饮管理有限公司',
+    contact_person: '尝在一起联系人', contact_phone: '0731-00000001',
+    store_count: 3, user_count: 1, created_at: '2026-01-15T00:00:00Z',
+  },
+  {
+    brand_id: 'BRD_ZQX0001', brand_name: '最黔线', cuisine_type: 'guizhou',
+    status: 'active', avg_ticket_yuan: 75,
+    group_id: 'GRP_ZQX0001', group_name: '老江菜馆餐饮管理有限公司',
+    contact_person: '最黔线联系人', contact_phone: '0731-00000002',
+    store_count: 6, user_count: 1, created_at: '2026-01-20T00:00:00Z',
+  },
+  {
+    brand_id: 'BRD_SGC0001', brand_name: '尚宫厨', cuisine_type: 'hunan',
+    status: 'active', avg_ticket_yuan: 180,
+    group_id: 'GRP_SGC0001', group_name: '尚宫厨餐饮管理有限公司',
+    contact_person: '尚宫厨联系人', contact_phone: '0731-00000003',
+    store_count: 5, user_count: 1, created_at: '2026-02-01T00:00:00Z',
+  },
+];
+
+const SEED_STATS: PlatformStats = {
+  total_merchants: 3, active_merchants: 3, inactive_merchants: 0,
+  total_stores: 14, active_stores: 14,
+  total_users: 3, active_users: 3, total_groups: 3,
+};
 
 const MerchantListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -40,7 +71,9 @@ const MerchantListPage: React.FC = () => {
     try {
       const data = await apiClient.get<PlatformStats>('/api/v1/merchants/stats');
       setStats(data);
-    } catch { /* silent */ }
+    } catch {
+      setStats(SEED_STATS);
+    }
   }, []);
 
   const fetchMerchants = useCallback(async () => {
@@ -54,7 +87,19 @@ const MerchantListPage: React.FC = () => {
       const data = await apiClient.get<MerchantSummary[]>(`/api/v1/merchants${qs ? `?${qs}` : ''}`);
       setMerchants(data);
     } catch {
-      message.error('加载商户列表失败');
+      // 后端未启动时降级显示种子客户
+      let fallback = SEED_MERCHANTS;
+      if (keyword) {
+        const q = keyword.toLowerCase();
+        fallback = fallback.filter(m =>
+          m.brand_name.toLowerCase().includes(q) ||
+          m.group_name.toLowerCase().includes(q) ||
+          m.contact_person.includes(q)
+        );
+      }
+      if (statusFilter) fallback = fallback.filter(m => m.status === statusFilter);
+      if (cuisineFilter) fallback = fallback.filter(m => m.cuisine_type === cuisineFilter);
+      setMerchants(fallback);
     } finally {
       setLoading(false);
     }

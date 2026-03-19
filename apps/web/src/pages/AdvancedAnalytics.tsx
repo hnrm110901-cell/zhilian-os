@@ -18,7 +18,7 @@ const { TabPane } = Tabs;
 
 const AdvancedAnalytics: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [salesPrediction, setSalesPrediction] = useState<any>(null);
   const [anomalies, setAnomalies] = useState<any>(null);
@@ -296,7 +296,7 @@ const AdvancedAnalytics: React.FC = () => {
         >
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">屯象餐厅-朝阳店</Option>}
+          ))}
         </Select>
       </Card>
 

@@ -2,17 +2,20 @@
 Task Model
 任务管理模型
 """
-from sqlalchemy import Column, String, Text, DateTime, Enum, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
+
 import enum
+import uuid
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
 class TaskStatus(str, enum.Enum):
     """任务状态"""
+
     PENDING = "pending"  # 待处理
     IN_PROGRESS = "in_progress"  # 进行中
     COMPLETED = "completed"  # 已完成
@@ -22,6 +25,7 @@ class TaskStatus(str, enum.Enum):
 
 class TaskPriority(str, enum.Enum):
     """任务优先级"""
+
     LOW = "low"  # 低
     NORMAL = "normal"  # 普通
     HIGH = "high"  # 高
@@ -47,12 +51,10 @@ class Task(Base, TimestampMixin):
         Enum(TaskStatus, values_callable=lambda x: [e.value for e in x]),
         default=TaskStatus.PENDING,
         nullable=False,
-        index=True
+        index=True,
     )
     priority = Column(
-        Enum(TaskPriority, values_callable=lambda x: [e.value for e in x]),
-        default=TaskPriority.NORMAL,
-        nullable=False
+        Enum(TaskPriority, values_callable=lambda x: [e.value for e in x]), default=TaskPriority.NORMAL, nullable=False
     )
 
     # 任务关联

@@ -33,7 +33,7 @@ const IndustrySolutionsPage: React.FC = () => {
   const [solution, setSolution] = useState<Solution | null>(null);
   const [applyResult, setApplyResult] = useState<Record<string, unknown> | null>(null);
   const [industryType, setIndustryType] = useState('chinese_restaurant');
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
 
   const loadStores = useCallback(async () => {
@@ -73,7 +73,7 @@ const IndustrySolutionsPage: React.FC = () => {
             <Select value={storeId} onChange={setStoreId} style={{ width: 140 }}>
               {stores.length > 0 ? stores.map((s: any) => (
                 <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-              )) : <Option value="STORE001">门店 001</Option>}
+              ))}
             </Select>
             <Select value={industryType} onChange={setIndustryType} style={{ width: 160 }}>
               {Object.entries(industryLabel).map(([k, v]) => (

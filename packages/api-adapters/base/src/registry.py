@@ -90,3 +90,125 @@ def list_registered_pos_types() -> list:
 def list_implemented_pos_types() -> list:
     """返回已实现的 POS 系统类型"""
     return [k for k, v in POS_REGISTRY.items() if v is not None]
+
+
+# ============================================
+# 预订系统注册表
+# ============================================
+
+RESERVATION_REGISTRY: Dict[str, Optional[str]] = {
+    "yiding": "packages.api-adapters.yiding.src.adapter.YiDingAdapter",
+    "kebide": None,
+    "yanmishu": None,
+}
+
+# ============================================
+# 外卖平台注册表
+# ============================================
+
+DELIVERY_REGISTRY: Dict[str, Optional[str]] = {
+    "meituan_delivery": None,
+    "eleme": "packages.api-adapters.eleme.src.adapter.ElemeAdapter",
+    "douyin": "packages.api-adapters.douyin.src.adapter.DouyinAdapter",
+}
+
+# ============================================
+# 供应链注册表
+# ============================================
+
+SUPPLY_CHAIN_REGISTRY: Dict[str, Optional[str]] = {}
+
+# ============================================
+# 会员系统注册表
+# ============================================
+
+MEMBER_REGISTRY: Dict[str, Optional[str]] = {
+    "weishenghuo": "packages.api-adapters.weishenghuo.src.adapter.WeishenghuoAdapter",
+}
+
+# ============================================
+# 财务系统注册表
+# ============================================
+
+FINANCE_REGISTRY: Dict[str, Optional[str]] = {
+    "nuonuo": "packages.api-adapters.nuonuo.src.adapter.NuonuoAdapter",
+}
+
+
+# ============================================
+# 统一分类注册表
+# ============================================
+
+ADAPTER_CATEGORIES = {
+    "pos": POS_REGISTRY,
+    "reservation": RESERVATION_REGISTRY,
+    "delivery": DELIVERY_REGISTRY,
+    "supply_chain": SUPPLY_CHAIN_REGISTRY,
+    "member": MEMBER_REGISTRY,
+    "finance": FINANCE_REGISTRY,
+}
+
+
+def get_adapter(category: str, system_type: str, config: Optional[Dict[str, Any]] = None):
+    """
+    统一适配器工厂函数
+
+    Args:
+        category: 系统类别 (pos/reservation/delivery/supply_chain/member/finance)
+        system_type: 具体系统 (yiding/kebide/pinzhi/meituan/...)
+        config: 适配器配置
+
+    Returns:
+        适配器实例
+
+    Raises:
+        ValueError: 类别或系统类型不在注册表中
+        AdapterNotImplementedError: 适配器尚未实现
+    """
+    if category not in ADAPTER_CATEGORIES:
+        raise ValueError(
+            f"未知系统类别: '{category}'。可用: {list(ADAPTER_CATEGORIES.keys())}"
+        )
+
+    registry = ADAPTER_CATEGORIES[category]
+
+    if system_type not in registry:
+        registered = list(registry.keys())
+        raise ValueError(
+            f"类别'{category}'中未注册: '{system_type}'。已注册: {registered}"
+        )
+
+    adapter_path = registry[system_type]
+    if adapter_path is None:
+        raise AdapterNotImplementedError(system_type)
+
+    module_path, class_name = adapter_path.rsplit(".", 1)
+    module_path = module_path.replace("-", "_")
+
+    import importlib
+    try:
+        module = importlib.import_module(module_path)
+        adapter_class = getattr(module, class_name)
+    except (ImportError, AttributeError) as e:
+        logger.error(
+            "适配器加载失败",
+            category=category,
+            system_type=system_type,
+            error=str(e)
+        )
+        raise ImportError(f"无法加载适配器 '{category}/{system_type}': {e}") from e
+
+    return adapter_class(config or {})
+
+
+def list_all_categories() -> list:
+    """返回所有系统类别"""
+    return list(ADAPTER_CATEGORIES.keys())
+
+
+def list_category_types(category: str) -> dict:
+    """返回指定类别的所有系统类型及实现状态"""
+    if category not in ADAPTER_CATEGORIES:
+        raise ValueError(f"未知系统类别: '{category}'")
+    registry = ADAPTER_CATEGORIES[category]
+    return {k: (v is not None) for k, v in registry.items()}

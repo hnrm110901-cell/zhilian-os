@@ -11,14 +11,14 @@ table {
 }
 
 .thead th {
-  padding: 10px 12px;
+  padding: 10px 14px;
   text-align: left;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  background: var(--surface);
+  background: transparent;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
   user-select: none;
@@ -28,10 +28,11 @@ table {
 .thead th.center { text-align: center; }
 
 .row td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.04));
   color: var(--text-primary);
   vertical-align: middle;
+  transition: background 0.15s ease;
 }
 
 .row:last-child td { border-bottom: none; }
@@ -42,7 +43,7 @@ table {
 .row td.center { text-align: center; }
 
 .empty {
-  padding: 32px;
+  padding: 40px;
   text-align: center;
   color: var(--text-tertiary);
   font-size: 13px;

@@ -129,37 +129,33 @@ jobs:
             supervisorctl reread 2>/dev/null || true
             supervisorctl update 2>/dev/null || true
 
-            echo "=== [PROD 3/6] Build & start API container ==="
+            echo "=== [PROD 3/5] Build & start API container ==="
+            echo "  (entrypoint auto: wait DB, migrate, seed, start)"
             cd /opt/zhilian-os/prod
             docker compose \
               --env-file .env.prod \
               -f docker-compose.prod.yml \
               up -d --no-deps --build api-gateway
 
-            echo "=== [PROD 4/6] Wait for API health ==="
+            echo "=== [PROD 4/5] Wait for API ready (DB+Redis verified) ==="
             HEALTHY=0
-            for i in $(seq 1 20); do
-              if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
-                echo "✓ API healthy after ${i}×3s"
+            for i in $(seq 1 30); do
+              RESP=$(curl -sf http://127.0.0.1:8000/api/v1/ready 2>/dev/null || echo '{}')
+              if echo "$RESP" | grep -q '"ready"'; then
+                echo "API ready after ${i}x3s"
                 HEALTHY=1
                 break
               fi
-              echo "  waiting... ($i/20)"
+              echo "  waiting... ($i/30)"
               sleep 3
             done
             if [ "$HEALTHY" = "0" ]; then
-              echo "✗ API failed to start"
-              docker logs zhilian-api --tail 50 2>&1 || true
+              echo "API failed to become ready"
+              docker logs zhilian-api --tail 80 2>&1 || true
               exit 1
             fi
 
-            echo "=== [PROD 5/6] Run Alembic migrations ==="
-            docker exec zhilian-api \
-              python -m alembic -c /app/alembic.ini upgrade head \
-              && echo "✓ Migrations applied" \
-              || echo "⚠ Migration warning (check logs)"
-
-            echo "=== [PROD 6/6] Restart Celery workers ==="
+            echo "=== [PROD 5/5] Restart Celery workers ==="
             cd /opt/zhilian-os/prod
             docker compose \
               --env-file .env.prod \
@@ -242,11 +238,11 @@ jobs:
         run: |
           sleep 5
           if [ "${{ github.ref_name }}" = "main" ]; then
-            API_URL="https://${{ env.SERVER_HOST }}/api/v1/health"
+            API_URL="https://${{ env.SERVER_HOST }}/api/v1/ready"
             FRONT_URL="https://${{ env.SERVER_HOST }}/"
             HOST_HEADER="zlsjos.cn"
           else
-            API_URL="http://${{ env.SERVER_HOST }}:8001/api/v1/health"
+            API_URL="http://${{ env.SERVER_HOST }}:8001/api/v1/ready"
             FRONT_URL="http://${{ env.SERVER_HOST }}:8081/"
             HOST_HEADER="staging.zlsjos.cn"
           fi

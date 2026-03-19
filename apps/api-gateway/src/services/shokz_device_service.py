@@ -16,19 +16,22 @@ Shokz设备集成服务 (Shokz Device Integration Service)
 4. 异常驱动通知（外卖催单、VIP到店、客诉预警）
 5. 多设备管理（店长、副店长、厨师长）
 """
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-from enum import Enum
-from pydantic import BaseModel
+
 import os
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
 import httpx
 import structlog
+from pydantic import BaseModel
 
 logger = structlog.get_logger()
 
 
 class ShokzDeviceModel(str, Enum):
     """Shokz设备型号"""
+
     OPENCOMM2_UC = "OpenComm2 UC"  # 商务版（推荐）
     OPENRUN_PRO = "OpenRun Pro"  # 运动版
     OPENMOVE = "OpenMove"  # 入门版
@@ -36,6 +39,7 @@ class ShokzDeviceModel(str, Enum):
 
 class DeviceStatus(str, Enum):
     """设备状态"""
+
     CONNECTED = "connected"  # 已连接
     DISCONNECTED = "disconnected"  # 已断开
     PAIRING = "pairing"  # 配对中
@@ -45,6 +49,7 @@ class DeviceStatus(str, Enum):
 
 class VoiceCommand(str, Enum):
     """语音命令"""
+
     QUERY_REVENUE = "query_revenue"  # 查询营业额
     QUERY_ORDERS = "query_orders"  # 查询订单
     QUERY_INVENTORY = "query_inventory"  # 查询库存
@@ -56,6 +61,7 @@ class VoiceCommand(str, Enum):
 
 class ShokzDeviceInfo(BaseModel):
     """Shokz设备信息"""
+
     device_id: str
     device_name: str  # 例如："店长-张三-Shokz"
     device_model: ShokzDeviceModel
@@ -75,6 +81,7 @@ class ShokzDeviceInfo(BaseModel):
 
 class VoiceInteraction(BaseModel):
     """语音交互记录"""
+
     interaction_id: str
     device_id: str
     store_id: str
@@ -105,12 +112,7 @@ class ShokzDeviceService:
             "waterproof": "IP55",
             "weight_grams": 35,
             "cost": 1200.0,  # 人民币
-            "features": [
-                "DSP降噪",
-                "多点连接",
-                "快充（5分钟充电2小时使用）",
-                "NFC快速配对"
-            ]
+            "features": ["DSP降噪", "多点连接", "快充（5分钟充电2小时使用）", "NFC快速配对"],
         },
         ShokzDeviceModel.OPENRUN_PRO: {
             "name": "Shokz OpenRun Pro",
@@ -119,12 +121,8 @@ class ShokzDeviceService:
             "waterproof": "IP67",
             "weight_grams": 29,
             "cost": 1000.0,
-            "features": [
-                "运动防汗",
-                "快充",
-                "轻量化设计"
-            ]
-        }
+            "features": ["运动防汗", "快充", "轻量化设计"],
+        },
     }
 
     # 推荐配置
@@ -133,20 +131,20 @@ class ShokzDeviceService:
             "device_model": ShokzDeviceModel.OPENCOMM2_UC,
             "quantity": 1,
             "priority": "high",
-            "notifications": ["all"]  # 接收所有通知
+            "notifications": ["all"],  # 接收所有通知
         },
         "assistant_manager": {  # 副店长
             "device_model": ShokzDeviceModel.OPENCOMM2_UC,
             "quantity": 1,
             "priority": "medium",
-            "notifications": ["takeout", "vip", "complaint"]
+            "notifications": ["takeout", "vip", "complaint"],
         },
         "chef": {  # 厨师长
             "device_model": ShokzDeviceModel.OPENRUN_PRO,
             "quantity": 1,
             "priority": "medium",
-            "notifications": ["kitchen", "inventory"]
-        }
+            "notifications": ["kitchen", "inventory"],
+        },
     }
 
     def __init__(self):
@@ -213,19 +211,14 @@ class ShokzDeviceService:
         store_id: str,
         user_id: str,
         user_role: str,
-        edge_node_id: str
+        edge_node_id: str,
     ) -> ShokzDeviceInfo:
         """
         注册Shokz设备
 
         门店部署时，将Shokz耳机与树莓派5配对
         """
-        logger.info(
-            "注册Shokz设备",
-            device_name=device_name,
-            mac_address=mac_address,
-            store_id=store_id
-        )
+        logger.info("注册Shokz设备", device_name=device_name, mac_address=mac_address, store_id=store_id)
 
         device_id = f"shokz_{store_id}_{mac_address.replace(':', '')}"
 
@@ -242,7 +235,7 @@ class ShokzDeviceService:
             battery_level=100,
             signal_strength=-50,
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
         self.devices[device_id] = device
@@ -250,10 +243,7 @@ class ShokzDeviceService:
         logger.info("Shokz设备注册成功", device_id=device_id)
         return device
 
-    async def connect_device(
-        self,
-        device_id: str
-    ) -> ShokzDeviceInfo:
+    async def connect_device(self, device_id: str) -> ShokzDeviceInfo:
         """
         连接设备
 
@@ -269,18 +259,12 @@ class ShokzDeviceService:
         device.updated_at = datetime.now()
 
         logger.info(
-            "Shokz设备已连接",
-            device_id=device_id,
-            device_name=device.device_name,
-            edge_callback=bool(callback_result)
+            "Shokz设备已连接", device_id=device_id, device_name=device.device_name, edge_callback=bool(callback_result)
         )
 
         return device
 
-    async def disconnect_device(
-        self,
-        device_id: str
-    ) -> ShokzDeviceInfo:
+    async def disconnect_device(self, device_id: str) -> ShokzDeviceInfo:
         """断开设备连接"""
         if device_id not in self.devices:
             raise ValueError(f"设备不存在: {device_id}")
@@ -293,11 +277,7 @@ class ShokzDeviceService:
         logger.info("Shokz设备已断开", device_id=device_id, edge_callback=bool(callback_result))
         return device
 
-    async def update_battery_level(
-        self,
-        device_id: str,
-        battery_level: int
-    ) -> ShokzDeviceInfo:
+    async def update_battery_level(self, device_id: str, battery_level: int) -> ShokzDeviceInfo:
         """
         更新电量
 
@@ -313,19 +293,11 @@ class ShokzDeviceService:
         # 低电量预警
         if battery_level < int(os.getenv("SHOKZ_LOW_BATTERY_THRESHOLD", "20")):
             device.status = DeviceStatus.LOW_BATTERY
-            logger.warning(
-                "Shokz设备电量低",
-                device_id=device_id,
-                battery_level=battery_level
-            )
+            logger.warning("Shokz设备电量低", device_id=device_id, battery_level=battery_level)
 
         return device
 
-    async def voice_input(
-        self,
-        device_id: str,
-        audio_data: str
-    ) -> VoiceInteraction:
+    async def voice_input(self, device_id: str, audio_data: str) -> VoiceInteraction:
         """
         语音输入
 
@@ -337,15 +309,13 @@ class ShokzDeviceService:
         device = self.devices[device_id]
         start_time = datetime.now()
 
-        logger.info(
-            "接收语音输入",
-            device_id=device_id,
-            user_role=device.user_role
-        )
+        logger.info("接收语音输入", device_id=device_id, user_role=device.user_role)
 
         # ASR识别：调用 voice_service
         import base64
+
         from .voice_service import voice_service
+
         try:
             audio_bytes = base64.b64decode(audio_data) if isinstance(audio_data, str) else audio_data
             stt_result = await voice_service.speech_to_text(audio_bytes)
@@ -358,6 +328,7 @@ class ShokzDeviceService:
 
         # 意图识别
         from .message_router import message_router
+
         intent, _, _ = message_router.route_message(text_input, device.user_id or device_id)
 
         # 生成响应（由上层业务逻辑填充，这里保留占位）
@@ -387,27 +358,17 @@ class ShokzDeviceService:
             audio_output=audio_output,
             interaction_time=datetime.now(),
             processing_time_ms=processing_time_ms,
-            success=True
+            success=True,
         )
 
         self.interactions.append(interaction)
         device.last_command_time = datetime.now()
 
-        logger.info(
-            "语音交互完成",
-            device_id=device_id,
-            intent=intent,
-            processing_time_ms=processing_time_ms
-        )
+        logger.info("语音交互完成", device_id=device_id, intent=intent, processing_time_ms=processing_time_ms)
 
         return interaction
 
-    async def voice_output(
-        self,
-        device_id: str,
-        text: str,
-        priority: str = "normal"
-    ) -> Dict:
+    async def voice_output(self, device_id: str, text: str, priority: str = "normal") -> Dict:
         """
         语音输出
 
@@ -423,16 +384,13 @@ class ShokzDeviceService:
 
         device = self.devices[device_id]
 
-        logger.info(
-            "推送语音通知",
-            device_id=device_id,
-            text=text,
-            priority=priority
-        )
+        logger.info("推送语音通知", device_id=device_id, text=text, priority=priority)
 
         # TTS合成：调用 voice_service
         import base64
+
         from .voice_service import voice_service
+
         try:
             tts_result = await voice_service.text_to_speech(text)
             audio_bytes = tts_result.get("audio_data", b"") if tts_result.get("success") else b""
@@ -464,11 +422,7 @@ class ShokzDeviceService:
         return result
 
     async def send_alert(
-        self,
-        store_id: str,
-        alert_type: VoiceCommand,
-        message: str,
-        target_roles: List[str] = None
+        self, store_id: str, alert_type: VoiceCommand, message: str, target_roles: List[str] = None
     ) -> List[Dict]:
         """
         发送异常驱动通知
@@ -480,16 +434,12 @@ class ShokzDeviceService:
         - VIP到店 → 店长
         - 后厨异常 → 厨师长
         """
-        logger.info(
-            "发送异常驱动通知",
-            store_id=store_id,
-            alert_type=alert_type,
-            target_roles=target_roles
-        )
+        logger.info("发送异常驱动通知", store_id=store_id, alert_type=alert_type, target_roles=target_roles)
 
         # 筛选目标设备
         target_devices = [
-            device for device in self.devices.values()
+            device
+            for device in self.devices.values()
             if device.store_id == store_id
             and device.status == DeviceStatus.CONNECTED
             and (target_roles is None or device.user_role in target_roles)
@@ -497,59 +447,31 @@ class ShokzDeviceService:
 
         results = []
         for device in target_devices:
-            result = await self.voice_output(
-                device_id=device.device_id,
-                text=message,
-                priority="high"
-            )
+            result = await self.voice_output(device_id=device.device_id, text=message, priority="high")
             results.append(result)
 
-        logger.info(
-            "异常驱动通知已发送",
-            store_id=store_id,
-            alert_type=alert_type,
-            devices_count=len(results)
-        )
+        logger.info("异常驱动通知已发送", store_id=store_id, alert_type=alert_type, devices_count=len(results))
 
         return results
 
-    async def get_device_info(
-        self,
-        device_id: str
-    ) -> ShokzDeviceInfo:
+    async def get_device_info(self, device_id: str) -> ShokzDeviceInfo:
         """获取设备信息"""
         if device_id not in self.devices:
             raise ValueError(f"设备不存在: {device_id}")
 
         return self.devices[device_id]
 
-    async def list_store_devices(
-        self,
-        store_id: str
-    ) -> List[ShokzDeviceInfo]:
+    async def list_store_devices(self, store_id: str) -> List[ShokzDeviceInfo]:
         """列出门店的所有Shokz设备"""
-        devices = [
-            device for device in self.devices.values()
-            if device.store_id == store_id
-        ]
+        devices = [device for device in self.devices.values() if device.store_id == store_id]
         return devices
 
-    async def get_interaction_history(
-        self,
-        device_id: str,
-        limit: int = 100
-    ) -> List[VoiceInteraction]:
+    async def get_interaction_history(self, device_id: str, limit: int = 100) -> List[VoiceInteraction]:
         """获取语音交互历史"""
-        interactions = [
-            interaction for interaction in self.interactions
-            if interaction.device_id == device_id
-        ]
+        interactions = [interaction for interaction in self.interactions if interaction.device_id == device_id]
         return interactions[-limit:]
 
-    async def get_device_specs(
-        self,
-        device_model: ShokzDeviceModel
-    ) -> Dict:
+    async def get_device_specs(self, device_model: ShokzDeviceModel) -> Dict:
         """获取设备规格"""
         return self.DEVICE_SPECS.get(device_model, {})
 
@@ -568,23 +490,15 @@ class ShokzDeviceService:
         用于向投资人证明轻量化部署
         """
         return {
-            "hardware": {
-                "shokz_opencomm2_uc": 1200.0,  # 店长
-                "shokz_opencomm2_uc_2": 1200.0,  # 副店长
-                "total": 2400.0
-            },
-            "accessories": {
-                "charging_cables": 50.0,
-                "carrying_case": 50.0,
-                "total": 100.0
-            },
+            "hardware": {"shokz_opencomm2_uc": 1200.0, "shokz_opencomm2_uc_2": 1200.0, "total": 2400.0},  # 店长  # 副店长
+            "accessories": {"charging_cables": 50.0, "carrying_case": 50.0, "total": 100.0},
             "implementation": {
                 "bluetooth_pairing": 100.0,  # 蓝牙配对（30分钟）
                 "voice_training": 200.0,  # 语音训练（1小时）
-                "total": 300.0
+                "total": 300.0,
             },
             "total_cost_per_store": 2800.0,  # 每店总成本（2个设备）
-            "deployment_time_hours": 1.5  # 部署时长
+            "deployment_time_hours": 1.5,  # 部署时长
         }
 
 

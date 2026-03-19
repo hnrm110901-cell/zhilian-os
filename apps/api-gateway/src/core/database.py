@@ -2,16 +2,17 @@
 Database Configuration and Connection
 支持多租户 Schema 隔离: 根据 TenantContext.brand_id 动态切换 search_path
 """
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
-from sqlalchemy.exc import OperationalError, IntegrityError
-from sqlalchemy import text
+
+import asyncio
+import os
 from contextlib import asynccontextmanager
 from typing import Optional
-import asyncio
-import structlog
-import os
 
+import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from src.core.config import settings
 from src.core.tenant_context import TenantContext
 from src.core.tenant_filter import enable_tenant_filter
@@ -42,9 +43,9 @@ async def reload_schema_map_from_db():
     """从 tenant_schema_map 表热加载映射（服务启动或定时刷新时调用）"""
     try:
         async with engine.begin() as conn:
-            result = await conn.execute(text(
-                "SELECT schema_name, brand_id, tenant_id FROM public.tenant_schema_map WHERE is_active = TRUE"
-            ))
+            result = await conn.execute(
+                text("SELECT schema_name, brand_id, tenant_id FROM public.tenant_schema_map WHERE is_active = TRUE")
+            )
             rows = result.fetchall()
             for row in rows:
                 _TENANT_SCHEMA_MAP[row[1]] = row[0]  # brand_id → schema
@@ -59,6 +60,7 @@ async def _set_search_path(session: AsyncSession, schema_name: str):
     """动态设置当前会话的 search_path"""
     await session.execute(text(f"SET search_path TO {schema_name}, public"))
     logger.debug("search_path set", schema=schema_name)
+
 
 # Import Base for models
 from src.models.base import Base
@@ -88,10 +90,14 @@ if settings.APP_ENV == "test":
         echo=settings.APP_DEBUG,
         poolclass=NullPool,
         # Connection arguments for better reliability
-        connect_args={
-            "server_settings": {"application_name": "zhilian_os_api_test"},
-            "timeout": 10,
-        } if IS_POSTGRES else {},
+        connect_args=(
+            {
+                "server_settings": {"application_name": "zhilian_os_api_test"},
+                "timeout": 10,
+            }
+            if IS_POSTGRES
+            else {}
+        ),
     )
 else:
     # Production/Development: Use QueuePool with optimized settings
@@ -105,11 +111,15 @@ else:
         pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
         pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "3600")),
         pool_pre_ping=True,
-        connect_args={
-            "server_settings": {"application_name": "zhilian_os_api"},
-            "timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
-            "command_timeout": int(os.getenv("DB_COMMAND_TIMEOUT", "60")),
-        } if IS_POSTGRES else {},
+        connect_args=(
+            {
+                "server_settings": {"application_name": "zhilian_os_api"},
+                "timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+                "command_timeout": int(os.getenv("DB_COMMAND_TIMEOUT", "60")),
+            }
+            if IS_POSTGRES
+            else {}
+        ),
     )
 
 # Create session factory
@@ -208,6 +218,7 @@ async def get_db(enable_tenant_isolation: bool = True):
 async def init_db(retries: int = 5, delay: float = 3.0):
     """Initialize database - create all tables（带重试，兼容 DB 启动慢的场景）"""
     import asyncio
+
     from src.models import Base
 
     last_exc = None

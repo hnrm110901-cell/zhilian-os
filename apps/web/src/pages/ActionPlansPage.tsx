@@ -83,7 +83,7 @@ const DIMENSION_LABEL: Record<string, string> = {
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const ActionPlansPage: React.FC = () => {
-  const storeId = localStorage.getItem('store_id') || 'STORE001';
+  const storeId = localStorage.getItem('store_id') || '';
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   );

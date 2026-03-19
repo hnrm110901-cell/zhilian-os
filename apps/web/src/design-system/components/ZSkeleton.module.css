@@ -4,21 +4,22 @@
 }
 
 .base {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-sm, 8px);
   background: linear-gradient(
     90deg,
-    var(--surface) 25%,
-    var(--surface-hover) 50%,
-    var(--surface) 75%
+    var(--surface-hover, rgba(0,0,0,0.03)) 25%,
+    rgba(0,0,0,0.05) 50%,
+    var(--surface-hover, rgba(0,0,0,0.03)) 75%
   );
   background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
+  animation: shimmer 1.6s infinite linear;
 }
 
 .line {
   height: 14px;
   width: 100%;
   margin-bottom: 10px;
+  border-radius: var(--radius-xs, 6px);
 }
 
 .line:last-child {
@@ -29,6 +30,7 @@
 .block {
   height: 80px;
   width: 100%;
+  border-radius: var(--radius-md, 12px);
 }
 
 .avatar {

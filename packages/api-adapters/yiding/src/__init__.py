@@ -1,7 +1,7 @@
 """
-易订适配器 - YiDing Adapter
+易订预订系统适配器 - YiDing Reservation System Adapter
 
-智链OS与易订预订系统的集成适配器
+基于易订开放API（https://open.zhidianfan.com/yidingopen/）
 """
 
 from .adapter import YiDingAdapter
@@ -13,43 +13,32 @@ from .types import (
     UnifiedReservation,
     UnifiedCustomer,
     UnifiedTable,
+    UnifiedBill,
+    UnifiedDish,
     ReservationStats,
-    CreateReservationDTO,
-    UpdateReservationDTO,
-    CreateCustomerDTO,
-    UpdateCustomerDTO,
     ReservationStatus,
     TableType,
-    TableStatus
+    TableStatus,
+    CreateReservationDTO,
 )
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 __all__ = [
-    # Main adapter
     "YiDingAdapter",
-
-    # Components
     "YiDingClient",
+    "YiDingAPIError",
     "YiDingMapper",
     "YiDingCache",
-
-    # Exceptions
-    "YiDingAPIError",
-
-    # Types
     "YiDingConfig",
     "UnifiedReservation",
     "UnifiedCustomer",
     "UnifiedTable",
+    "UnifiedBill",
+    "UnifiedDish",
     "ReservationStats",
-    "CreateReservationDTO",
-    "UpdateReservationDTO",
-    "CreateCustomerDTO",
-    "UpdateCustomerDTO",
-
-    # Enums
     "ReservationStatus",
     "TableType",
     "TableStatus",
+    "CreateReservationDTO",
 ]

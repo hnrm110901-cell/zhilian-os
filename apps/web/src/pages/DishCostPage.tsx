@@ -14,7 +14,7 @@ const { Option } = Select;
 const DishCostPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [data, setData] = useState<any>(null);
 
   const loadStores = useCallback(async () => {
@@ -88,7 +88,6 @@ const DishCostPage: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.id || s.store_id} value={s.id || s.store_id}>{s.name}</Option>)
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
         </Space>

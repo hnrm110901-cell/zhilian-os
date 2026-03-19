@@ -19,7 +19,6 @@ import structlog
 from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
 from src.models.waste_event import WasteEvent, WasteEventStatus, WasteEventType
 
 logger = structlog.get_logger()
@@ -153,13 +152,7 @@ class WasteEventService:
         if ingredient_id:
             conditions.append(WasteEvent.ingredient_id == ingredient_id)
 
-        stmt = (
-            select(WasteEvent)
-            .where(and_(*conditions))
-            .order_by(WasteEvent.occurred_at.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        stmt = select(WasteEvent).where(and_(*conditions)).order_by(WasteEvent.occurred_at.desc()).offset(offset).limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -208,11 +201,7 @@ class WasteEventService:
 
     async def close_event(self, event_id: str) -> bool:
         """关闭损耗事件"""
-        await self.db.execute(
-            update(WasteEvent)
-            .where(WasteEvent.event_id == event_id)
-            .values(status=WasteEventStatus.CLOSED)
-        )
+        await self.db.execute(update(WasteEvent).where(WasteEvent.event_id == event_id).values(status=WasteEventStatus.CLOSED))
         return True
 
     # ── 聚合统计 ──────────────────────────────────────────────────────────────
@@ -224,6 +213,7 @@ class WasteEventService:
     ) -> dict:
         """门店损耗汇总（按食材分组）"""
         from sqlalchemy import func
+
         since = datetime.utcnow() - timedelta(days=days)
         stmt = (
             select(
@@ -246,9 +236,7 @@ class WasteEventService:
         rows = result.all()
 
         total_events = await self.db.execute(
-            select(func.count(WasteEvent.id)).where(
-                and_(WasteEvent.store_id == store_id, WasteEvent.occurred_at >= since)
-            )
+            select(func.count(WasteEvent.id)).where(and_(WasteEvent.store_id == store_id, WasteEvent.occurred_at >= since))
         )
 
         return {
@@ -273,6 +261,7 @@ class WasteEventService:
     ) -> List[dict]:
         """损耗根因分布统计"""
         from sqlalchemy import func
+
         since = datetime.utcnow() - timedelta(days=days)
         stmt = (
             select(
@@ -308,8 +297,8 @@ class WasteEventService:
         ingredient_id: str,
     ) -> Optional[float]:
         """从 BOM 读取食材的标准用量（理论消耗）"""
-        from src.models.bom import BOMTemplate, BOMItem
         from sqlalchemy import and_
+        from src.models.bom import BOMItem, BOMTemplate
 
         stmt = (
             select(BOMItem.standard_qty)
@@ -380,6 +369,7 @@ class WasteEventService:
             return
         try:
             import json
+
             from src.ontology.data_sync import OntologyDataSync
 
             with OntologyDataSync() as sync:
@@ -404,11 +394,8 @@ class WasteEventService:
     async def _trigger_wechat_alert(self, event: WasteEvent) -> None:
         """损耗偏差超阈值时，创建企微 Action 告警"""
         try:
-            from src.services.wechat_action_fsm import (
-                ActionCategory,
-                ActionPriority,
-                get_wechat_fsm,
-            )
+            from src.services.wechat_action_fsm import ActionCategory, ActionPriority, get_wechat_fsm
+
             fsm = get_wechat_fsm()
             pct = round((event.variance_pct or 0) * 100, 1)
             priority = ActionPriority.P0 if abs(pct) >= 50 else ActionPriority.P1
@@ -432,9 +419,7 @@ class WasteEventService:
 
             # 记录 Action ID 到事件
             await self.db.execute(
-                update(WasteEvent)
-                .where(WasteEvent.id == event.id)
-                .values(wechat_action_id=action.action_id)
+                update(WasteEvent).where(WasteEvent.id == event.id).values(wechat_action_id=action.action_id)
             )
         except Exception as e:
             logger.warning("企微损耗告警失败", error=str(e), event_id=event.event_id)
@@ -443,6 +428,7 @@ class WasteEventService:
         """投递损耗推理到 Celery 队列"""
         try:
             from src.core.celery_tasks import process_waste_event
+
             process_waste_event.delay(event_id)
         except Exception as e:
             logger.warning("Celery 推理任务投递失败", error=str(e), event_id=event_id)

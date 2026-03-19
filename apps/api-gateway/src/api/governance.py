@@ -2,17 +2,19 @@
 AI 治理看板 API
 Governance Dashboard — 聚合决策采纳率、Agent 健康度、人工干预率等治理指标
 """
-from fastapi import APIRouter, Depends, Query, HTTPException
-from typing import Optional, Dict, Any, List
+
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db
+from ..models.decision_log import DecisionLog, DecisionOutcome, DecisionStatus
 from ..models.user import User
-from ..models.decision_log import DecisionLog, DecisionStatus, DecisionOutcome
 from ..services.agent_monitor_service import agent_monitor_service
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -46,13 +48,26 @@ async def get_governance_dashboard(
 
         # ── KPI summary ───────────────────────────────────────────────────────
         total = len(logs)
-        decided = [l for l in logs if l.decision_status in (
-            DecisionStatus.APPROVED, DecisionStatus.REJECTED,
-            DecisionStatus.MODIFIED, DecisionStatus.EXECUTED,
-        )]
-        approved_count = sum(1 for l in decided if l.decision_status in (
-            DecisionStatus.APPROVED, DecisionStatus.EXECUTED,
-        ))
+        decided = [
+            l
+            for l in logs
+            if l.decision_status
+            in (
+                DecisionStatus.APPROVED,
+                DecisionStatus.REJECTED,
+                DecisionStatus.MODIFIED,
+                DecisionStatus.EXECUTED,
+            )
+        ]
+        approved_count = sum(
+            1
+            for l in decided
+            if l.decision_status
+            in (
+                DecisionStatus.APPROVED,
+                DecisionStatus.EXECUTED,
+            )
+        )
         rejected_count = sum(1 for l in decided if l.decision_status == DecisionStatus.REJECTED)
         modified_count = sum(1 for l in decided if l.decision_status == DecisionStatus.MODIFIED)
 
@@ -80,21 +95,36 @@ async def get_governance_dashboard(
             wl = [l for l in logs if week_start <= l.created_at <= week_end]
             if not wl:
                 continue
-            w_decided = [l for l in wl if l.decision_status in (
-                DecisionStatus.APPROVED, DecisionStatus.REJECTED,
-                DecisionStatus.MODIFIED, DecisionStatus.EXECUTED,
-            )]
-            w_approved = sum(1 for l in w_decided if l.decision_status in (
-                DecisionStatus.APPROVED, DecisionStatus.EXECUTED,
-            ))
+            w_decided = [
+                l
+                for l in wl
+                if l.decision_status
+                in (
+                    DecisionStatus.APPROVED,
+                    DecisionStatus.REJECTED,
+                    DecisionStatus.MODIFIED,
+                    DecisionStatus.EXECUTED,
+                )
+            ]
+            w_approved = sum(
+                1
+                for l in w_decided
+                if l.decision_status
+                in (
+                    DecisionStatus.APPROVED,
+                    DecisionStatus.EXECUTED,
+                )
+            )
             w_rate = round(w_approved / len(w_decided) * 100, 1) if w_decided else 0.0
-            weekly_trend.append({
-                "week_start": week_start.strftime("%m-%d"),
-                "week_end": week_end.strftime("%m-%d"),
-                "total": len(wl),
-                "decided": len(w_decided),
-                "adoption_rate": w_rate,
-            })
+            weekly_trend.append(
+                {
+                    "week_start": week_start.strftime("%m-%d"),
+                    "week_end": week_end.strftime("%m-%d"),
+                    "total": len(wl),
+                    "decided": len(w_decided),
+                    "adoption_rate": w_rate,
+                }
+            )
         weekly_trend.reverse()
 
         # ── 各 Agent 决策统计（柱状图）────────────────────────────────────────
@@ -113,9 +143,15 @@ async def get_governance_dashboard(
             else:
                 agent_buckets[at]["pending"] += 1
         agent_stats = [
-            {"agent_type": k, **v,
-             "adoption_rate": round(v["approved"] / (v["approved"] + v["rejected"] + v["modified"]) * 100, 1)
-             if (v["approved"] + v["rejected"] + v["modified"]) > 0 else 0.0}
+            {
+                "agent_type": k,
+                **v,
+                "adoption_rate": (
+                    round(v["approved"] / (v["approved"] + v["rejected"] + v["modified"]) * 100, 1)
+                    if (v["approved"] + v["rejected"] + v["modified"]) > 0
+                    else 0.0
+                ),
+            }
             for k, v in agent_buckets.items()
         ]
         agent_stats.sort(key=lambda x: x["total"], reverse=True)
@@ -123,20 +159,22 @@ async def get_governance_dashboard(
         # ── 最近 20 条决策日志 ─────────────────────────────────────────────────
         recent_logs = []
         for l in logs[:20]:
-            recent_logs.append({
-                "id": str(l.id),
-                "created_at": l.created_at.strftime("%Y-%m-%d %H:%M"),
-                "store_id": l.store_id,
-                "agent_type": l.agent_type,
-                "decision_type": l.decision_type.value if l.decision_type else None,
-                "ai_suggestion": (l.ai_suggestion or "")[:80],
-                "decision_status": l.decision_status.value if l.decision_status else None,
-                "outcome": l.outcome.value if l.outcome else None,
-                "ai_confidence": round((l.ai_confidence or 0) * 100, 1),
-                "trust_score": round((l.trust_score or 0) * 100, 1),
-                "cost_impact_yuan": float(l.cost_impact or 0),
-                "revenue_impact_yuan": float(l.revenue_impact or 0),
-            })
+            recent_logs.append(
+                {
+                    "id": str(l.id),
+                    "created_at": l.created_at.strftime("%Y-%m-%d %H:%M"),
+                    "store_id": l.store_id,
+                    "agent_type": l.agent_type,
+                    "decision_type": l.decision_type.value if l.decision_type else None,
+                    "ai_suggestion": (l.ai_suggestion or "")[:80],
+                    "decision_status": l.decision_status.value if l.decision_status else None,
+                    "outcome": l.outcome.value if l.outcome else None,
+                    "ai_confidence": round((l.ai_confidence or 0) * 100, 1),
+                    "trust_score": round((l.trust_score or 0) * 100, 1),
+                    "cost_impact_yuan": float(l.cost_impact or 0),
+                    "revenue_impact_yuan": float(l.revenue_impact or 0),
+                }
+            )
 
         # ── 实时 Agent 调用指标（来自内存）────────────────────────────────────
         realtime = await agent_monitor_service.get_realtime_stats()

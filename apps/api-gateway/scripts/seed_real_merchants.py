@@ -1,8 +1,8 @@
 """
 种子脚本：正式开通三个种子客户商户后台
-- 尝在一起（品智收银 + 奥琦玮微生活）
-- 最黔线（品智收银 + 奥琦玮微生活）
-- 尚宫厨（品智收银 + 奥琦玮微生活 + 卡券中心）
+- 尝在一起（品智收银 + 微生活会员 + 喰星云供应链）
+- 最黔线（品智收银 + 微生活会员）
+- 尚宫厨（品智收银 + 微生活会员 + 微生活卡券中心）
 
 运行方式：
   cd apps/api-gateway
@@ -79,15 +79,41 @@ MERCHANTS = [
         },
         # 品智收银配置（一个域名 + 全局 Token + 各店独立 Token）
         "pinzhi": {
-            "base_url": "https://czyq.pinzhikeji.net/api/v1",
+            "base_url": "https://czyq.pinzhikeji.net/pzcatering-gateway",
             "api_token": "3bbc9bed2b42c1e1b3cca26389fbb81c",
         },
-        # 奥琦玮微生活配置
-        "aoqiwei_crm": {
+        # 易订预订系统配置（接口凭证待确认，管理后台账号如下）
+        "yiding": {
+            "base_url": "https://open.zhidianfan.com/yidingopen/",
+            "stores": [
+                {
+                    "name": "尝在一起闲鲜餐厅",
+                    "portal_username": "czyq001",
+                    "portal_password": "24683791S",
+                    "appid": "",   # ⚠️ 待填写：需从易订获取API appid
+                    "secret": "",  # ⚠️ 待填写：需从易订获取API secret
+                },
+                {
+                    "name": "浏阳市永安镇尝在一起闲鲜餐厅",
+                    "portal_username": "cznlp000",
+                    "portal_password": "24503791S",
+                    "appid": "",   # ⚠️ 待填写
+                    "secret": "",  # ⚠️ 待填写
+                },
+            ],
+        },
+        # 微生活会员系统配置（奥琦玮旗下，api.acewill.net）
+        "weishenghuo": {
             "base_url": "https://api.acewill.net",
             "app_id": "dp25MLoc2gnXE7A223ZiVv",
             "app_key": "3d2eaa5f9b9a6a6746a18d28e770b501",
             "merchant_id": "1275413383",  # ✅ 已配置
+        },
+        # 喰星云供应链配置（奥琦玮旗下，尝在一起专属实例）
+        "chixingyun": {
+            "base_url": "http://czyqss.scmacewill.cn",
+            "app_key": "changzaiyiqi",
+            "app_secret": "WmRpv8OlR1UR",
         },
         "stores": [
             {
@@ -156,10 +182,11 @@ MERCHANTS = [
             "brand_id": "BRD_ZQX0001",
         },
         "pinzhi": {
-            "base_url": "https://ljcg.pinzhikeji.net/api/v1",
+            "base_url": "https://ljcg.pinzhikeji.net/pzcatering-gateway",
             "api_token": "47a428538d350fac1640a51b6bbda68c",
         },
-        "aoqiwei_crm": {
+        # 微生活会员系统配置（奥琦玮旗下）
+        "weishenghuo": {
             "base_url": "https://api.acewill.net",
             "app_id": "dp2C8kqBMmGrHUVpBjqAw8q3",
             "app_key": "56573c798c8ab0dc565e704190207f12",
@@ -262,17 +289,18 @@ MERCHANTS = [
             "brand_id": "BRD_SGC0001",
         },
         "pinzhi": {
-            "base_url": "https://xcsgc.pinzhikeji.net/api/v1",
+            "base_url": "https://xcsgc.pinzhikeji.net/pzcatering-gateway",
             "api_token": "8275cf74d1943d7a32531d2d4f889870",
         },
-        "aoqiwei_crm": {
+        # 微生活会员系统配置（奥琦玮旗下）
+        "weishenghuo": {
             "base_url": "https://api.acewill.net",
             "app_id": "dp0X0jl45wauwdGgkRETITz",
             "app_key": "649738234c7426bfa0dbfa431c92a750",
             "merchant_id": "1549254243",  # ✅ 已配置（心传尚宫厨）
         },
-        # 卡券中心（尚宫厨独有）
-        "aoqiwei_coupon": {
+        # 微生活卡券中心（尚宫厨独有）
+        "weishenghuo_coupon": {
             "base_url": "https://apigateway.acewill.net",
             "app_id": "1549254243_6",
             "app_key": "d650652396b1bab5434d51c44c4d1436",
@@ -503,39 +531,60 @@ def seed():
                     brand_id=brand_id,
                 )
 
-            # 5. 奥琦玮微生活CRM集成（品牌级，用第一家门店的 store_id 标记）
+            # 5. 微生活会员系统集成（奥琦玮旗下，品牌级）
             first_store_id = m["stores"][0]["id"]
-            crm = m["aoqiwei_crm"]
-            merchant_id_status = "✅ 已配置" if crm["merchant_id"] else "⚠️  待填写"
-            print(f"  [info] 奥琦玮商户号: {crm['merchant_id'] or '【待填写】'} {merchant_id_status}")
+            wsh = m["weishenghuo"]
+            merchant_id_status = "✅ 已配置" if wsh["merchant_id"] else "⚠️  待填写"
+            print(f"  [info] 微生活商户号: {wsh['merchant_id'] or '【待填写】'} {merchant_id_status}")
             upsert_external_system(
                 session=session,
-                name=f"奥琦玮微生活CRM - {brand_name}",
+                name=f"微生活会员 - {brand_name}",
                 sys_type=IntegrationType.MEMBER,
-                provider="aoqiwei",
-                api_endpoint=crm["base_url"],
-                api_key=crm["app_id"],
-                api_secret=crm["app_key"],
+                provider="weishenghuo",
+                api_endpoint=wsh["base_url"],
+                api_key=wsh["app_id"],
+                api_secret=wsh["app_key"],
                 store_id=None,  # 品牌级别，不绑定单店
                 config={
-                    "aoqiwei_app_id": crm["app_id"],
-                    "aoqiwei_app_key": crm["app_key"],
-                    "aoqiwei_merchant_id": crm["merchant_id"],
-                    "merchant_id_pending": crm["merchant_id"] == "",
+                    "weishenghuo_app_id": wsh["app_id"],
+                    "weishenghuo_app_key": wsh["app_key"],
+                    "weishenghuo_merchant_id": wsh["merchant_id"],
+                    "merchant_id_pending": wsh["merchant_id"] == "",
                     "sign_algorithm": "MD5(appId+appKey+timestamp+merchantId)",
                     "brand_id": brand_id,
                 },
                 brand_id=brand_id,
             )
 
-            # 6. 卡券中心（仅尚宫厨）
-            if "aoqiwei_coupon" in m:
-                coupon = m["aoqiwei_coupon"]
+            # 6. 喰星云供应链集成（奥琦玮旗下，仅配置了的商户）
+            if "chixingyun" in m:
+                scm = m["chixingyun"]
                 upsert_external_system(
                     session=session,
-                    name=f"奥琦玮卡券中心 - {brand_name}",
+                    name=f"喰星云供应链 - {brand_name}",
+                    sys_type=IntegrationType.SUPPLIER,
+                    provider="chixingyun",
+                    api_endpoint=scm["base_url"],
+                    api_key=scm["app_key"],
+                    api_secret=scm["app_secret"],
+                    store_id=None,  # 品牌级别
+                    config={
+                        "chixingyun_base_url": scm["base_url"],
+                        "chixingyun_app_key": scm["app_key"],
+                        "sign_algorithm": "MD5(sorted_params+appSecret)",
+                        "brand_id": brand_id,
+                    },
+                    brand_id=brand_id,
+                )
+
+            # 7. 微生活卡券中心（仅尚宫厨）
+            if "weishenghuo_coupon" in m:
+                coupon = m["weishenghuo_coupon"]
+                upsert_external_system(
+                    session=session,
+                    name=f"微生活卡券中心 - {brand_name}",
                     sys_type=IntegrationType.MEMBER,
-                    provider="aoqiwei_coupon",
+                    provider="weishenghuo_coupon",
                     api_endpoint=coupon["base_url"],
                     api_key=coupon["app_id"],
                     api_secret=coupon["app_key"],
@@ -561,7 +610,7 @@ def _print_summary():
 ┌──────────────────────────────────────────────────────────┐
 │                    商户开通摘要                            │
 ├──────────────┬──────────┬────────────┬───────────────────┤
-│ 商户         │ 门店数   │ 登录账号   │ 奥琦玮商户号       │
+│ 商户         │ 门店数   │ 登录账号   │ 微生活商户号       │
 ├──────────────┼──────────┼────────────┼───────────────────┤
 │ 尝在一起     │ 3家      │ czyz_admin │ ✅ 1275413383      │
 │ 最黔线       │ 6家      │ zqx_admin  │ ✅ 1827518239      │
@@ -569,6 +618,7 @@ def _print_summary():
 └──────────────┴──────────┴────────────┴───────────────────┘
 
 ✅ 所有商户号已配置完毕！
+  奥琦玮子系统: 品智收银(POS) + 微生活(会员) + 喰星云(供应链)
 
   品智数据同步（Celery 定时任务）默认每5分钟拉取一次订单数据
      启动命令: celery -A src.core.celery_tasks worker --beat -l info

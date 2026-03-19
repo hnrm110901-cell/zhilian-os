@@ -1,12 +1,14 @@
 """
 Celery配置和应用实例
 """
+
+import os
+from typing import Optional, Tuple
+
+import structlog
 from celery import Celery
 from celery.schedules import crontab
 from kombu import Exchange, Queue
-import os
-import structlog
-from typing import Optional, Tuple
 
 from .config import settings
 
@@ -71,27 +73,22 @@ celery_app.conf.update(
     result_serializer="json",
     timezone=_celery_timezone,
     enable_utc=_celery_enable_utc,
-
     # 任务结果配置
     result_expires=int(os.getenv("CELERY_RESULT_EXPIRES", "3600")),  # 结果保留N秒
     result_backend_transport_options={
         "master_name": "mymaster",
         "retry_on_timeout": True,
     },
-
     # 任务执行配置
     task_acks_late=True,  # 任务完成后才确认
     task_reject_on_worker_lost=True,  # Worker丢失时拒绝任务
     task_track_started=True,  # 跟踪任务开始状态
-
     # 重试配置
-    task_default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),      # 默认重试延迟N秒
-    task_max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),               # 最大重试N次
-
+    task_default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),  # 默认重试延迟N秒
+    task_max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),  # 最大重试N次
     # Worker配置
-    worker_prefetch_multiplier=int(os.getenv("CELERY_PREFETCH_MULTIPLIER", "4")),          # 每个worker预取N个任务
-    worker_max_tasks_per_child=int(os.getenv("CELERY_MAX_TASKS_PER_CHILD", "1000")),       # 每个worker子进程最多执行N个任务后重启
-
+    worker_prefetch_multiplier=int(os.getenv("CELERY_PREFETCH_MULTIPLIER", "4")),  # 每个worker预取N个任务
+    worker_max_tasks_per_child=int(os.getenv("CELERY_MAX_TASKS_PER_CHILD", "1000")),  # 每个worker子进程最多执行N个任务后重启
     # 队列配置
     task_queues=(
         # 高优先级队列 - 实时事件处理
@@ -116,7 +113,6 @@ celery_app.conf.update(
             queue_arguments={"x-max-priority": 1},
         ),
     ),
-
     # 任务路由
     task_routes={
         "src.core.celery_tasks.process_neural_event": {
@@ -179,6 +175,18 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.dispatch_stale_journeys": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.generate_and_send_weekly_report": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.execute_scheduled_reports": {
+            "queue": "default",
+            "routing_key": "default",
+        },
         "src.core.celery_tasks.refresh_private_domain_rfm": {
             "queue": "low_priority",
             "routing_key": "low_priority",
@@ -224,7 +232,7 @@ celery_app.conf.update(
             "routing_key": "high_priority",
         },
         "src.core.celery_tasks.dispatch_agent_message": {
-            "queue": "high_priority",   # P0/P1 走高优先队列；fire_and_forget 本身按 priority 选队列
+            "queue": "high_priority",  # P0/P1 走高优先队列；fire_and_forget 本身按 priority 选队列
             "routing_key": "high_priority",
         },
         "src.core.celery_tasks.member_agent_dormant_sweep": {
@@ -239,8 +247,31 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.scheduled_im_roster_sync": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.retry_failed_dingtalk_messages": {
+            "queue": "high_priority",
+            "routing_key": "high_priority",
+        },
+        "src.core.celery_tasks.remind_incomplete_onboarding": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.sweep_milestone_notifications": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "check_approval_timeouts": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.run_decision_effect_reviews": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
-
     # Celery Beat定时任务调度
     beat_schedule={
         # 每15分钟检测营收异常
@@ -256,7 +287,9 @@ celery_app.conf.update(
         # 每天6AM生成昨日简报(RAG增强)
         "generate-daily-report-rag": {
             "task": "src.core.celery_tasks.generate_daily_report_with_rag",
-            "schedule": crontab(hour=int(os.getenv("CELERY_RAG_REPORT_HOUR", "6")), minute=int(os.getenv("CELERY_RAG_REPORT_MINUTE", "0"))),
+            "schedule": crontab(
+                hour=int(os.getenv("CELERY_RAG_REPORT_HOUR", "6")), minute=int(os.getenv("CELERY_RAG_REPORT_MINUTE", "0"))
+            ),
             "args": (),
             "options": {
                 "queue": "default",
@@ -266,7 +299,10 @@ celery_app.conf.update(
         # 每天10AM检查库存预警(午高峰前)
         "check-inventory-alert": {
             "task": "src.core.celery_tasks.check_inventory_alert",
-            "schedule": crontab(hour=int(os.getenv("CELERY_INVENTORY_CHECK_HOUR", "10")), minute=int(os.getenv("CELERY_INVENTORY_CHECK_MINUTE", "0"))),
+            "schedule": crontab(
+                hour=int(os.getenv("CELERY_INVENTORY_CHECK_HOUR", "10")),
+                minute=int(os.getenv("CELERY_INVENTORY_CHECK_MINUTE", "0")),
+            ),
             "args": (),
             "options": {
                 "queue": "default",
@@ -276,7 +312,10 @@ celery_app.conf.update(
         # 每日22:30生成当日营业日报
         "generate-daily-reports": {
             "task": "src.core.celery_tasks.generate_and_send_daily_report",
-            "schedule": crontab(hour=int(os.getenv("CELERY_BUSINESS_REPORT_HOUR", "22")), minute=int(os.getenv("CELERY_BUSINESS_REPORT_MINUTE", "30"))),
+            "schedule": crontab(
+                hour=int(os.getenv("CELERY_BUSINESS_REPORT_HOUR", "22")),
+                minute=int(os.getenv("CELERY_BUSINESS_REPORT_MINUTE", "30")),
+            ),
             "args": (),  # 将为所有门店生成报告
             "options": {
                 "queue": "default",
@@ -286,7 +325,10 @@ celery_app.conf.update(
         # 每日凌晨3点执行POS对账
         "perform-daily-reconciliation": {
             "task": "src.core.celery_tasks.perform_daily_reconciliation",
-            "schedule": crontab(hour=int(os.getenv("CELERY_RECONCILIATION_HOUR", "3")), minute=int(os.getenv("CELERY_RECONCILIATION_MINUTE", "0"))),
+            "schedule": crontab(
+                hour=int(os.getenv("CELERY_RECONCILIATION_HOUR", "3")),
+                minute=int(os.getenv("CELERY_RECONCILIATION_MINUTE", "0")),
+            ),
             "args": (),  # 将为所有门店执行对账
             "options": {
                 "queue": "default",
@@ -329,7 +371,7 @@ celery_app.conf.update(
         },
         # 每日凌晨 2AM 同步 PG 主数据 → Neo4j 图谱
         "sync-ontology-graph": {
-            "task": "src.core.celery_tasks.sync_ontology_graph",
+            "task": "tasks.daily_ontology_sync",
             "schedule": crontab(
                 hour=int(os.getenv("CELERY_ONTOLOGY_SYNC_HOUR", "2")),
                 minute=0,
@@ -393,7 +435,7 @@ celery_app.conf.update(
             "args": (),
             "options": {
                 "queue": "default",
-                "priority": 9,   # 最高优先级，必须准时执行
+                "priority": 9,  # 最高优先级，必须准时执行
             },
         },
         # 每 5 分钟检查工作流 deadline（T-10min 预警 + 过期自动锁定）
@@ -527,7 +569,7 @@ celery_app.conf.update(
         # 每小时触发新会员激活旅程
         "trigger-new-member-journeys": {
             "task": "src.core.celery_tasks.trigger_new_member_journeys",
-            "schedule": crontab(minute=5),   # 每小时第 5 分钟执行，错开整点高峰
+            "schedule": crontab(minute=5),  # 每小时第 5 分钟执行，错开整点高峰
             "args": (),
             "options": {"queue": "default", "priority": 5},
         },
@@ -575,8 +617,8 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 7},
         },
-        # 每日凌晨 02:25 奥琦玮CRM会员数据增强（基于近30天订单手机号逐条查询）
-        "enrich-members-aoqiwei-crm": {
+        # 每日凌晨 02:25 微生活会员数据增强（基于近30天订单手机号逐条查询）
+        "enrich-members-weishenghuo": {
             "task": "src.core.celery_tasks.enrich_members_from_aoqiwei_crm",
             "schedule": crontab(
                 hour=int(os.getenv("AOQIWEI_CRM_ENRICH_HOUR", "2")),
@@ -683,6 +725,76 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 5},
         },
+        # IM 通讯录定时同步（每日 02:00，在 POS 对账前完成人员同步）
+        "scheduled-im-roster-sync": {
+            "task": "src.core.celery_tasks.scheduled_im_roster_sync",
+            "schedule": crontab(
+                hour=int(os.getenv("IM_SYNC_HOUR", "2")),
+                minute=int(os.getenv("IM_SYNC_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
+        # IM 考勤数据同步（每日 06:00，同步昨日打卡数据）
+        "scheduled-im-attendance-sync": {
+            "task": "src.core.celery_tasks.scheduled_im_attendance_sync",
+            "schedule": crontab(
+                hour=int(os.getenv("IM_ATTENDANCE_SYNC_HOUR", "6")),
+                minute=int(os.getenv("IM_ATTENDANCE_SYNC_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # 每5分钟重试失败的钉钉消息
+        "retry-failed-dingtalk-messages": {
+            "task": "src.core.celery_tasks.retry_failed_dingtalk_messages",
+            "schedule": crontab(minute="*/5"),
+            "args": (),
+            "options": {"queue": "high_priority", "priority": 8},
+        },
+        # Phase 4: 每日 09:00 提醒入职任务未完成的新员工
+        "remind-incomplete-onboarding": {
+            "task": "src.core.celery_tasks.remind_incomplete_onboarding",
+            "schedule": crontab(
+                hour=int(os.getenv("ONBOARDING_REMIND_HOUR", "9")),
+                minute=int(os.getenv("ONBOARDING_REMIND_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # Phase 4: 每日 10:00 扫描未推送的里程碑/技能认证通知
+        "sweep-milestone-notifications": {
+            "task": "src.core.celery_tasks.sweep_milestone_notifications",
+            "schedule": crontab(
+                hour=int(os.getenv("MILESTONE_SWEEP_HOUR", "10")),
+                minute=int(os.getenv("MILESTONE_SWEEP_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # Phase 3 HR: 每日 08:00 合规告警扫描（健康证/合同/身份证到期）
+        "check-compliance-alerts-daily": {
+            "task": "check_compliance_alerts",
+            "schedule": crontab(hour=8, minute=0),  # 每日 08:00
+            "options": {"queue": "default"},
+        },
+        # W2-1: 每小时整点检查超期审批（自动升级/催办）
+        "check-approval-timeouts-hourly": {
+            "task": "check_approval_timeouts",
+            "schedule": crontab(minute=0),  # 每小时整点
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
+        # Phase 2 飞轮: 每日 04:00 扫描已执行决策的30/60/90天效果回顾
+        "decision-flywheel-effect-review": {
+            "task": "src.core.celery_tasks.run_decision_effect_reviews",
+            "schedule": crontab(
+                hour=int(os.getenv("FLYWHEEL_REVIEW_HOUR", "4")),
+                minute=int(os.getenv("FLYWHEEL_REVIEW_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
         # Phase 9 — 每3分钟检测边缘主机心跳，离线自动创建 P1 告警
         "check-edge-hub-heartbeats": {
             "task": "tasks.check_edge_hub_heartbeats",
@@ -706,6 +818,64 @@ celery_app.conf.update(
             "schedule": crontab(hour=6, minute=0, day_of_week=1),  # Monday 06:00 UTC
             "args": (),
             "options": {"queue": "low_priority", "priority": 3},
+        # 私域旅程 catch-up：每5分钟扫描 next_action_at 过期的 running 旅程并重新调度
+        "dispatch-stale-journeys": {
+            "task": "src.core.celery_tasks.dispatch_stale_journeys",
+            "schedule": crontab(minute="*/5"),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
+        # 周报：每周五 10:00 UTC（北京 18:00）生成本周汇总 + 企微推送
+        "generate-weekly-report": {
+            "task": "src.core.celery_tasks.generate_and_send_weekly_report",
+            "schedule": crontab(
+                hour=int(os.getenv("WEEKLY_REPORT_HOUR", "10")),
+                minute=int(os.getenv("WEEKLY_REPORT_MINUTE", "0")),
+                day_of_week=int(os.getenv("WEEKLY_REPORT_DOW", "5")),  # 5=Friday
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # 定时报表执行器：每 10 分钟扫描 ScheduledReport 并投递（email/system）
+        "execute-scheduled-reports": {
+            "task": "src.core.celery_tasks.execute_scheduled_reports",
+            "schedule": crontab(minute="*/10"),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
+        # v2.0 跨系统异常告警（营业时段每2小时：10,12,14,16,18,20,22 点整）
+        "push-cross-system-alerts": {
+            "task": "push_cross_system_alerts",
+            "schedule": crontab(minute=0, hour="10,12,14,16,18,20,22"),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
+        # 每日凌晨 04:00 品智 Webhook 补漏拉取（对比 API 与本地，补齐漏单）
+        "pull-pinzhi-missed-orders": {
+            "task": "pull_pinzhi_missed_orders",
+            "schedule": crontab(
+                hour=int(os.getenv("PINZHI_MISSED_PULL_HOUR", "4")),
+                minute=int(os.getenv("PINZHI_MISSED_PULL_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
+        # 每日凌晨 03:30 微生活会员增量同步（逐条查询 + ConsumerIdMapping 桥接）
+        "sync-weishenghuo-members": {
+            "task": "sync_weishenghuo_members",
+            "schedule": crontab(
+                hour=int(os.getenv("AOQIWEI_CRM_SYNC_HOUR", "3")),
+                minute=int(os.getenv("AOQIWEI_CRM_SYNC_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
+        # P2: 每日凌晨 03:00 发券 ROI 日汇总
+        "aggregate-coupon-roi-daily": {
+            "task": "src.core.celery_tasks.aggregate_coupon_roi_daily",
+            "schedule": crontab(hour=3, minute=0),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
         },
     },
 )

@@ -148,6 +148,9 @@ class TestSecurity:
         data = {"sub": "user123"}
         token = create_access_token(data)
 
-        # Decode without verification to check algorithm
-        unverified = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        # Decode using the same key that create_access_token used.
+        # Re-import settings at call time to get the actual value (may differ
+        # from module-level import if another test mutated settings).
+        from src.core.config import settings as _settings
+        unverified = jwt.decode(token, _settings.SECRET_KEY, algorithms=[ALGORITHM])
         assert unverified["sub"] == "user123"

@@ -2,14 +2,15 @@
 审计日志中间件
 自动记录API请求和操作
 """
+
+import time
+
+import structlog
 from fastapi import Request, Response
+from src.models.audit_log import AuditAction, ResourceType
+from src.services.audit_log_service import audit_log_service
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
-import time
-import structlog
-
-from src.services.audit_log_service import audit_log_service
-from src.models.audit_log import AuditAction, ResourceType
 
 logger = structlog.get_logger()
 
@@ -85,7 +86,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                 return {
                     "user_id": str(user.id),
                     "username": user.username,
-                    "user_role": user.role.value if hasattr(user.role, 'value') else str(user.role),
+                    "user_role": user.role.value if hasattr(user.role, "value") else str(user.role),
                     "store_id": user.store_id,
                 }
 
@@ -94,6 +95,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
                 from src.core.security import decode_access_token
+
                 payload = decode_access_token(token)
                 return {
                     "user_id": payload.get("sub"),
@@ -107,20 +109,11 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
 
         return None
 
-    async def _log_request(
-        self,
-        request: Request,
-        response: Response,
-        user_info: dict,
-        process_time: float
-    ):
+    async def _log_request(self, request: Request, response: Response, user_info: dict, process_time: float):
         """记录请求日志"""
         try:
             # 确定操作类型和资源类型
-            action, resource_type = self._determine_action_and_resource(
-                request.method,
-                request.url.path
-            )
+            action, resource_type = self._determine_action_and_resource(request.method, request.url.path)
 
             # 确定操作状态
             status = "success" if response.status_code < 400 else "failed"
@@ -132,11 +125,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             user_agent = request.headers.get("User-Agent")
 
             # 生成描述
-            description = self._generate_description(
-                request.method,
-                request.url.path,
-                response.status_code
-            )
+            description = self._generate_description(request.method, request.url.path, response.status_code)
 
             # 记录审计日志
             await audit_log_service.log_action(

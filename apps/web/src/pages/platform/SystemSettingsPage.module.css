@@ -17,21 +17,21 @@
 .pageTitle {
   font-size: 20px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .pageDesc {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin: 4px 0 0;
 }
 
 /* ── Section Card ───────────────────────────────────────────────────────────*/
 
 .section {
-  background: var(--surface, #0D2029);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
 }
@@ -42,7 +42,7 @@
   gap: 10px;
   margin-bottom: 20px;
   padding-bottom: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .sectionIcon {
@@ -79,13 +79,13 @@
 .sectionTitle {
   font-size: 16px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .sectionDesc {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin: 2px 0 0;
 }
 
@@ -108,7 +108,7 @@
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
   padding-top: 8px;
 }
 
@@ -120,13 +120,13 @@
 .formInput {
   width: 100%;
   height: 38px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0 12px;
   font-size: 14px;
   font-family: inherit;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   outline: none;
   transition: border-color 0.2s;
 }
@@ -136,7 +136,7 @@
 }
 
 .formInput::placeholder {
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--text-tertiary);
 }
 
 .formInput:disabled {
@@ -151,13 +151,13 @@
 .formSelect {
   width: 100%;
   height: 38px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0 12px;
   font-size: 14px;
   font-family: inherit;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   outline: none;
   cursor: pointer;
   appearance: none;
@@ -172,13 +172,13 @@
 
 .formHint {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.30);
+  color: var(--text-tertiary);
   margin-top: 4px;
 }
 
 .formStatic {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
   padding-top: 8px;
 }
 
@@ -196,7 +196,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--border);
 }
 
 .toggleRow:last-child {
@@ -211,12 +211,12 @@
 
 .toggleLabel {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
 }
 
 .toggleDesc {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
 }
 
 .toggle {
@@ -225,7 +225,7 @@
   height: 24px;
   border: none;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface-hover);
   cursor: pointer;
   transition: background 0.2s;
   flex-shrink: 0;
@@ -289,15 +289,15 @@
 }
 
 .infoCard {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px;
 }
 
 .infoLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
@@ -306,7 +306,7 @@
 .infoValue {
   font-size: 16px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
 }
 
 .infoValueMint {
@@ -325,15 +325,15 @@
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.38);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border);
 }
 
 .merchantTable td {
   padding: 12px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
 }
 
 .merchantTable tr:last-child td {
@@ -342,7 +342,7 @@
 
 .merchantName {
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
 }
 
 .merchantTag {
@@ -372,7 +372,7 @@
   gap: 10px;
   justify-content: flex-end;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border);
 }
 
 .btnPrimary {
@@ -399,10 +399,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -411,8 +411,8 @@
 }
 
 .btnSecondary:hover {
-  border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.85);
+  border-color: var(--border);
+  color: var(--text-primary);
 }
 
 /* ── Loading / Error ────────────────────────────────────────────────────────*/
@@ -427,7 +427,7 @@
 .errorWrap {
   text-align: center;
   padding: 40px;
-  color: rgba(255, 255, 255, 0.50);
+  color: var(--text-secondary);
   font-size: 14px;
 }
 

@@ -2,17 +2,20 @@
 Reconciliation Model
 对账记录模型
 """
-from sqlalchemy import Column, String, Integer, Float, Text, Date, Enum, JSON
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
+
 import enum
+import uuid
 from datetime import date
+
+from sqlalchemy import JSON, Column, Date, Enum, Float, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
 class ReconciliationStatus(str, enum.Enum):
     """对账状态"""
+
     PENDING = "pending"  # 待对账
     MATCHED = "matched"  # 已匹配
     MISMATCHED = "mismatched"  # 有差异
@@ -52,7 +55,7 @@ class ReconciliationRecord(Base, TimestampMixin):
         Enum(ReconciliationStatus, values_callable=lambda x: [e.value for e in x]),
         default=ReconciliationStatus.PENDING,
         nullable=False,
-        index=True
+        index=True,
     )
 
     # 差异详情

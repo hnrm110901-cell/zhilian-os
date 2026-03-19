@@ -182,7 +182,7 @@ const costItemColumns: ZTableColumn<CostReportItem>[] = [
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const BOMManagementPage: React.FC = () => {
-  const [storeId, setStoreId]       = useState(localStorage.getItem('store_id') || 'STORE001');
+  const [storeId, setStoreId]       = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores]         = useState<any[]>([]);
   const [boms, setBoms]             = useState<BOMTemplate[]>([]);
   const [loading, setLoading]       = useState(false);
@@ -230,7 +230,7 @@ const BOMManagementPage: React.FC = () => {
       const list: any[] = res.stores || res || [];
       setStores(list);
       if (list.length > 0 && !list.find((s: any) => (s.store_id || s.id) === storeId)) {
-        setStoreId(list[0].store_id || list[0].id || 'STORE001');
+        setStoreId(list[0].store_id || list[0].id || '');
       }
     } catch { /* ignore */ }
   }, [storeId]);
@@ -384,11 +384,7 @@ const BOMManagementPage: React.FC = () => {
 
   const storeOptions = stores.length > 0
     ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
-    : [
-        { value: 'STORE001', label: '北京旗舰店' },
-        { value: 'STORE002', label: '上海直营店' },
-        { value: 'STORE003', label: '广州加盟店' },
-      ];
+    : [];
 
   // ── BOM 列表列定义 ──────────────────────────────────────────────────────────
 

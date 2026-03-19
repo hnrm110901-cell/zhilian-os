@@ -73,7 +73,7 @@ interface Decision {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_BRAND = 'B001';
-const DEFAULT_STORE = 'S001';
+const DEFAULT_STORE = localStorage.getItem('store_id') || '';
 
 const ANOMALY_COLOR: Record<string, string> = {
   normal: 'green', warning: 'gold', critical: 'orange', severe: 'red',

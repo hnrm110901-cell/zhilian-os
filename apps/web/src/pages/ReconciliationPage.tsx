@@ -19,7 +19,7 @@ const ReconciliationPage: React.FC = () => {
   const [detailVisible, setDetailVisible] = useState(false);
   const [currentRecord, setCurrentRecord] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
 
   const loadStores = useCallback(async () => {
@@ -109,7 +109,7 @@ const ReconciliationPage: React.FC = () => {
             <Select value={storeId} onChange={setStoreId} style={{ width: 120 }}>
               {stores.length > 0 ? stores.map((s: any) => (
                 <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-              )) : <Option value="STORE001">门店001</Option>}
+              ))}
             </Select>
             <DatePicker value={dayjs(selectedDate)} onChange={d => d && setSelectedDate(d.format('YYYY-MM-DD'))} />
             <Button type="primary" icon={<ReloadOutlined />} loading={performing} onClick={performReconciliation}>执行对账</Button>

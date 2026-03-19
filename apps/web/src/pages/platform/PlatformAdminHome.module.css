@@ -21,10 +21,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.65);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -56,15 +56,15 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0;
-  background: var(--surface, #0D2029);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
 }
 
 .heroBar > * {
   padding: 20px 24px;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid var(--border);
 }
 
 .heroBar > *:last-child {
@@ -99,13 +99,13 @@
 
 .agentName {
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   font-size: 13px;
 }
 
 .responseMs {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -133,24 +133,24 @@
 .statusRowLabel {
   flex: 1;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
 }
 
 .statusRowVal {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
 }
 
 .trendLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin-bottom: 4px;
 }
 
 .refreshIconBtn {
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -177,7 +177,7 @@
 .sectionTitle {
   font-size: 15px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -200,8 +200,8 @@
 }
 
 .merchantCard {
-  background: var(--surface, #0D2029);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
   cursor: pointer;
@@ -225,12 +225,12 @@
 .merchantCardName {
   font-size: 15px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
 }
 
 .merchantCardMeta {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin-top: 2px;
 }
 
@@ -256,14 +256,14 @@
 .merchantStatVal {
   font-size: 20px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
 .merchantStatLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
 }
 
 /* ── 4. Bottom Row ───────────────────────────────────────────────────────────*/
@@ -293,7 +293,7 @@
   display: flex;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
   align-items: flex-start;
 }
 
@@ -305,7 +305,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-hover);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -320,14 +320,14 @@
 
 .eventTime {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin-right: 8px;
   font-variant-numeric: tabular-nums;
 }
 
 .eventContent {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
 }
 
 /* ── AI Suggestion List ──────────────────────────────────────────────────────*/
@@ -340,7 +340,7 @@
 
 .suggestionItem {
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .suggestionItem:last-child {
@@ -356,14 +356,14 @@
 
 .suggestionMerchant {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   font-weight: 500;
 }
 
 .suggestionAction {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
@@ -406,8 +406,8 @@
   align-items: center;
   padding: 12px 16px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
 }
 
 .merchantRow:last-child {
@@ -416,11 +416,11 @@
 
 .merchantName {
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
 }
 
 .merchantCell {
-  color: rgba(255, 255, 255, 0.50);
+  color: var(--text-secondary);
 }
 
 .merchantStatus {

@@ -61,7 +61,7 @@ const AIEvolutionPage: React.FC = () => {
   const [weeklyTrend, setWeeklyTrend] = useState<WeeklyTrend[]>([]);
   const [agentPerformance, setAgentPerformance] = useState<AgentPerformance[]>([]);
   const [hitlEscalations, setHitlEscalations] = useState<HitlEscalation[]>([]);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
 
   const loadStores = useCallback(async () => {
@@ -176,7 +176,7 @@ const AIEvolutionPage: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-            )) : <Option value="STORE001">门店 001</Option>}
+            ))}
           </Select>
         </div>
 

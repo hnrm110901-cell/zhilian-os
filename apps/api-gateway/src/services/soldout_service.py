@@ -3,15 +3,16 @@
 
 厨师长一键触发 → POS + 美团 + 小程序同步下架
 """
+
+import os
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.dish import Dish
 
 import structlog
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.models.dish import Dish
 
 logger = structlog.get_logger()
 
@@ -22,6 +23,7 @@ class SoldoutService:
     def __init__(self, db: AsyncSession, store_id: str):
         self.db = db
         self.store_id = store_id
+        self._adapters: dict = {}  # 缓存已初始化的适配器
 
     async def soldout_dish(
         self,
@@ -140,15 +142,17 @@ class SoldoutService:
         for d in dishes:
             if keyword and keyword.lower() not in (d.name or "").lower():
                 continue
-            items.append({
-                "dish_id": str(d.id),
-                "dish_name": d.name,
-                "dish_code": d.code,
-                "category_id": str(d.category_id) if d.category_id else None,
-                "price_yuan": float(d.price) if d.price else 0,
-                "kitchen_station": d.kitchen_station,
-                "tags": d.tags or [],
-            })
+            items.append(
+                {
+                    "dish_id": str(d.id),
+                    "dish_name": d.name,
+                    "dish_code": d.code,
+                    "category_id": str(d.category_id) if d.category_id else None,
+                    "price_yuan": float(d.price) if d.price else 0,
+                    "kitchen_station": d.kitchen_station,
+                    "tags": d.tags or [],
+                }
+            )
         return items
 
     async def batch_soldout(
@@ -185,30 +189,160 @@ class SoldoutService:
     async def _notify_channels(self, dish: Dish, action: str) -> dict:
         """
         通知各渠道沽清/恢复。
-        目前仅更新本地数据库，POS/美团/小程序 的实际 API 调用在对接后启用。
+
+        按门店已配置的渠道逐一调用对应适配器：
+        - POS: 品智(Pinzhi) / 奥琦玮(Aoqiwei) / 客如云(Keruyun)
+        - 外卖: 美团(Meituan) / 饿了么(Eleme)
+        - 小程序: 微信（待对接）
+
+        失败不阻塞主流程，每个渠道独立 try/except。
         """
         results = {"local_db": "ok"}
+        is_restore = action == "restore"
+        dish_code = dish.code or ""
 
-        # POS 通知（通过 POS adapter）
-        try:
-            # TODO: 对接实际 POS API（正品/奥琦玮 G10）
-            # await pos_adapter.set_dish_availability(dish.code, available=(action == "restore"))
-            results["pos"] = "pending_integration"
-        except Exception as e:
-            results["pos"] = f"error: {str(e)}"
+        # ── POS 通知 ──
+        results["pos"] = await self._notify_pos(dish_code, is_restore)
 
-        # 美团通知
-        try:
-            # TODO: 对接美团开放平台 API
-            results["meituan"] = "pending_integration"
-        except Exception as e:
-            results["meituan"] = f"error: {str(e)}"
+        # ── 美团外卖 ──
+        results["meituan"] = await self._notify_meituan(dish_code, is_restore)
 
-        # 微信小程序通知
-        try:
-            # TODO: 对接微信小程序后台
-            results["wechat_mini"] = "pending_integration"
-        except Exception as e:
-            results["wechat_mini"] = f"error: {str(e)}"
+        # ── 饿了么 ──
+        results["eleme"] = await self._notify_eleme(dish_code, is_restore)
+
+        # ── 客如云 ──
+        results["keruyun"] = await self._notify_keruyun(dish_code, is_restore)
+
+        # ── 微信小程序（待对接，需要小程序后台 API 密钥）──
+        results["wechat_mini"] = "not_configured"
 
         return results
+
+    async def _notify_pos(self, dish_code: str, is_restore: bool) -> str:
+        """通知 POS 系统沽清/恢复"""
+        pos_type = os.getenv("POS_ADAPTER_TYPE", "")
+        if not pos_type:
+            return "not_configured"
+
+        try:
+            if pos_type == "pinzhi":
+                # 品智 POS 暂无沽清 API，记录日志等待厂商支持
+                logger.info("pos.pinzhi.soldout_not_supported", dish_code=dish_code)
+                return "not_supported_by_vendor"
+
+            elif pos_type == "aoqiwei":
+                # 奥琦玮 POS 暂无沽清 API
+                logger.info("pos.aoqiwei.soldout_not_supported", dish_code=dish_code)
+                return "not_supported_by_vendor"
+
+            elif pos_type == "keruyun":
+                adapter = await self._get_keruyun_adapter()
+                if not adapter:
+                    return "not_configured"
+                await adapter.update_dish_status(
+                    sku_id=dish_code,
+                    is_sold_out=0 if is_restore else 1,
+                )
+                return "ok"
+
+            return "unknown_pos_type"
+        except Exception as e:
+            logger.warning("pos.notify_failed", pos_type=pos_type, error=str(e))
+            return f"error: {str(e)}"
+
+    async def _notify_meituan(self, dish_code: str, is_restore: bool) -> str:
+        """通知美团外卖沽清/恢复"""
+        poi_id = os.getenv("MEITUAN_POI_ID", "")
+        app_id = os.getenv("MEITUAN_APP_ID", "")
+        app_secret = os.getenv("MEITUAN_APP_SECRET", "")
+        if not (poi_id and app_id and app_secret):
+            return "not_configured"
+
+        try:
+            adapter = await self._get_adapter("meituan", lambda: self._create_meituan_adapter())
+            if is_restore:
+                await adapter.on_sale_food(food_id=dish_code)
+            else:
+                await adapter.sold_out_food(food_id=dish_code)
+            return "ok"
+        except Exception as e:
+            logger.warning("meituan.notify_failed", error=str(e))
+            return f"error: {str(e)}"
+
+    async def _notify_eleme(self, dish_code: str, is_restore: bool) -> str:
+        """通知饿了么沽清/恢复"""
+        eleme_app_key = os.getenv("ELEME_APP_KEY", "")
+        eleme_app_secret = os.getenv("ELEME_APP_SECRET", "")
+        if not (eleme_app_key and eleme_app_secret):
+            return "not_configured"
+
+        try:
+            adapter = await self._get_adapter("eleme", lambda: self._create_eleme_adapter())
+            if is_restore:
+                await adapter.on_sale_food(food_id=dish_code)
+            else:
+                await adapter.sold_out_food(food_id=dish_code)
+            return "ok"
+        except Exception as e:
+            logger.warning("eleme.notify_failed", error=str(e))
+            return f"error: {str(e)}"
+
+    async def _notify_keruyun(self, dish_code: str, is_restore: bool) -> str:
+        """通知客如云 POS 沽清/恢复"""
+        client_id = os.getenv("KERUYUN_CLIENT_ID", "")
+        client_secret = os.getenv("KERUYUN_CLIENT_SECRET", "")
+        if not (client_id and client_secret):
+            return "not_configured"
+
+        try:
+            adapter = await self._get_keruyun_adapter()
+            if not adapter:
+                return "not_configured"
+            await adapter.update_dish_status(
+                sku_id=dish_code,
+                is_sold_out=0 if is_restore else 1,
+            )
+            return "ok"
+        except Exception as e:
+            logger.warning("keruyun.notify_failed", error=str(e))
+            return f"error: {str(e)}"
+
+    # ── 适配器工厂 ──
+
+    async def _get_adapter(self, key: str, factory):
+        """获取或创建适配器实例（懒初始化 + 缓存）"""
+        if key not in self._adapters:
+            self._adapters[key] = factory()
+        return self._adapters[key]
+
+    def _create_meituan_adapter(self):
+        """创建美团适配器"""
+        from packages.api_adapters.meituan_saas.src.adapter import MeituanSaasAdapter
+        return MeituanSaasAdapter(config={
+            "app_key": os.getenv("MEITUAN_APP_ID", ""),
+            "app_secret": os.getenv("MEITUAN_APP_SECRET", ""),
+            "poi_id": os.getenv("MEITUAN_POI_ID", ""),
+        })
+
+    def _create_eleme_adapter(self):
+        """创建饿了么适配器"""
+        from packages.api_adapters.eleme.src.adapter import ElemeAdapter
+        return ElemeAdapter(config={
+            "app_key": os.getenv("ELEME_APP_KEY", ""),
+            "app_secret": os.getenv("ELEME_APP_SECRET", ""),
+        })
+
+    async def _get_keruyun_adapter(self):
+        """获取客如云适配器"""
+        client_id = os.getenv("KERUYUN_CLIENT_ID", "")
+        client_secret = os.getenv("KERUYUN_CLIENT_SECRET", "")
+        if not (client_id and client_secret):
+            return None
+        if "keruyun" not in self._adapters:
+            from packages.api_adapters.keruyun.src.adapter import KeruyunAdapter
+            self._adapters["keruyun"] = KeruyunAdapter(config={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "store_id": self.store_id,
+            })
+        return self._adapters["keruyun"]

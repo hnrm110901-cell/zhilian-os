@@ -59,7 +59,7 @@ const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const DataSecurityPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [keys, setKeys] = useState<CustomerKey[]>([]);
   const [loading, setLoading] = useState(false);
@@ -85,7 +85,7 @@ const DataSecurityPage: React.FC = () => {
       const res = await apiClient.get('/api/v1/stores');
       const list: any[] = res.stores || res || [];
       setStores(list);
-      if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
+      if (list.length > 0) setStoreId(list[0].store_id || list[0].id || '');
     } catch { /* ignore */ }
   }, []);
 
@@ -279,7 +279,6 @@ const DataSecurityPage: React.FC = () => {
             <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
               {stores.length > 0
                 ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
-                : <Option value="STORE001">北京旗舰店</Option>}
             </Select>
             <Button icon={<ReloadOutlined />} onClick={() => { loadKeys(); loadCoverage(); }} loading={loading} />
           </Space>

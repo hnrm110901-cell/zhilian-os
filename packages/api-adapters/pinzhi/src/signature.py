@@ -46,7 +46,7 @@ def generate_sign(token: str, params: Dict[str, Any]) -> str:
     # 4. 添加token
     param_str += f"&token={token}"
 
-    # 5. MD5加密（小写）
+    # 5. MD5加密（小写，实测品智服务器只接受小写）
     sign = hashlib.md5(param_str.encode("utf-8")).hexdigest()
 
     return sign

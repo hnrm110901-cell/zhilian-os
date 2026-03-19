@@ -102,19 +102,18 @@ async def test_check_and_alert_above_threshold_triggers_alert():
     async def _pass_through(coro, timeout):
         return await coro
 
-    with patch("src.services.waste_guard_service.asyncio.wait_for", side_effect=_pass_through):
-        with patch.dict(sys.modules, {
-            "src.services.waste_reasoning_service": MagicMock(run_waste_reasoning=mock_reasoning),
-            "src.services.wechat_work_message_service": MagicMock(
-                wechat_work_message_service=MagicMock(send_card_message=mock_send_card)
-            ),
-        }):
-            result = await WasteGuardService.check_and_alert(
-                session=session,
-                store_id="S001",
-                tenant_id="T001",
-                variances=variances,
-            )
+    import src.services.waste_guard_service as _wgs_mod
+    import src.services.waste_reasoning_service as _wrs_mod
+
+    with patch.object(_wgs_mod.asyncio, "wait_for", side_effect=_pass_through), \
+         patch.object(_wrs_mod, "run_waste_reasoning", mock_reasoning), \
+         patch("src.services.wechat_work_message_service.wechat_work_message_service", MagicMock(send_card_message=mock_send_card)):
+        result = await WasteGuardService.check_and_alert(
+            session=session,
+            store_id="S001",
+            tenant_id="T001",
+            variances=variances,
+        )
 
     assert len(result) == 1
     assert result[0].startswith("WG-")
@@ -200,19 +199,18 @@ async def test_check_and_alert_partial_threshold():
         triggered_ingredients.append(title)
         return {"success": True}
 
-    with patch("src.services.waste_guard_service.asyncio.wait_for", new=_fake_wait_for):
-        with patch.dict(sys.modules, {
-            "src.services.waste_reasoning_service": MagicMock(run_waste_reasoning=mock_reasoning),
-            "src.services.wechat_work_message_service": MagicMock(
-                wechat_work_message_service=MagicMock(send_card_message=AsyncMock(side_effect=_fake_send_card))
-            ),
-        }):
-            result = await WasteGuardService.check_and_alert(
-                session=session,
-                store_id="S001",
-                tenant_id="T001",
-                variances=variances,
-            )
+    import src.services.waste_guard_service as _wgs_mod
+    import src.services.waste_reasoning_service as _wrs_mod
+
+    with patch.object(_wgs_mod.asyncio, "wait_for", new=_fake_wait_for), \
+         patch.object(_wrs_mod, "run_waste_reasoning", mock_reasoning), \
+         patch("src.services.wechat_work_message_service.wechat_work_message_service", MagicMock(send_card_message=AsyncMock(side_effect=_fake_send_card))):
+        result = await WasteGuardService.check_and_alert(
+            session=session,
+            store_id="S001",
+            tenant_id="T001",
+            variances=variances,
+        )
 
     # 只有 ING002 和 ING003 超阈值
     assert len(result) == 2

@@ -1,0 +1,47 @@
+.page { padding: 24px; max-width: 1200px; margin: 0 auto; }
+.header { display: flex; align-items: center; gap: 24px; margin-bottom: 20px; }
+.title { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.tabs { display: flex; gap: 4px; }
+.tab {
+  padding: 6px 16px; border-radius: 6px; border: none;
+  background: var(--surface-hover); color: var(--text-tertiary);
+  cursor: pointer; font-size: 13px;
+}
+.tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  text-align: left; padding: 10px 12px;
+  color: var(--text-tertiary); font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+.table td {
+  padding: 10px 12px; color: var(--text-primary);
+  border-bottom: 1px solid var(--surface-hover);
+}
+.empty { text-align: center; padding: 40px; color: var(--text-tertiary); }
+.tagReward {
+  display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+  background: rgba(10,175,154,0.15); color: #0AAF9A;
+}
+.tagPenalty {
+  display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+  background: rgba(235,87,87,0.15); color: #EB5757;
+}
+.amountGreen { color: #0AAF9A; font-weight: 600; }
+.amountRed { color: #EB5757; font-weight: 600; }
+.desc { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; gap: 6px; }
+.btnApprove {
+  padding: 4px 10px; border-radius: 4px; border: none;
+  background: rgba(10,175,154,0.15); color: #0AAF9A;
+  cursor: pointer; font-size: 12px;
+}
+.btnReject {
+  padding: 4px 10px; border-radius: 4px; border: none;
+  background: rgba(235,87,87,0.1); color: #EB5757;
+  cursor: pointer; font-size: 12px;
+}
+.status_pending { color: #F2994A; }
+.status_approved { color: #0AAF9A; }
+.status_rejected { color: #EB5757; }

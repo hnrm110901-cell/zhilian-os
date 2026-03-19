@@ -1,22 +1,24 @@
 """
 L4 行动层 Action 模型：可执行任务 + 状态机 + 分级升级（Palantir 目标架构）
 """
-from sqlalchemy import Column, String, Text, DateTime, Enum, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, JSON
-import uuid
+
 import enum
+import uuid
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
 
 class ActionStatus(str, enum.Enum):
     CREATED = "created"
-    SENT = "sent"       # 已推送企微
-    ACKED = "acked"     # 已回执
+    SENT = "sent"  # 已推送企微
+    ACKED = "acked"  # 已回执
     IN_PROGRESS = "in_progress"
     DONE = "done"
-    CLOSED = "closed"   # 超时关闭或取消
+    CLOSED = "closed"  # 超时关闭或取消
 
 
 class ActionPriority(str, enum.Enum):
@@ -58,8 +60,8 @@ class OntologyAction(Base, TimestampMixin):
     priority = Column(String(10), default=ActionPriority.P1.value, nullable=False)
 
     deadline_at = Column(DateTime)
-    sent_at = Column(DateTime)   # 推送时间
-    acked_at = Column(DateTime) # 回执时间
+    sent_at = Column(DateTime)  # 推送时间
+    acked_at = Column(DateTime)  # 回执时间
     done_at = Column(DateTime)
 
     # 溯源：关联推理报告或事件

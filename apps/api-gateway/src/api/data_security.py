@@ -13,10 +13,10 @@
 """
 
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user, require_role
 from src.models.user import User, UserRole
@@ -29,6 +29,7 @@ _admin_only = require_role(UserRole.ADMIN, UserRole.FINANCE)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class KeyOut(BaseModel):
     id: str
@@ -64,6 +65,7 @@ class DecryptIn(BaseModel):
 
 
 # ── 密钥管理端点 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/keys/{store_id}", response_model=KeyOut, status_code=status.HTTP_201_CREATED)
 async def create_store_key(
@@ -150,6 +152,7 @@ async def revoke_key(
 
 # ── 加密覆盖率审计 ────────────────────────────────────────────────────────────
 
+
 @router.get("/coverage/{store_id}")
 async def get_encryption_coverage(
     store_id: str,
@@ -162,6 +165,7 @@ async def get_encryption_coverage(
 
 
 # ── 加密/解密测试端点（仅开发环境）──────────────────────────────────────────
+
 
 @router.post("/encrypt", response_model=EncryptOut)
 async def encrypt_text(
@@ -205,6 +209,7 @@ async def decrypt_text(
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
+
 
 def _key_to_out(key) -> dict:
     return {

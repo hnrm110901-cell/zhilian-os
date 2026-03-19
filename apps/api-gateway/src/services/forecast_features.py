@@ -2,9 +2,11 @@
 中国法定节假日数据
 用于销售预测的特征工程
 """
+
+import os
 from datetime import date, datetime
 from typing import Dict, List, Optional
-import os
+
 import structlog
 
 logger = structlog.get_logger()
@@ -21,7 +23,6 @@ class ChineseHolidays:
         date(2026, 1, 1): {"name": "元旦", "type": "法定节假日", "impact": "high"},
         date(2026, 1, 2): {"name": "元旦调休", "type": "调休", "impact": "medium"},
         date(2026, 1, 3): {"name": "元旦调休", "type": "调休", "impact": "medium"},
-
         # 春节
         date(2026, 2, 17): {"name": "春节", "type": "法定节假日", "impact": "very_high"},
         date(2026, 2, 18): {"name": "春节", "type": "法定节假日", "impact": "very_high"},
@@ -30,27 +31,22 @@ class ChineseHolidays:
         date(2026, 2, 21): {"name": "春节", "type": "法定节假日", "impact": "very_high"},
         date(2026, 2, 22): {"name": "春节", "type": "法定节假日", "impact": "very_high"},
         date(2026, 2, 23): {"name": "春节", "type": "法定节假日", "impact": "very_high"},
-
         # 清明节
         date(2026, 4, 4): {"name": "清明节", "type": "法定节假日", "impact": "high"},
         date(2026, 4, 5): {"name": "清明节", "type": "法定节假日", "impact": "high"},
         date(2026, 4, 6): {"name": "清明节", "type": "法定节假日", "impact": "high"},
-
         # 劳动节
         date(2026, 5, 1): {"name": "劳动节", "type": "法定节假日", "impact": "high"},
         date(2026, 5, 2): {"name": "劳动节", "type": "法定节假日", "impact": "high"},
         date(2026, 5, 3): {"name": "劳动节", "type": "法定节假日", "impact": "high"},
-
         # 端午节
         date(2026, 6, 19): {"name": "端午节", "type": "法定节假日", "impact": "high"},
         date(2026, 6, 20): {"name": "端午节", "type": "法定节假日", "impact": "high"},
         date(2026, 6, 21): {"name": "端午节", "type": "法定节假日", "impact": "high"},
-
         # 中秋节
         date(2026, 9, 25): {"name": "中秋节", "type": "法定节假日", "impact": "high"},
         date(2026, 9, 26): {"name": "中秋节", "type": "法定节假日", "impact": "high"},
         date(2026, 9, 27): {"name": "中秋节", "type": "法定节假日", "impact": "high"},
-
         # 国庆节
         date(2026, 10, 1): {"name": "国庆节", "type": "法定节假日", "impact": "very_high"},
         date(2026, 10, 2): {"name": "国庆节", "type": "法定节假日", "impact": "very_high"},
@@ -102,9 +98,9 @@ class ChineseHolidays:
 
         impact_map = {
             "very_high": float(os.getenv("HOLIDAY_IMPACT_VERY_HIGH", "2.5")),  # 春节、国庆
-            "high": float(os.getenv("HOLIDAY_IMPACT_HIGH", "2.0")),            # 其他法定节假日、情人节
-            "medium": float(os.getenv("HOLIDAY_IMPACT_MEDIUM", "1.5")),        # 调休、一般营销节日
-            "low": float(os.getenv("HOLIDAY_IMPACT_LOW", "1.2")),              # 小型节日
+            "high": float(os.getenv("HOLIDAY_IMPACT_HIGH", "2.0")),  # 其他法定节假日、情人节
+            "medium": float(os.getenv("HOLIDAY_IMPACT_MEDIUM", "1.5")),  # 调休、一般营销节日
+            "low": float(os.getenv("HOLIDAY_IMPACT_LOW", "1.2")),  # 小型节日
         }
 
         return impact_map.get(info.get("impact", "low"), 1.0)
@@ -113,6 +109,7 @@ class ChineseHolidays:
     def is_holiday_eve(cls, target_date: date) -> bool:
         """判断是否为节假日前一天"""
         from datetime import timedelta
+
         next_day = target_date + timedelta(days=1)
         return cls.is_holiday(next_day)
 
@@ -204,9 +201,13 @@ class WeatherImpact:
                 return float(os.getenv("TEMP_IMPACT_HOTPOT_HOT", "0.8"))
         else:
             # 一般餐厅：极端温度影响客流
-            if temperature < int(os.getenv("TEMP_THRESHOLD_FREEZING", "0")) or temperature > int(os.getenv("TEMP_THRESHOLD_EXTREME_HIGH", "35")):
+            if temperature < int(os.getenv("TEMP_THRESHOLD_FREEZING", "0")) or temperature > int(
+                os.getenv("TEMP_THRESHOLD_EXTREME_HIGH", "35")
+            ):
                 return float(os.getenv("TEMP_IMPACT_NORMAL_EXTREME", "0.8"))
-            elif temperature < int(os.getenv("TEMP_THRESHOLD_COLD", "10")) or temperature > int(os.getenv("TEMP_THRESHOLD_HOT", "30")):
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_COLD", "10")) or temperature > int(
+                os.getenv("TEMP_THRESHOLD_HOT", "30")
+            ):
                 return float(os.getenv("TEMP_IMPACT_NORMAL_MODERATE", "0.9"))
             else:
                 return 1.0

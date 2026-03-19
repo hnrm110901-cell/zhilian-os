@@ -5,18 +5,28 @@ FCT 高级功能 API
 2. 多实体合并：/api/v1/fct-advanced/consolidation/*
 3. 税务申报自动提取：/api/v1/fct-advanced/tax-declaration/*
 """
+
+from datetime import date, datetime
+from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import date, datetime
-
 from src.services.fct_advanced_service import (
-    BankTransaction, MatchRule,
-    match_transaction, batch_match_transactions, compute_bank_balance,
-    EntityFinancials, IntercompanyItem,
-    consolidate_entities, validate_intercompany_balance,
-    VoucherSummary, ExtractRule,
-    extract_tax_fields, compute_vat_payable, compute_surcharge, compute_cit_quarterly,
+    BankTransaction,
+    EntityFinancials,
+    ExtractRule,
+    IntercompanyItem,
+    MatchRule,
+    VoucherSummary,
+    batch_match_transactions,
+    compute_bank_balance,
+    compute_cit_quarterly,
+    compute_surcharge,
+    compute_vat_payable,
+    consolidate_entities,
+    extract_tax_fields,
+    match_transaction,
+    validate_intercompany_balance,
 )
 
 router = APIRouter(prefix="/api/v1/fct-advanced", tags=["fct_advanced"])
@@ -25,6 +35,7 @@ router = APIRouter(prefix="/api/v1/fct-advanced", tags=["fct_advanced"])
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. 银企直连
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class BankTransactionIn(BaseModel):
     id: str
@@ -35,6 +46,7 @@ class BankTransactionIn(BaseModel):
     memo: str = ""
     bank_ref: str = ""
 
+
 class MatchRuleIn(BaseModel):
     rule_name: str
     match_field: str = "counterparty"
@@ -42,9 +54,11 @@ class MatchRuleIn(BaseModel):
     target_account_code: str = ""
     priority: int = 0
 
+
 class BatchMatchRequest(BaseModel):
     transactions: List[BankTransactionIn]
     rules: List[MatchRuleIn]
+
 
 class BalanceRequest(BaseModel):
     opening_balance: float
@@ -59,10 +73,7 @@ async def api_batch_match(req: BatchMatchRequest):
     result = batch_match_transactions(txs, rules)
     return {
         **result,
-        "transactions": [
-            {"id": t.id, "match_status": t.match_status}
-            for t in txs
-        ],
+        "transactions": [{"id": t.id, "match_status": t.match_status} for t in txs],
     }
 
 
@@ -78,6 +89,7 @@ async def api_compute_balance(req: BalanceRequest):
 # 2. 多实体合并
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class EntityFinancialsIn(BaseModel):
     entity_id: str
     entity_name: str
@@ -85,11 +97,13 @@ class EntityFinancialsIn(BaseModel):
     cost_yuan: float = 0
     profit_yuan: float = 0
 
+
 class IntercompanyItemIn(BaseModel):
     from_entity_id: str
     to_entity_id: str
     amount_yuan: float
     description: str = ""
+
 
 class ConsolidationRequest(BaseModel):
     period: str
@@ -126,11 +140,13 @@ async def api_validate_intercompany(items: List[IntercompanyItemIn]):
 # 3. 税务申报自动提取
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class VoucherSummaryIn(BaseModel):
     account_code: str
     account_name: str
     debit_total: float = 0
     credit_total: float = 0
+
 
 class ExtractRuleIn(BaseModel):
     field_name: str
@@ -139,14 +155,17 @@ class ExtractRuleIn(BaseModel):
     direction: str
     sort_order: int = 0
 
+
 class ExtractRequest(BaseModel):
     voucher_summaries: List[VoucherSummaryIn]
     rules: List[ExtractRuleIn]
+
 
 class VatRequest(BaseModel):
     output_tax: float
     input_tax: float
     carried_forward: float = 0
+
 
 class CitRequest(BaseModel):
     revenue_yuan: float
@@ -192,14 +211,18 @@ async def api_compute_surcharge(vat_payable: float):
 async def api_compute_cit(req: CitRequest):
     """计算企业所得税（季度预缴）。"""
     return compute_cit_quarterly(
-        req.revenue_yuan, req.cost_yuan,
-        req.profit_rate_assumption, req.cit_rate, req.is_micro,
+        req.revenue_yuan,
+        req.cost_yuan,
+        req.profit_rate_assumption,
+        req.cit_rate,
+        req.is_micro,
     )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 驾驶舱 BFF
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @router.get("/dashboard")
 async def api_fct_advanced_dashboard():

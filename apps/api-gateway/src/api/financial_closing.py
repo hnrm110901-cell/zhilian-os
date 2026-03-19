@@ -8,16 +8,16 @@ GET  /monthly           月度汇总
 GET  /calendar          日历视图
 GET  /anomalies         异常告警
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
-from typing import Optional
+
 from datetime import date
+from typing import Optional
 
 import structlog
-
-from src.core.dependencies import require_role, get_current_active_user
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from src.core.database import get_db_session
-from src.models.user import UserRole, User
+from src.core.dependencies import get_current_active_user, require_role
+from src.models.user import User, UserRole
 from src.services.financial_closing_service import financial_closing_service
 
 logger = structlog.get_logger()
@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/v1/financial-closing", tags=["日清日结"])
 
 # ── Request Models ────────────────────────────────────────────────────
 
+
 class RunClosingRequest(BaseModel):
     brand_id: str = Field(..., description="品牌ID")
     closing_date: date = Field(..., description="日结日期")
@@ -34,6 +35,7 @@ class RunClosingRequest(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────
+
 
 @router.post("/run", summary="执行日结")
 async def run_daily_closing(

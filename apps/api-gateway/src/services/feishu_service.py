@@ -2,13 +2,15 @@
 飞书服务
 Feishu (Lark) Service for message sending and user management
 """
+
+import hashlib
 import json
 import os
-import hashlib
-from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 import httpx
 import structlog
-from datetime import datetime, timedelta
 
 from ..core.config import settings
 from .redis_cache_service import redis_cache
@@ -55,9 +57,7 @@ class FeishuService:
                     self.tenant_access_token = data["tenant_access_token"]
                     # token有效期约2小时，提前5分钟刷新
                     expire_seconds = data.get("expire", 7200)
-                    self.token_expire_time = datetime.now() + timedelta(
-                        seconds=expire_seconds - 300
-                    )
+                    self.token_expire_time = datetime.now() + timedelta(seconds=expire_seconds - 300)
                     logger.info("飞书tenant_access_token获取成功")
                     return self.tenant_access_token
                 else:
@@ -302,10 +302,7 @@ class FeishuService:
         if not expected_token:
             return True
 
-        actual_token = (
-            event_data.get("token")
-            or event_data.get("header", {}).get("token")
-        )
+        actual_token = event_data.get("token") or event_data.get("header", {}).get("token")
         return actual_token == expected_token
 
     def validate_signature(
@@ -409,8 +406,8 @@ class FeishuService:
 
     async def _process_text_message(self, user_id: str, content: str) -> Dict[str, Any]:
         """处理文本消息，调用Agent"""
-        from .message_router import message_router
         from .agent_service import AgentService
+        from .message_router import message_router
 
         # 使用消息路由器识别意图
         agent_type, action, params = message_router.route_message(content, user_id)
@@ -430,7 +427,7 @@ class FeishuService:
                 {
                     "action": action,
                     "params": params,
-                }
+                },
             )
 
             # 格式化响应

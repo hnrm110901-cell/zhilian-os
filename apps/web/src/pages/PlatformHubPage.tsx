@@ -128,16 +128,12 @@ const DEMO_SCHEDULER: SchedulerHealth = {
   failed_tasks: 0,
 };
 
-const DEMO_APPROVALS: ApprovalItem[] = [
-  { id: 'a1', decision_type: '采购建议', store_id: 'S001', created_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: 'a2', decision_type: '菜品定价', store_id: 'S002', created_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: 'a3', decision_type: '排班调整', store_id: 'S001', created_at: new Date(Date.now() - 18000000).toISOString() },
-];
+const DEMO_APPROVALS: ApprovalItem[] = [];
 
 const DEMO_AUDIT = [
   { text: '用户 admin 登录系统',               time: '10分钟前', color: '#1A7A52' },
   { text: '更新 LLM 配置（gpt-4o-mini）',     time: '1小时前',  color: '#0AAF9A' },
-  { text: '导出报表：月度经营报告 S001',        time: '2小时前',  color: '#0AAF9A' },
+  { text: '导出报表：月度经营报告',              time: '2小时前',  color: '#0AAF9A' },
   { text: '备份任务完成（全量）',               time: '6小时前',  color: '#1A7A52' },
   { text: '集成状态更新：天财商龙',             time: '昨天',     color: '#8c8c8c' },
 ];

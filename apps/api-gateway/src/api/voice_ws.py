@@ -9,13 +9,14 @@ Shokz 设备通过此端点流式上传音频，实时获取识别结果和 TTS 
   服务端 → 客户端: JSON {"type": "tts_audio", "audio": "<base64 PCM>"}
   服务端 → 客户端: JSON {"type": "error", "message": "..."}
 """
+
 import asyncio
 import base64
 import json
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from ..services.iflytek_websocket_service import iflytek_ws_service
 from ..services.voice_command_service import voice_command_service
@@ -119,12 +120,16 @@ async def tts_stream(
                     sample_rate=sample_rate,
                 )
                 audio_b64 = base64.b64encode(audio).decode("utf-8")
-                await websocket.send_text(json.dumps({
-                    "type": "tts_audio",
-                    "audio": audio_b64,
-                    "sample_rate": sample_rate,
-                    "size": len(audio),
-                }))
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "tts_audio",
+                            "audio": audio_b64,
+                            "sample_rate": sample_rate,
+                            "size": len(audio),
+                        }
+                    )
+                )
                 logger.info("TTS 合成完成", store_id=store_id, text_len=len(text), audio_size=len(audio))
 
     except WebSocketDisconnect:
@@ -209,11 +214,15 @@ async def dialog_stream(
                         voice=voice,
                     )
                     audio_b64 = base64.b64encode(audio).decode("utf-8")
-                    await websocket.send_text(json.dumps({
-                        "type": "tts_audio",
-                        "audio": audio_b64,
-                        "sample_rate": sample_rate,
-                    }))
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "type": "tts_audio",
+                                "audio": audio_b64,
+                                "sample_rate": sample_rate,
+                            }
+                        )
+                    )
 
     except WebSocketDisconnect:
         logger.info("Dialog WebSocket 断开", store_id=store_id)

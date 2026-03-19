@@ -2,24 +2,26 @@
 联邦学习服务
 实现门店间的协同学习，保护数据隐私
 """
+
 import os
-from typing import Dict, List, Optional, Any
+import uuid
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import structlog
-from enum import Enum
-import uuid
-from sqlalchemy import select, func
-
-from src.services.base_service import BaseService
+from sqlalchemy import func, select
 from src.core.database import get_db_session
-from src.models.federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
+from src.models.federated_learning import FLModelUpload, FLTrainingRound, RoundStatus
+from src.services.base_service import BaseService
 
 logger = structlog.get_logger()
 
 
 class ModelType(str, Enum):
     """模型类型"""
+
     # 新命名（与测试/业务文案一致）
     DEMAND_FORECAST = "demand_forecast"
     RECOMMENDATION = "recommendation"
@@ -32,6 +34,7 @@ class ModelType(str, Enum):
 
 class AggregationMethod(str, Enum):
     """聚合方法"""
+
     FEDAVG = "fedavg"  # 联邦平均
     FEDPROX = "fedprox"  # 联邦近端
     WEIGHTED_AVG = "weighted_avg"  # 加权平均
@@ -116,9 +119,7 @@ class FederatedLearningService(BaseService):
         store_id = self.require_store_id()
 
         async with get_db_session() as session:
-            result = await session.execute(
-                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
-            )
+            result = await session.execute(select(FLTrainingRound).where(FLTrainingRound.id == round_id))
             round_record = result.scalar_one_or_none()
             if not round_record:
                 raise ValueError(f"训练轮次不存在: {round_id}")
@@ -137,7 +138,8 @@ class FederatedLearningService(BaseService):
             "round_id": round_id,
             "store_id": store_id,
             "status": "joined",
-            "training_config": training_config or {
+            "training_config": training_config
+            or {
                 "epochs": int(os.getenv("FL_TRAIN_EPOCHS", "10")),
                 "batch_size": int(os.getenv("FL_TRAIN_BATCH_SIZE", "32")),
                 "learning_rate": float(os.getenv("FL_TRAIN_LEARNING_RATE", "0.001")),
@@ -174,10 +176,7 @@ class FederatedLearningService(BaseService):
             raise ValueError("Invalid model parameters")
 
         # 序列化 numpy arrays 为 list
-        serialized = {
-            k: v.tolist() if isinstance(v, np.ndarray) else v
-            for k, v in noisy_parameters.items()
-        }
+        serialized = {k: v.tolist() if isinstance(v, np.ndarray) else v for k, v in noisy_parameters.items()}
 
         async with get_db_session() as session:
             upload = FLModelUpload(
@@ -226,10 +225,7 @@ class FederatedLearningService(BaseService):
         store_models = await self._get_store_models(round_id)
 
         if len(store_models) < self.min_stores:
-            raise ValueError(
-                f"Insufficient stores for aggregation. "
-                f"Required: {self.min_stores}, Got: {len(store_models)}"
-            )
+            raise ValueError(f"Insufficient stores for aggregation. " f"Required: {self.min_stores}, Got: {len(store_models)}")
 
         # 执行聚合
         if method == AggregationMethod.FEDAVG:
@@ -240,14 +236,9 @@ class FederatedLearningService(BaseService):
             raise ValueError(f"Unsupported aggregation method: {method}")
 
         # 保存全局模型到 DB
-        global_params_serialized = {
-            k: v.tolist() if isinstance(v, np.ndarray) else v
-            for k, v in global_model.items()
-        }
+        global_params_serialized = {k: v.tolist() if isinstance(v, np.ndarray) else v for k, v in global_model.items()}
         async with get_db_session() as session:
-            result = await session.execute(
-                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
-            )
+            result = await session.execute(select(FLTrainingRound).where(FLTrainingRound.id == round_id))
             round_record = result.scalar_one_or_none()
             if round_record:
                 round_record.status = RoundStatus.COMPLETED
@@ -350,10 +341,7 @@ class FederatedLearningService(BaseService):
             layer_params = [params[key] for params in all_parameters]
 
             # 加权平均
-            weighted_sum = sum(
-                param * weight
-                for param, weight in zip(layer_params, normalized_weights)
-            )
+            weighted_sum = sum(param * weight for param, weight in zip(layer_params, normalized_weights))
             global_parameters[key] = weighted_sum
 
         logger.debug(
@@ -455,31 +443,29 @@ class FederatedLearningService(BaseService):
         从数据库获取训练轮次中所有门店的模型
         """
         async with get_db_session() as session:
-            result = await session.execute(
-                select(FLModelUpload).where(FLModelUpload.round_id == round_id)
-            )
+            result = await session.execute(select(FLModelUpload).where(FLModelUpload.round_id == round_id))
             uploads = result.scalars().all()
 
         store_models = []
         for upload in uploads:
             params = upload.model_parameters or {}
             # 反序列化 list → numpy array
-            np_params = {
-                k: np.array(v) if isinstance(v, list) else v
-                for k, v in params.items()
-            }
-            store_models.append({
-                "store_id": upload.store_id,
-                "parameters": np_params,
-                "weight": 1.0,
-                "training_samples": upload.training_samples or 0,
-            })
+            np_params = {k: np.array(v) if isinstance(v, list) else v for k, v in params.items()}
+            store_models.append(
+                {
+                    "store_id": upload.store_id,
+                    "parameters": np_params,
+                    "weight": 1.0,
+                    "training_samples": upload.training_samples or 0,
+                }
+            )
 
         return store_models
 
     def _generate_round_id(self) -> str:
         """生成训练轮次ID"""
         from uuid import uuid4
+
         return f"round_{uuid4().hex[:12]}"
 
     async def get_training_status(self, round_id: str) -> Dict[str, Any]:
@@ -493,9 +479,7 @@ class FederatedLearningService(BaseService):
             训练状态信息
         """
         async with get_db_session() as session:
-            result = await session.execute(
-                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
-            )
+            result = await session.execute(select(FLTrainingRound).where(FLTrainingRound.id == round_id))
             round_record = result.scalar_one_or_none()
 
             if not round_record:
@@ -535,9 +519,7 @@ class FederatedLearningService(BaseService):
         store_id = self.require_store_id()
 
         async with get_db_session() as session:
-            result = await session.execute(
-                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
-            )
+            result = await session.execute(select(FLTrainingRound).where(FLTrainingRound.id == round_id))
             round_record = result.scalar_one_or_none()
 
         if not round_record or not round_record.global_model_parameters:
@@ -671,9 +653,7 @@ class DataIsolationManager:
         }
         return True
 
-    def validate_data_access(
-        self, accessor_store_id: str, target_store_id: str, data_type: str
-    ) -> bool:
+    def validate_data_access(self, accessor_store_id: str, target_store_id: str, data_type: str) -> bool:
         """验证数据访问权限：仅允许同一门店内访问。"""
         return accessor_store_id == target_store_id
 
@@ -693,6 +673,7 @@ class DataIsolationManager:
     def _hash_value(self, value: str) -> str:
         """返回 16 位哈希字符串（SHA-256 截断）。"""
         import hashlib
+
         return hashlib.sha256(value.encode()).hexdigest()[:16]
 
 

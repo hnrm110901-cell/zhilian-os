@@ -3,15 +3,16 @@ ARCH-003: 门店记忆服务
 
 计算门店的运营模式记忆：高峰时段、菜品健康度、员工基线。
 """
+
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
+
 import structlog
 
-from ..models.store_memory import (
-    StoreMemory, PeakHourPattern, StaffProfile, DishHealth, AnomalyPattern, StoreMemoryStore
-)
+from ..models.store_memory import AnomalyPattern, DishHealth, PeakHourPattern, StaffProfile, StoreMemory, StoreMemoryStore
 
 logger = structlog.get_logger()
+
 
 # 数据量与置信度的映射
 def _confidence_level(days: int) -> str:
@@ -51,11 +52,13 @@ class StoreMemoryService:
 
         try:
             import math
-            from sqlalchemy import select, func, extract
+
+            from sqlalchemy import extract, func, select
+
             from ..models.order import Order, OrderStatus
 
             start_date = datetime.utcnow() - timedelta(days=lookback_days)
-            today      = date.today()
+            today = date.today()
             decay_rate = 0.05
 
             # 单次查询：(日期, 小时) 分组，一次 round-trip 替代 24 次
@@ -79,8 +82,8 @@ class StoreMemoryService:
             rows = (await self._db.execute(stmt)).all()
 
             # 按小时累积加权和
-            hour_w_sum   = {h: 0.0 for h in range(24)}
-            hour_orders  = {h: 0.0 for h in range(24)}
+            hour_w_sum = {h: 0.0 for h in range(24)}
+            hour_orders = {h: 0.0 for h in range(24)}
             hour_revenue = {h: 0.0 for h in range(24)}
             actual_days: set = set()
 
@@ -101,37 +104,39 @@ class StoreMemoryService:
                 offset = max((today - day).days, 0)
                 w = math.exp(-decay_rate * offset)
 
-                hour_w_sum[h]   += w
-                hour_orders[h]  += float(row.order_count) * w
+                hour_w_sum[h] += w
+                hour_orders[h] += float(row.order_count) * w
                 hour_revenue[h] += float(row.revenue) * w
                 actual_days.add(day)
 
             # 加权均值（归一化为每有数据的日）
-            avg_orders:  Dict[int, float] = {}
+            avg_orders: Dict[int, float] = {}
             avg_revenue: Dict[int, float] = {}
             for h in range(24):
                 w = hour_w_sum[h]
                 if w > 0:
-                    avg_orders[h]  = hour_orders[h]  / w
-                    avg_revenue[h] = hour_revenue[h] / w / 100   # 分 → 元
+                    avg_orders[h] = hour_orders[h] / w
+                    avg_revenue[h] = hour_revenue[h] / w / 100  # 分 → 元
                 else:
-                    avg_orders[h]  = 0.0
+                    avg_orders[h] = 0.0
                     avg_revenue[h] = 0.0
 
             # 动态高峰阈值：全天均值 × 1.3，最低 0.5 单防零值误判
-            mean_orders     = sum(avg_orders.values()) / 24
-            peak_threshold  = max(mean_orders * 1.3, 0.5)
+            mean_orders = sum(avg_orders.values()) / 24
+            peak_threshold = max(mean_orders * 1.3, 0.5)
 
             patterns = []
             for h in range(24):
-                patterns.append(PeakHourPattern(
-                    hour=h,
-                    avg_orders=round(avg_orders[h],  3),
-                    avg_revenue=round(avg_revenue[h], 2),
-                    avg_customers=round(avg_orders[h] * 2.5, 1),
-                    is_peak=avg_orders[h] >= peak_threshold,
-                    weight=round(hour_w_sum[h], 4),
-                ))
+                patterns.append(
+                    PeakHourPattern(
+                        hour=h,
+                        avg_orders=round(avg_orders[h], 3),
+                        avg_revenue=round(avg_revenue[h], 2),
+                        avg_customers=round(avg_orders[h] * 2.5, 1),
+                        is_peak=avg_orders[h] >= peak_threshold,
+                        weight=round(hour_w_sum[h], 4),
+                    )
+                )
 
             logger.info(
                 "compute_peak_patterns.done",
@@ -161,7 +166,8 @@ class StoreMemoryService:
             return DishHealth(sku_id=sku_id, is_healthy=True)
 
         try:
-            from sqlalchemy import select, func
+            from sqlalchemy import func, select
+
             from ..models.order import Order, OrderItem, OrderStatus
 
             now = datetime.utcnow()
@@ -243,35 +249,30 @@ class StoreMemoryService:
             return StaffProfile(staff_id=staff_id)
 
         try:
-            from sqlalchemy import select, func
+            from sqlalchemy import func, select
+
             from ..models.order import Order, OrderStatus
 
             start_date = datetime.utcnow() - timedelta(days=lookback_days)
 
-            stmt = (
-                select(
-                    func.count(Order.id).label("order_count"),
-                    func.coalesce(func.sum(Order.final_amount), 0).label("revenue"),
-                )
-                .where(
-                    Order.store_id == store_id,
-                    Order.waiter_id == staff_id,
-                    Order.order_time >= start_date,
-                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
-                )
+            stmt = select(
+                func.count(Order.id).label("order_count"),
+                func.coalesce(func.sum(Order.final_amount), 0).label("revenue"),
+            ).where(
+                Order.store_id == store_id,
+                Order.waiter_id == staff_id,
+                Order.order_time >= start_date,
+                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
             )
             result = await self._db.execute(stmt)
             row = result.one()
 
             # 统计实际出勤天数（有订单的不重复日期数）
-            shift_stmt = (
-                select(func.count(func.distinct(func.date(Order.order_time))))
-                .where(
-                    Order.store_id == store_id,
-                    Order.waiter_id == staff_id,
-                    Order.order_time >= start_date,
-                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
-                )
+            shift_stmt = select(func.count(func.distinct(func.date(Order.order_time)))).where(
+                Order.store_id == store_id,
+                Order.waiter_id == staff_id,
+                Order.order_time >= start_date,
+                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
             )
             shift_result = await self._db.execute(shift_stmt)
             shifts = max(int(shift_result.scalar() or 1), 1)
@@ -388,4 +389,3 @@ class StoreMemoryService:
             severity=pattern.severity,
         )
         return pattern
-

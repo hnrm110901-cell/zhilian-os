@@ -3,8 +3,11 @@ import { Card, Button, Statistic, Row, Col, Form, Input, Table, Alert } from 'an
 import { SyncOutlined, SettingOutlined } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
+import { useAuthStore } from '../stores/authStore';
 
 const MeituanQueuePage: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const defaultStoreId = user?.store_id || '';
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState<Record<string, boolean>>({});
@@ -48,7 +51,7 @@ const MeituanQueuePage: React.FC = () => {
     setSyncLoading(prev => ({ ...prev, waiting: true }));
     try {
       await apiClient.post('/api/v1/meituan/queue/sync/waiting-info', {
-        store_id: config?.store_id || 'STORE001',
+        store_id: config?.store_id || defaultStoreId,
         app_auth_token: config?.app_auth_token || '',
       });
       showSuccess('等待信息同步成功');
@@ -75,7 +78,7 @@ const MeituanQueuePage: React.FC = () => {
           >
             <Alert message="每行格式：桌型ID,桌型名称,容纳人数（如：1,双人桌,2）" type="info" style={{ marginBottom: 12 }} />
             <Form form={tableTypeForm} layout="vertical" onFinish={syncTableTypes}>
-              <Form.Item name="store_id" label="门店ID" initialValue={config?.store_id || 'STORE001'} rules={[{ required: true }]}>
+              <Form.Item name="store_id" label="门店ID" initialValue={config?.store_id || defaultStoreId} rules={[{ required: true }]}>
                 <Input />
               </Form.Item>
               <Form.Item name="app_auth_token" label="App Auth Token" rules={[{ required: true }]}>

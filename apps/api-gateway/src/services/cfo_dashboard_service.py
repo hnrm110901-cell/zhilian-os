@@ -6,6 +6,7 @@
   - 预算计划     (budget_plans + profit_attribution_results)
   - 财务洞察     (finance_insights)
 """
+
 from __future__ import annotations
 
 import json
@@ -29,6 +30,7 @@ ALERT_SEVERITY_WEIGHT = {"critical": 3, "high": 2, "medium": 1, "low": 0}
 
 # ── 内部工具 ──────────────────────────────────────────────────────────────────
 
+
 def _safe_float(val) -> Optional[float]:
     if val is None:
         return None
@@ -44,6 +46,7 @@ def _to_float(val, default: float = 0.0) -> float:
 
 
 # ── 纯函数层 ─────────────────────────────────────────────────────────────────
+
 
 def compute_brand_grade_distribution(scores: List[float]) -> Dict[str, int]:
     """从门店评分列表统计 A/B/C/D 分布。"""
@@ -93,9 +96,7 @@ def generate_financial_narrative(
     parts: List[str] = []
 
     # 综合健康
-    parts.append(
-        f"本期{store_count}家门店财务健康均分 {avg_score:.1f}分（{grade_desc}），"
-    )
+    parts.append(f"本期{store_count}家门店财务健康均分 {avg_score:.1f}分（{grade_desc}），")
 
     # 预警态势
     if critical_alerts > 0:
@@ -117,9 +118,7 @@ def generate_financial_narrative(
     # 最弱门店
     if worst_store_id and worst_store_score is not None:
         worst_grade = compute_brand_avg_grade(worst_store_score)
-        parts.append(
-            f"门店 {worst_store_id} 评分最低（{worst_store_score:.1f}分/{worst_grade}），建议优先关注。"
-        )
+        parts.append(f"门店 {worst_store_id} 评分最低（{worst_store_score:.1f}分/{worst_grade}），建议优先关注。")
 
     # 重点洞察类型
     insight_labels = {
@@ -151,33 +150,38 @@ def prioritize_brand_actions(
 
     for ins in insights:
         p = ins.get("priority", "low")
-        items.append({
-            "source": "insight",
-            "store_id": ins.get("store_id", ""),
-            "type": ins.get("insight_type", ""),
-            "priority": p,
-            "sort_key": INSIGHT_PRIORITY_ORDER.get(p, 99),
-            "content": ins.get("content", ""),
-            "action_id": f"ins_{ins.get('store_id','')}_{ins.get('insight_type','')}",
-        })
+        items.append(
+            {
+                "source": "insight",
+                "store_id": ins.get("store_id", ""),
+                "type": ins.get("insight_type", ""),
+                "priority": p,
+                "sort_key": INSIGHT_PRIORITY_ORDER.get(p, 99),
+                "content": ins.get("content", ""),
+                "action_id": f"ins_{ins.get('store_id','')}_{ins.get('insight_type','')}",
+            }
+        )
 
     for evt in alert_events:
         sev = evt.get("severity", "low")
-        items.append({
-            "source": "alert",
-            "store_id": evt.get("store_id", ""),
-            "type": evt.get("metric", ""),
-            "priority": "high" if sev in ("critical", "high") else "medium",
-            "sort_key": -ALERT_SEVERITY_WEIGHT.get(sev, 0),   # 严重告警排前
-            "content": evt.get("message", ""),
-            "action_id": f"alert_{evt.get('event_id', '')}",
-        })
+        items.append(
+            {
+                "source": "alert",
+                "store_id": evt.get("store_id", ""),
+                "type": evt.get("metric", ""),
+                "priority": "high" if sev in ("critical", "high") else "medium",
+                "sort_key": -ALERT_SEVERITY_WEIGHT.get(sev, 0),  # 严重告警排前
+                "content": evt.get("message", ""),
+                "action_id": f"alert_{evt.get('event_id', '')}",
+            }
+        )
 
     items.sort(key=lambda x: (x["sort_key"], x["store_id"]))
     return items[:15]
 
 
 # ── DB 函数层 ─────────────────────────────────────────────────────────────────
+
 
 async def get_brand_health_overview(
     db: AsyncSession,
@@ -216,24 +220,32 @@ async def get_brand_health_overview(
 
     store_scores = [
         {
-            "store_id":        r[0],
-            "total_score":     _to_float(r[1]),
-            "grade":           r[2],
-            "profit_score":    _to_float(r[3]),
-            "cash_score":      _to_float(r[4]),
-            "tax_score":       _to_float(r[5]),
-            "settlement_score":_to_float(r[6]),
-            "budget_score":    _to_float(r[7]),
+            "store_id": r[0],
+            "total_score": _to_float(r[1]),
+            "grade": r[2],
+            "profit_score": _to_float(r[3]),
+            "cash_score": _to_float(r[4]),
+            "tax_score": _to_float(r[5]),
+            "settlement_score": _to_float(r[6]),
+            "budget_score": _to_float(r[7]),
         }
         for r in rows
     ]
 
     return {
-        "store_scores":       store_scores,
-        "avg_score":          round(avg_score, 2),
+        "store_scores": store_scores,
+        "avg_score": round(avg_score, 2),
         "grade_distribution": compute_brand_grade_distribution(scores_list),
-        "best_store":  {"store_id": store_scores[0]["store_id"],  "total_score": store_scores[0]["total_score"],  "grade": store_scores[0]["grade"]},
-        "worst_store": {"store_id": store_scores[-1]["store_id"], "total_score": store_scores[-1]["total_score"], "grade": store_scores[-1]["grade"]},
+        "best_store": {
+            "store_id": store_scores[0]["store_id"],
+            "total_score": store_scores[0]["total_score"],
+            "grade": store_scores[0]["grade"],
+        },
+        "worst_store": {
+            "store_id": store_scores[-1]["store_id"],
+            "total_score": store_scores[-1]["total_score"],
+            "grade": store_scores[-1]["grade"],
+        },
         "store_count": len(rows),
     }
 
@@ -263,27 +275,25 @@ async def get_brand_alert_summary(
         sid = r[0]
         if sid not in by_store:
             by_store[sid] = []
-        by_store[sid].append({
-            "severity": r[1],
-            "status":   r[2],
-            "metric":   r[3],
-            "message":  r[4],
-            "event_id": r[5],
-            "store_id": sid,
-        })
+        by_store[sid].append(
+            {
+                "severity": r[1],
+                "status": r[2],
+                "metric": r[3],
+                "message": r[4],
+                "event_id": r[5],
+                "store_id": sid,
+            }
+        )
 
     return {
-        "open_count":         open_count,
-        "critical_count":     critical_count,
+        "open_count": open_count,
+        "critical_count": critical_count,
         "acknowledged_count": acknowledged_count,
-        "total_count":        len(rows),
-        "by_store":           [
-            {"store_id": sid, "events": evts}
-            for sid, evts in by_store.items()
-        ],
+        "total_count": len(rows),
+        "by_store": [{"store_id": sid, "events": evts} for sid, evts in by_store.items()],
         "all_events": [
-            {"severity": r[1], "status": r[2], "metric": r[3],
-             "message": r[4], "event_id": r[5], "store_id": r[0]}
+            {"severity": r[1], "status": r[2], "metric": r[3], "message": r[4], "event_id": r[5], "store_id": r[0]}
             for r in rows
         ],
     }
@@ -313,14 +323,14 @@ async def get_brand_budget_summary(
     if not plan_rows:
         return {
             "store_count_with_budget": 0,
-            "avg_achievement_pct":     None,
-            "over_budget_count":       0,
-            "under_budget_count":      0,
-            "store_budgets":           [],
+            "avg_achievement_pct": None,
+            "over_budget_count": 0,
+            "under_budget_count": 0,
+            "store_budgets": [],
         }
 
     plan_ids = [r[0] for r in plan_rows]
-    store_map = {r[0]: r[1] for r in plan_rows}   # plan_id → store_id
+    store_map = {r[0]: r[1] for r in plan_rows}  # plan_id → store_id
 
     # 拿各计划的 revenue 预算行
     budget_rows = await db.execute(
@@ -364,21 +374,23 @@ async def get_brand_budget_summary(
             else:
                 under_count += 1
 
-        store_budgets.append({
-            "store_id":          sid,
-            "budget_revenue":    budget_rev,
-            "actual_revenue":    actual_rev,
-            "achievement_pct":   round(ach, 2) if ach is not None else None,
-        })
+        store_budgets.append(
+            {
+                "store_id": sid,
+                "budget_revenue": budget_rev,
+                "actual_revenue": actual_rev,
+                "achievement_pct": round(ach, 2) if ach is not None else None,
+            }
+        )
 
     avg_ach = round(sum(achievements) / len(achievements), 2) if achievements else None
 
     return {
         "store_count_with_budget": len(plan_rows),
-        "avg_achievement_pct":     avg_ach,
-        "over_budget_count":       over_count,
-        "under_budget_count":      under_count,
-        "store_budgets":           store_budgets,
+        "avg_achievement_pct": avg_ach,
+        "over_budget_count": over_count,
+        "under_budget_count": under_count,
+        "store_budgets": store_budgets,
     }
 
 
@@ -402,10 +414,10 @@ async def get_brand_actions(
     )
     return [
         {
-            "store_id":     r[0],
+            "store_id": r[0],
             "insight_type": r[1],
-            "priority":     r[2],
-            "content":      r[3],
+            "priority": r[2],
+            "content": r[3],
         }
         for r in rows.fetchall()
     ]
@@ -442,15 +454,15 @@ async def save_report_snapshot(
                 updated_at            = EXCLUDED.updated_at
         """),
         {
-            "brand_id":    brand_id,
-            "period":      period,
-            "narrative":   data.get("narrative"),
+            "brand_id": brand_id,
+            "period": period,
+            "narrative": data.get("narrative"),
             "store_count": data.get("store_count"),
-            "avg_score":   data.get("avg_health_score"),
+            "avg_score": data.get("avg_health_score"),
             "brand_grade": data.get("brand_grade"),
             "open_alerts": data.get("open_alerts_count"),
             "critical_alerts": data.get("critical_alerts_count"),
-            "budget_ach":  data.get("budget_achievement_pct"),
+            "budget_ach": data.get("budget_achievement_pct"),
             "content_json": json.dumps(data, ensure_ascii=False, default=str),
             "now": now,
         },
@@ -468,9 +480,9 @@ async def get_cfo_dashboard(
     每个子查询独立 try/except 降级，部分失败不影响整体返回。
     """
     health_overview: Optional[Dict] = None
-    alert_summary:   Optional[Dict] = None
-    budget_summary:  Optional[Dict] = None
-    actions:         List[Dict]     = []
+    alert_summary: Optional[Dict] = None
+    budget_summary: Optional[Dict] = None
+    actions: List[Dict] = []
 
     try:
         health_overview = await get_brand_health_overview(db, brand_id, period)
@@ -527,12 +539,12 @@ async def get_cfo_dashboard(
         brand_grade_final = "—"
 
     return {
-        "brand_id":          brand_id,
-        "period":            period,
-        "brand_grade":       brand_grade_final,
-        "narrative":         narrative,
-        "health_overview":   health_overview,
-        "alert_summary":     alert_summary,
-        "budget_summary":    budget_summary,
-        "actions":           prioritized_actions,
+        "brand_id": brand_id,
+        "period": period,
+        "brand_grade": brand_grade_final,
+        "narrative": narrative,
+        "health_overview": health_overview,
+        "alert_summary": alert_summary,
+        "budget_summary": budget_summary,
+        "actions": prioritized_actions,
     }

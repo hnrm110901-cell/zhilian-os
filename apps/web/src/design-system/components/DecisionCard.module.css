@@ -1,26 +1,28 @@
 .card {
   background: var(--surface);
-  border-radius: var(--radius-lg);
-  border: 2px solid var(--border);
-  padding: 16px 20px;
+  border-radius: var(--radius-lg, 16px);
+  border: 1px solid var(--border);
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition: box-shadow 250ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1)),
+              transform 250ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 .card:hover {
   box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
-/* Severity border colors */
-.high    { border-color: #C53030; }
-.medium  { border-color: #C8923A; }
-.low     { border-color: #0AAF9A; }
+/* Severity left accent — subtle top bar instead of thick border */
+.high    { border-top: 2px solid #DC2626; }
+.medium  { border-top: 2px solid #D97706; }
+.low     { border-top: 2px solid #0AAF9A; }
 
-[data-theme='dark'] .high    { border-color: #F87171; }
-[data-theme='dark'] .medium  { border-color: #FFC244; }
-[data-theme='dark'] .low     { border-color: #2DD4BC; }
+[data-theme='dark'] .high    { border-top-color: #F87171; }
+[data-theme='dark'] .medium  { border-top-color: #FBBF24; }
+[data-theme='dark'] .low     { border-top-color: #2DD4BC; }
 
 .header {
   display: flex;
@@ -34,23 +36,25 @@
   font-weight: 700;
   color: var(--text-primary);
   flex: 1;
+  letter-spacing: -0.01em;
 }
 
 .saving {
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, 'SF Pro Display', 'Inter', sans-serif;
   font-variant-numeric: tabular-nums;
   font-size: 18px;
   font-weight: 700;
   color: var(--green);
   white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 
-.saving::before { content: '¥'; font-size: 14px; }
+.saving::before { content: '\A5'; font-size: 14px; }
 
 .desc {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .footer {
@@ -70,7 +74,7 @@
   width: 40px;
   height: 4px;
   border-radius: 2px;
-  background: var(--border-color);
+  background: rgba(0,0,0,0.04);
   margin-left: 6px;
   vertical-align: middle;
   position: relative;

@@ -17,6 +17,7 @@ EffectEvaluator — 决策效果闭环
   - partial                    → trust +0.5
   - failure                    → trust ↓（衰减）
 """
+
 from __future__ import annotations
 
 import datetime
@@ -140,8 +141,7 @@ class EffectEvaluator:
     async def _find_unevaluated(self) -> List[Dict[str, Any]]:
         """查找已执行但未评估的 DecisionLog。"""
         try:
-            rows = (await self.db.execute(
-                text("""
+            rows = (await self.db.execute(text("""
                     SELECT id, decision_type, store_id, executed_at,
                            expected_result, context_data, trust_score
                     FROM decision_logs
@@ -150,8 +150,7 @@ class EffectEvaluator:
                       AND executed_at IS NOT NULL
                     ORDER BY executed_at ASC
                     LIMIT 100
-                """)
-            )).fetchall()
+                """))).fetchall()
 
             return [
                 {
@@ -179,6 +178,7 @@ class EffectEvaluator:
         # 尝试从 SkillRegistry 读取
         try:
             from src.core.skill_registry import SkillRegistry
+
             registry = SkillRegistry.get()
             # 查找匹配 decision_type 对应的技能
             skills = registry.query(intent=decision_type)
@@ -220,8 +220,11 @@ class EffectEvaluator:
         }
 
     async def _evaluate_inventory(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """库存预警评估：查 waste_events 变化。"""
         try:
@@ -254,8 +257,11 @@ class EffectEvaluator:
             return None
 
     async def _evaluate_schedule(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """排班优化评估：查 labor_cost_ratio 变化。"""
         try:
@@ -289,8 +295,11 @@ class EffectEvaluator:
             return None
 
     async def _evaluate_purchase(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """采购建议评估：查采购成本偏差。"""
         expected_cost = expected.get("estimated_cost_yuan")
@@ -329,8 +338,11 @@ class EffectEvaluator:
             return None
 
     async def _evaluate_pricing(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """菜品定价评估：查菜品销量×毛利变化（7天窗口）。"""
         return {
@@ -340,13 +352,17 @@ class EffectEvaluator:
         }
 
     async def _evaluate_cost(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """总成本优化评估。"""
         try:
-            rows = (await self.db.execute(
-                text("""
+            rows = (
+                await self.db.execute(
+                    text("""
                     SELECT total_cost_rate
                     FROM cost_truth_snapshots
                     WHERE store_id = :sid
@@ -354,8 +370,9 @@ class EffectEvaluator:
                     ORDER BY snapshot_date DESC
                     LIMIT 1
                 """),
-                {"sid": store_id, "since": executed_at.date()},
-            )).fetchone()
+                    {"sid": store_id, "since": executed_at.date()},
+                )
+            ).fetchone()
 
             if not rows:
                 return None
@@ -384,13 +401,17 @@ class EffectEvaluator:
             return None
 
     async def _evaluate_revenue(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """营收异常评估：查营收恢复情况（24h 窗口）。"""
         try:
-            rows = (await self.db.execute(
-                text("""
+            rows = (
+                await self.db.execute(
+                    text("""
                     SELECT COALESCE(SUM(total_amount), 0)
                     FROM orders
                     WHERE store_id = :sid
@@ -398,12 +419,13 @@ class EffectEvaluator:
                       AND order_time < :until
                       AND status != 'cancelled'
                 """),
-                {
-                    "sid": store_id,
-                    "since": executed_at,
-                    "until": executed_at + datetime.timedelta(hours=24),
-                },
-            )).fetchone()
+                    {
+                        "sid": store_id,
+                        "since": executed_at,
+                        "until": executed_at + datetime.timedelta(hours=24),
+                    },
+                )
+            ).fetchone()
 
             actual_revenue = float(rows[0]) if rows and rows[0] else 0.0
             expected_revenue = expected.get("expected_revenue_yuan", 0.0)
@@ -437,8 +459,11 @@ class EffectEvaluator:
             return None
 
     async def _evaluate_kpi(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """KPI 改进评估（7天窗口）。"""
         return {
@@ -448,13 +473,17 @@ class EffectEvaluator:
         }
 
     async def _evaluate_order(
-        self, store_id: str, executed_at: datetime.datetime,
-        expected: Dict, context: Dict,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
+        expected: Dict,
+        context: Dict,
     ) -> Optional[Dict[str, Any]]:
         """订单异常评估：查异常订单是否消除（24h 窗口）。"""
         try:
-            rows = (await self.db.execute(
-                text("""
+            rows = (
+                await self.db.execute(
+                    text("""
                     SELECT COUNT(*)
                     FROM orders
                     WHERE store_id = :sid
@@ -462,12 +491,13 @@ class EffectEvaluator:
                       AND order_time < :until
                       AND status = 'anomaly'
                 """),
-                {
-                    "sid": store_id,
-                    "since": executed_at,
-                    "until": executed_at + datetime.timedelta(hours=24),
-                },
-            )).fetchone()
+                    {
+                        "sid": store_id,
+                        "since": executed_at,
+                        "until": executed_at + datetime.timedelta(hours=24),
+                    },
+                )
+            ).fetchone()
 
             anomaly_count = int(rows[0]) if rows else 0
 
@@ -490,7 +520,10 @@ class EffectEvaluator:
     # ── 数据查询 helpers ─────────────────────────────────────────────────
 
     async def _count_waste_events(
-        self, store_id: str, pivot: datetime.datetime, before: bool,
+        self,
+        store_id: str,
+        pivot: datetime.datetime,
+        before: bool,
     ) -> int:
         """统计损耗事件数量（pivot 前后各 48h）。"""
         if before:
@@ -501,22 +534,27 @@ class EffectEvaluator:
             until = pivot + datetime.timedelta(hours=48)
 
         try:
-            rows = (await self.db.execute(
-                text("""
+            rows = (
+                await self.db.execute(
+                    text("""
                     SELECT COUNT(*)
                     FROM waste_events
                     WHERE store_id = :sid
                       AND created_at >= :since
                       AND created_at < :until
                 """),
-                {"sid": store_id, "since": since, "until": until},
-            )).fetchone()
+                    {"sid": store_id, "since": since, "until": until},
+                )
+            ).fetchone()
             return int(rows[0]) if rows else 0
         except Exception:
             return 0
 
     async def _get_labor_cost_ratio(
-        self, store_id: str, pivot: datetime.datetime, before: bool,
+        self,
+        store_id: str,
+        pivot: datetime.datetime,
+        before: bool,
     ) -> Optional[float]:
         """获取人力成本率（pivot 前后各 72h 的平均值）。"""
         if before:
@@ -527,39 +565,45 @@ class EffectEvaluator:
             until = pivot + datetime.timedelta(hours=72)
 
         try:
-            rows = (await self.db.execute(
-                text("""
+            rows = (
+                await self.db.execute(
+                    text("""
                     SELECT AVG(labor_cost_ratio)
                     FROM cost_truth_snapshots
                     WHERE store_id = :sid
                       AND snapshot_date >= :since
                       AND snapshot_date < :until
                 """),
-                {"sid": store_id, "since": since.date(), "until": until.date()},
-            )).fetchone()
+                    {"sid": store_id, "since": since.date(), "until": until.date()},
+                )
+            ).fetchone()
             return float(rows[0]) if rows and rows[0] is not None else None
         except Exception:
             return None
 
     async def _get_actual_purchase_cost(
-        self, store_id: str, executed_at: datetime.datetime,
+        self,
+        store_id: str,
+        executed_at: datetime.datetime,
     ) -> Optional[float]:
         """获取实际采购成本（executed_at 后 72h）。"""
         try:
-            rows = (await self.db.execute(
-                text("""
+            rows = (
+                await self.db.execute(
+                    text("""
                     SELECT COALESCE(SUM(total_amount), 0)
                     FROM purchase_orders
                     WHERE store_id = :sid
                       AND created_at >= :since
                       AND created_at < :until
                 """),
-                {
-                    "sid": store_id,
-                    "since": executed_at,
-                    "until": executed_at + datetime.timedelta(hours=72),
-                },
-            )).fetchone()
+                    {
+                        "sid": store_id,
+                        "since": executed_at,
+                        "until": executed_at + datetime.timedelta(hours=72),
+                    },
+                )
+            ).fetchone()
             val = float(rows[0]) if rows and rows[0] else None
             # 分 → 元
             return round(val / 100, 2) if val else None

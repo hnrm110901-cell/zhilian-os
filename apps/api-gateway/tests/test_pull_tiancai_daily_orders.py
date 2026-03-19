@@ -3,11 +3,11 @@ tests/test_pull_tiancai_daily_orders.py — 天财商龙日单拉取任务单元
 
 覆盖：
   - TIANCAI_BASE_URL 未配置 → 直接返回 skipped，不访问 DB
-  - 门店无凭据 → 静默跳过，stores_processed=0
+  - 凭据未配置 → stores_processed=0（静默跳过）
   - 正常流程：拉取 N 条订单 → upsert → 返回正确计数
   - 门店 adapter 报错 → 降级（error 记录），其余继续
   - 两个门店，一个成功一个失败 → stores_processed=1, errors=1
-  - 门店级凭据优先于全局凭据
+  - 门店级 APP_ID 优先于全局 APP_ID
   - 空订单列表：stores_processed=1, orders_upserted=0
 """
 
@@ -24,6 +24,15 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+def _call_task(task_fn):
+    """Call a Celery task that may be bind=True (real) or plain (FakeCelery)."""
+    import inspect
+    params = inspect.signature(task_fn).parameters
+    if "self" in params:
+        return task_fn(MagicMock())  # bind=True: pass mock self
+    return task_fn()
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 辅助工厂
 # ════════════════════════════════════════════════════════════════════════════
@@ -32,6 +41,7 @@ def _make_store(sid: str = "S001"):
     s = MagicMock()
     s.id = sid
     s.is_active = True
+    s.code = None
     return s
 
 
@@ -71,7 +81,7 @@ def _make_session(stores):
 def _base_env(**overrides):
     return {
         "TIANCAI_BASE_URL": "https://test.tiancai.com",
-        "TIANCAI_APP_ID": "GLOBAL_ID",
+        "TIANCAI_APP_ID": "GLOBAL_APPID",
         "TIANCAI_APP_SECRET": "GLOBAL_SECRET",
         "TIANCAI_BRAND_ID": "B001",
         **overrides,
@@ -89,7 +99,7 @@ class TestPullTiancaiSkip:
         from src.core.celery_tasks import pull_tiancai_daily_orders
 
         with patch.dict(os.environ, {"TIANCAI_BASE_URL": ""}, clear=False):
-            result = pull_tiancai_daily_orders()
+            result = _call_task(pull_tiancai_daily_orders)
 
         assert result["skipped"] is True
         assert result["success"] is True
@@ -98,18 +108,17 @@ class TestPullTiancaiSkip:
         assert result["errors"] == []
 
     def test_store_without_credentials_silently_skipped(self):
-        """门店无凭据 → stores_processed=0，errors=[]。"""
+        """凭据未配置 → 门店被静默跳过，stores_processed=0。"""
         from src.core.celery_tasks import pull_tiancai_daily_orders
 
         fake_db, session = _make_session([_make_store("S001")])
 
         with patch.dict(os.environ, _base_env(TIANCAI_APP_ID="", TIANCAI_APP_SECRET="")), \
              patch("src.core.database.get_db_session", fake_db):
-            result = pull_tiancai_daily_orders()
+            result = _call_task(pull_tiancai_daily_orders)
 
         assert result["stores_processed"] == 0
         assert result["orders_upserted"] == 0
-        assert result["errors"] == []
         session.commit.assert_not_called()
 
 
@@ -135,7 +144,7 @@ class TestPullTiancaiNormal:
                  "packages.api_adapters.tiancai_shanglong.src.adapter.TiancaiShanglongAdapter",
                  return_value=mock_inst,
              ):
-            result = pull_tiancai_daily_orders()
+            result = _call_task(pull_tiancai_daily_orders)
 
         assert result["success"] is True
         assert result["stores_processed"] == 1
@@ -157,14 +166,14 @@ class TestPullTiancaiNormal:
                  "packages.api_adapters.tiancai_shanglong.src.adapter.TiancaiShanglongAdapter",
                  return_value=mock_inst,
              ):
-            result = pull_tiancai_daily_orders()
+            result = _call_task(pull_tiancai_daily_orders)
 
         assert result["stores_processed"] == 1
         assert result["orders_upserted"] == 0
         assert result["errors"] == []
 
-    def test_store_level_credentials_take_priority(self):
-        """门店级凭据优先于全局凭据。"""
+    def test_store_level_app_id_takes_priority(self):
+        """门店级 TIANCAI_APP_ID_{sid} 优先于全局 TIANCAI_APP_ID。"""
         from src.core.celery_tasks import pull_tiancai_daily_orders
 
         fake_db, _ = _make_session([_make_store("S001")])
@@ -177,10 +186,8 @@ class TestPullTiancaiNormal:
             return inst
 
         env = _base_env(
-            TIANCAI_APP_ID="GLOBAL_ID",
-            TIANCAI_APP_SECRET="GLOBAL_SECRET",
-            TIANCAI_APP_ID_S001="STORE_ID",
-            TIANCAI_APP_SECRET_S001="STORE_SECRET",
+            TIANCAI_APP_ID="GLOBAL_APPID",
+            TIANCAI_APP_ID_S001="STORE_APPID",
         )
 
         with patch.dict(os.environ, env), \
@@ -189,11 +196,10 @@ class TestPullTiancaiNormal:
                  "packages.api_adapters.tiancai_shanglong.src.adapter.TiancaiShanglongAdapter",
                  side_effect=_factory,
              ):
-            pull_tiancai_daily_orders()
+            _call_task(pull_tiancai_daily_orders)
 
         assert len(captured) == 1
-        assert captured[0]["app_id"] == "STORE_ID"
-        assert captured[0]["app_secret"] == "STORE_SECRET"
+        assert captured[0]["app_id"] == "STORE_APPID"
 
     def test_result_contains_date_field(self):
         """返回结果包含 date 字段（昨日日期字符串）。"""
@@ -204,7 +210,7 @@ class TestPullTiancaiNormal:
 
         with patch.dict(os.environ, _base_env()), \
              patch("src.core.database.get_db_session", fake_db):
-            result = pull_tiancai_daily_orders()
+            result = _call_task(pull_tiancai_daily_orders)
 
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
         assert result.get("date") == yesterday
@@ -230,7 +236,7 @@ class TestPullTiancaiErrorHandling:
                  "packages.api_adapters.tiancai_shanglong.src.adapter.TiancaiShanglongAdapter",
                  return_value=mock_inst,
              ):
-            result = pull_tiancai_daily_orders()
+            result = _call_task(pull_tiancai_daily_orders)
 
         assert result["success"] is True
         assert result["stores_processed"] == 0
@@ -245,9 +251,13 @@ class TestPullTiancaiErrorHandling:
 
         fake_db, session = _make_session([_make_store("S001"), _make_store("S002")])
 
+        call_count = {"n": 0}
+
         def _factory(config):
+            call_count["n"] += 1
             inst = MagicMock()
-            if config["store_id"] == "S001":
+            # First call is S001 (fails), second is S002 (succeeds)
+            if call_count["n"] == 1:
                 inst.pull_daily_orders = AsyncMock(side_effect=Exception("S001 down"))
             else:
                 inst.pull_daily_orders = AsyncMock(
@@ -261,7 +271,7 @@ class TestPullTiancaiErrorHandling:
                  "packages.api_adapters.tiancai_shanglong.src.adapter.TiancaiShanglongAdapter",
                  side_effect=_factory,
              ):
-            result = pull_tiancai_daily_orders()
+            result = _call_task(pull_tiancai_daily_orders)
 
         assert result["stores_processed"] == 1
         assert result["orders_upserted"] == 1

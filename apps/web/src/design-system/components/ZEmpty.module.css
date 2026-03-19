@@ -3,14 +3,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
-  gap: 12px;
+  padding: 56px 24px;
+  gap: 10px;
 }
 
 .icon {
   font-size: 40px;
   line-height: 1;
-  opacity: 0.35;
+  opacity: 0.25;
 }
 
 .title {
@@ -18,6 +18,7 @@
   font-weight: 600;
   color: var(--text-secondary);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .desc {
@@ -25,10 +26,10 @@
   color: var(--text-tertiary);
   margin: 0;
   text-align: center;
-  max-width: 260px;
+  max-width: 280px;
   line-height: 1.6;
 }
 
 .action {
-  margin-top: 4px;
+  margin-top: 8px;
 }

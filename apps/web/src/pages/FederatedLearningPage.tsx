@@ -31,7 +31,7 @@ const FederatedLearningPage: React.FC = () => {
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [contribution, setContribution] = useState<Contribution | null>(null);
   const [aggregateResult, setAggregateResult] = useState<ModelStatus | null>(null);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [modelType, setModelType] = useState('demand_forecast');
   const [submitForm] = Form.useForm();
 
@@ -86,9 +86,6 @@ const FederatedLearningPage: React.FC = () => {
           <Title level={4} style={{ margin: 0 }}>联邦学习</Title>
           <Space>
             <Select value={storeId} onChange={setStoreId} style={{ width: 140 }}>
-              <Option value="STORE001">门店 001</Option>
-              <Option value="STORE002">门店 002</Option>
-              <Option value="STORE003">门店 003</Option>
             </Select>
             <Select value={modelType} onChange={setModelType} style={{ width: 160 }}>
               <Option value="demand_forecast">需求预测</Option>

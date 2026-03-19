@@ -18,13 +18,15 @@ def _middleware():
 
 
 def _request(path="/api/v1/orders", method="GET", query_params=None,
-             path_params=None, body=None, user=None):
+             path_params=None, body=None, user=None, headers=None):
     """Create a mock request."""
     req = MagicMock()
     req.url.path = path
     req.method = method
     req.query_params = query_params or {}
     req.path_params = path_params or {}
+    req.headers = MagicMock()
+    req.headers.get = MagicMock(side_effect=lambda k, default="": (headers or {}).get(k, default))
     req.state = MagicMock()
     if user is not None:
         req.state.user = user

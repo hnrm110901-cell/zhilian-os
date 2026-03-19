@@ -41,7 +41,7 @@ interface HealthData {
 
 // ── 辅助 ─────────────────────────────────────────────────────────────────────
 
-const STORE_ID = 'store_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const gradeColor = (color: string): string => {
   const map: Record<string, string> = {

@@ -13,23 +13,18 @@
 """
 
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-
 from src.core.dependencies import get_current_user
 from src.models.user import User
-from src.services.wechat_action_fsm import (
-    ActionCategory,
-    ActionPriority,
-    ActionState,
-    WeChatActionFSM,
-    get_wechat_fsm,
-)
+from src.services.wechat_action_fsm import ActionCategory, ActionPriority, ActionState, WeChatActionFSM, get_wechat_fsm
 
 router = APIRouter(prefix="/api/v1/wechat-actions", tags=["wechat_actions"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class ActionCreateIn(BaseModel):
     store_id: str
@@ -49,6 +44,7 @@ class ResolveIn(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_action(
@@ -157,6 +153,7 @@ async def wechat_webhook(request: Request):
     企微服务器回调验签后调用此接口通知消息已读/操作事件。
     """
     import os
+
     token = os.getenv("WECHAT_WEBHOOK_TOKEN", "")
     timestamp = request.query_params.get("timestamp", "")
     nonce = request.query_params.get("nonce", "")

@@ -303,9 +303,7 @@ LIMIT 20""",
     def _validate_cypher(self, cypher: str) -> None:
         """安全校验：禁止写操作"""
         if _FORBIDDEN_PATTERNS.search(cypher):
-            raise ValueError(
-                "Cypher 包含禁止的写操作（CREATE/DELETE/SET/MERGE/DROP）"
-            )
+            raise ValueError("Cypher 包含禁止的写操作（CREATE/DELETE/SET/MERGE/DROP）")
 
     def _inject_store_filter(self, cypher: str, store_id: str) -> str:
         """
@@ -324,9 +322,7 @@ LIMIT 20""",
         if limit_match:
             existing = int(limit_match.group(1))
             if existing > 100:
-                cypher = re.sub(
-                    r"\bLIMIT\s+\d+", f"LIMIT {min(limit, 100)}", cypher, flags=re.IGNORECASE
-                )
+                cypher = re.sub(r"\bLIMIT\s+\d+", f"LIMIT {min(limit, 100)}", cypher, flags=re.IGNORECASE)
         else:
             cypher = cypher.rstrip() + f"\nLIMIT {min(limit, 100)}"
         return cypher
@@ -335,13 +331,12 @@ LIMIT 20""",
         """执行 Cypher 查询"""
         try:
             from neo4j import GraphDatabase
+
             password = self._neo4j_password
             if not password:
                 logger.warning("NEO4J_PASSWORD 未设置，跳过查询执行")
                 return []
-            driver = GraphDatabase.driver(
-                self._neo4j_uri, auth=(self._neo4j_user, password)
-            )
+            driver = GraphDatabase.driver(self._neo4j_uri, auth=(self._neo4j_user, password))
             with driver.session() as session:
                 result = session.run(cypher)
                 rows = [dict(record) for record in result]

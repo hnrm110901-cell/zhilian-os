@@ -3,6 +3,7 @@ OpsFlowAgent API — Phase 13
 运营流程体：订单异常 / 库存预警 / 菜品质检 / 出品链联动 / 综合优化
 前缀: /api/v1/ops-flow
 """
+
 from __future__ import annotations
 
 import time
@@ -12,14 +13,17 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, desc, func
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.models.ops_flow_agent import (
-    OpsChainEvent, OpsChainLinkage,
-    OpsOrderAnomaly, OpsInventoryAlert, OpsQualityRecord,
-    OpsFlowDecision, OpsFlowAgentLog,
+    OpsChainEvent,
+    OpsChainLinkage,
+    OpsFlowAgentLog,
+    OpsFlowDecision,
+    OpsInventoryAlert,
+    OpsOrderAnomaly,
+    OpsQualityRecord,
 )
 
 router = APIRouter(prefix="/api/v1/ops-flow")
@@ -27,11 +31,16 @@ router = APIRouter(prefix="/api/v1/ops-flow")
 
 # ── 懒加载 Agents ──────────────────────────────────────────────────────────────
 
+
 def _agents():
     from packages.agents.ops_flow.src.agent import (
-        ChainAlertAgent, OrderAnomalyAgent, InventoryIntelAgent,
-        QualityInspectionAgent, OpsOptimizeAgent,
+        ChainAlertAgent,
+        InventoryIntelAgent,
+        OpsOptimizeAgent,
+        OrderAnomalyAgent,
+        QualityInspectionAgent,
     )
+
     return (
         ChainAlertAgent(),
         OrderAnomalyAgent(),
@@ -43,17 +52,28 @@ def _agents():
 
 # ── Pydantic Schemas ───────────────────────────────────────────────────────────
 
+
 class OrderAnomalyIn(BaseModel):
     brand_id: str
     store_id: str
-    metrics: Dict[str, float] = Field(..., example={
-        "refund_rate": 0.08, "complaint_rate": 0.04,
-        "revenue_yuan": 8000.0, "avg_order_yuan": 85.0,
-    })
-    baseline: Dict[str, float] = Field(..., example={
-        "refund_rate": 0.02, "complaint_rate": 0.01,
-        "revenue_yuan": 10000.0, "avg_order_yuan": 100.0,
-    })
+    metrics: Dict[str, float] = Field(
+        ...,
+        example={
+            "refund_rate": 0.08,
+            "complaint_rate": 0.04,
+            "revenue_yuan": 8000.0,
+            "avg_order_yuan": 85.0,
+        },
+    )
+    baseline: Dict[str, float] = Field(
+        ...,
+        example={
+            "refund_rate": 0.02,
+            "complaint_rate": 0.01,
+            "revenue_yuan": 10000.0,
+            "avg_order_yuan": 100.0,
+        },
+    )
     daily_revenue_yuan: float = Field(default=10000.0, ge=0)
     time_period: str = Field(default="today")
 
@@ -95,6 +115,7 @@ class DecisionAcceptIn(BaseModel):
 
 # ── 1. 出品链联动事件 ──────────────────────────────────────────────────────────
 
+
 @router.get("/stores/{store_id}/chain-events")
 async def list_chain_events(
     store_id: str,
@@ -104,9 +125,7 @@ async def list_chain_events(
 ):
     """获取门店出品链联动事件列表"""
     chain_agent, *_ = _agents()
-    events = await chain_agent.get_active_events(
-        db=db, store_id=store_id, severity_filter=severity, limit=limit
-    )
+    events = await chain_agent.get_active_events(db=db, store_id=store_id, severity_filter=severity, limit=limit)
     return {"store_id": store_id, "events": events, "count": len(events)}
 
 
@@ -130,9 +149,7 @@ async def get_event_linkages(
 ):
     """获取某事件的联动触发明细"""
     result = await db.execute(
-        select(OpsChainLinkage)
-        .where(OpsChainLinkage.trigger_event_id == event_id)
-        .order_by(OpsChainLinkage.executed_at)
+        select(OpsChainLinkage).where(OpsChainLinkage.trigger_event_id == event_id).order_by(OpsChainLinkage.executed_at)
     )
     linkages = result.scalars().all()
     return {
@@ -153,6 +170,7 @@ async def get_event_linkages(
 
 
 # ── 2. 订单异常 ────────────────────────────────────────────────────────────────
+
 
 @router.post("/order-anomaly/detect")
 async def detect_order_anomaly(
@@ -188,6 +206,7 @@ async def list_order_anomalies(
 
 
 # ── 3. 库存预警 ────────────────────────────────────────────────────────────────
+
 
 @router.post("/inventory/check")
 async def check_inventory(
@@ -237,8 +256,7 @@ async def list_inventory_alerts(
 ):
     """获取门店库存预警列表"""
     _, _, inv_agent, *_ = _agents()
-    alerts = await inv_agent.list_alerts(db=db, store_id=store_id,
-                                          unresolved_only=unresolved_only, limit=limit)
+    alerts = await inv_agent.list_alerts(db=db, store_id=store_id, unresolved_only=unresolved_only, limit=limit)
     return {"store_id": store_id, "alerts": alerts, "count": len(alerts)}
 
 
@@ -248,9 +266,7 @@ async def resolve_inventory_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """标记库存预警已处理"""
-    result = await db.execute(
-        select(OpsInventoryAlert).where(OpsInventoryAlert.id == alert_id)
-    )
+    result = await db.execute(select(OpsInventoryAlert).where(OpsInventoryAlert.id == alert_id))
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(status_code=404, detail=f"预警 {alert_id} 不存在")
@@ -261,6 +277,7 @@ async def resolve_inventory_alert(
 
 
 # ── 4. 菜品质检 ────────────────────────────────────────────────────────────────
+
 
 @router.post("/quality/inspect")
 async def inspect_quality(
@@ -303,13 +320,12 @@ async def list_quality_records(
 ):
     """获取门店质检记录列表"""
     _, _, _, quality_agent, _ = _agents()
-    records = await quality_agent.list_records(
-        db=db, store_id=store_id, status_filter=status, limit=limit
-    )
+    records = await quality_agent.list_records(db=db, store_id=store_id, status_filter=status, limit=limit)
     return {"store_id": store_id, "records": records, "count": len(records)}
 
 
 # ── 5. 综合优化决策 ────────────────────────────────────────────────────────────
+
 
 @router.post("/stores/{store_id}/optimize")
 async def generate_optimize_decision(
@@ -321,7 +337,9 @@ async def generate_optimize_decision(
     """基于近期三层数据生成综合优化决策"""
     _, _, _, _, ops_agent = _agents()
     result = await ops_agent.generate_decision(
-        db=db, brand_id=brand_id, store_id=store_id,
+        db=db,
+        brand_id=brand_id,
+        store_id=store_id,
         lookback_hours=lookback_hours,
     )
     await db.commit()
@@ -349,13 +367,12 @@ async def list_decisions(
 ):
     """获取门店优化决策列表"""
     _, _, _, _, ops_agent = _agents()
-    decisions = await ops_agent.list_decisions(
-        db=db, store_id=store_id, status_filter=status, limit=limit
-    )
+    decisions = await ops_agent.list_decisions(db=db, store_id=store_id, status_filter=status, limit=limit)
     return {"store_id": store_id, "decisions": decisions, "count": len(decisions)}
 
 
 # ── 6. 驾驶舱 BFF ──────────────────────────────────────────────────────────────
+
 
 @router.get("/stores/{store_id}/dashboard")
 async def ops_flow_dashboard(
@@ -364,28 +381,27 @@ async def ops_flow_dashboard(
 ):
     """OpsFlowAgent 驾驶舱 — 出品链实时状态快览"""
     from datetime import timedelta
+
     now = datetime.now()
     since_24h = now - timedelta(hours=24)
 
     # 并行查询三层数据
     chain_result = await db.execute(
-        select(func.count(), func.sum(OpsChainEvent.linkage_count))
-        .where(and_(OpsChainEvent.store_id == store_id,
-                    OpsChainEvent.created_at >= since_24h))
+        select(func.count(), func.sum(OpsChainEvent.linkage_count)).where(
+            and_(OpsChainEvent.store_id == store_id, OpsChainEvent.created_at >= since_24h)
+        )
     )
     chain_stats = chain_result.one()
 
     order_result = await db.execute(
-        select(func.count(), func.sum(OpsOrderAnomaly.estimated_revenue_loss_yuan))
-        .where(and_(OpsOrderAnomaly.store_id == store_id,
-                    OpsOrderAnomaly.created_at >= since_24h))
+        select(func.count(), func.sum(OpsOrderAnomaly.estimated_revenue_loss_yuan)).where(
+            and_(OpsOrderAnomaly.store_id == store_id, OpsOrderAnomaly.created_at >= since_24h)
+        )
     )
     order_stats = order_result.one()
 
     inv_result = await db.execute(
-        select(func.count())
-        .where(and_(OpsInventoryAlert.store_id == store_id,
-                    OpsInventoryAlert.resolved == False))
+        select(func.count()).where(and_(OpsInventoryAlert.store_id == store_id, OpsInventoryAlert.resolved == False))
     )
     inv_unresolved = inv_result.scalar() or 0
 
@@ -393,18 +409,13 @@ async def ops_flow_dashboard(
         select(
             func.count(),
             func.avg(OpsQualityRecord.quality_score),
-        )
-        .where(and_(OpsQualityRecord.store_id == store_id,
-                    OpsQualityRecord.created_at >= since_24h))
+        ).where(and_(OpsQualityRecord.store_id == store_id, OpsQualityRecord.created_at >= since_24h))
     )
     quality_stats = q_result.one()
 
     # 最新联动事件（top3）
     recent_events_result = await db.execute(
-        select(OpsChainEvent)
-        .where(OpsChainEvent.store_id == store_id)
-        .order_by(desc(OpsChainEvent.created_at))
-        .limit(3)
+        select(OpsChainEvent).where(OpsChainEvent.store_id == store_id).order_by(desc(OpsChainEvent.created_at)).limit(3)
     )
     recent_events = [
         {
@@ -420,8 +431,7 @@ async def ops_flow_dashboard(
     # 最新优化决策
     latest_decision_result = await db.execute(
         select(OpsFlowDecision)
-        .where(and_(OpsFlowDecision.store_id == store_id,
-                    OpsFlowDecision.status == "pending"))
+        .where(and_(OpsFlowDecision.store_id == store_id, OpsFlowDecision.status == "pending"))
         .order_by(desc(OpsFlowDecision.created_at))
         .limit(1)
     )

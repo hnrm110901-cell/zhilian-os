@@ -2,6 +2,7 @@
 Federated API (compatibility shim)
 用于兼容 main.py 中既有路由挂载，避免缺失模块导致测试与启动失败。
 """
+
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/v1/federated", tags=["federated"])

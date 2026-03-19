@@ -39,17 +39,16 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 import structlog
-
-from src.services.forecast_features import ChineseHolidays, WeatherImpact, BusinessDistrictEvents
 from src.services.auspicious_date_service import AuspiciousDateService
+from src.services.forecast_features import BusinessDistrictEvents, ChineseHolidays, WeatherImpact
 from src.services.weather_adapter import weather_adapter
 
 logger = structlog.get_logger()
 
 # 组合策略枚举字符串常量
 STRATEGY_MULTIPLY = "multiply"
-STRATEGY_MAX      = "max"
-STRATEGY_SMART    = "smart"   # 推荐默认值
+STRATEGY_MAX = "max"
+STRATEGY_SMART = "smart"  # 推荐默认值
 
 
 @dataclass
@@ -57,32 +56,32 @@ class ExternalFactorsResult:
     """统一外部因子计算结果。"""
 
     # ── 各子系统原始结果 ──────────────────────────────────────────────────────
-    weather:    Optional[Dict[str, Any]] = None   # {temperature, condition, impact_factor}
-    holiday:    Optional[Dict[str, Any]] = None   # {name, impact_factor}
-    auspicious: Optional[Dict[str, Any]] = None   # {label, demand_factor, sources}
-    event:      Optional[Dict[str, Any]] = None   # {type, impact_factor}
+    weather: Optional[Dict[str, Any]] = None  # {temperature, condition, impact_factor}
+    holiday: Optional[Dict[str, Any]] = None  # {name, impact_factor}
+    auspicious: Optional[Dict[str, Any]] = None  # {label, demand_factor, sources}
+    event: Optional[Dict[str, Any]] = None  # {type, impact_factor}
 
     # ── 组合结果 ─────────────────────────────────────────────────────────────
-    composite_factor:     float             = 1.0   # 最终乘以 base_sales 的系数
-    composition_strategy: str              = STRATEGY_SMART
-    factors_breakdown:    Dict[str, float] = field(default_factory=dict)
+    composite_factor: float = 1.0  # 最终乘以 base_sales 的系数
+    composition_strategy: str = STRATEGY_SMART
+    factors_breakdown: Dict[str, float] = field(default_factory=dict)
     # e.g. {"weather": 0.85, "holiday": 1.6, "auspicious": 2.2}
 
     # ── 元数据 ────────────────────────────────────────────────────────────────
     target_date: str = ""
-    warnings:    List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "target_date":         self.target_date,
-            "weather":             self.weather,
-            "holiday":             self.holiday,
-            "auspicious":          self.auspicious,
-            "event":               self.event,
-            "composite_factor":    round(self.composite_factor, 3),
+            "target_date": self.target_date,
+            "weather": self.weather,
+            "holiday": self.holiday,
+            "auspicious": self.auspicious,
+            "event": self.event,
+            "composite_factor": round(self.composite_factor, 3),
             "composition_strategy": self.composition_strategy,
-            "factors_breakdown":   {k: round(v, 3) for k, v in self.factors_breakdown.items()},
-            "warnings":            self.warnings,
+            "factors_breakdown": {k: round(v, 3) for k, v in self.factors_breakdown.items()},
+            "warnings": self.warnings,
         }
 
 
@@ -107,17 +106,17 @@ class ExternalFactorsAdapter:
             store_config:    门店配置（传入 AuspiciousDateService 用于自定义吉日）
             restaurant_type: 餐厅类型（影响天气温度因子；火锅 vs 正餐）
         """
-        self._store_config    = store_config or {}
+        self._store_config = store_config or {}
         self._restaurant_type = restaurant_type
-        self._auspicious_svc  = AuspiciousDateService(store_config=store_config)
+        self._auspicious_svc = AuspiciousDateService(store_config=store_config)
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
     async def get_factors(
         self,
-        target_date:  date,
-        strategy:     str                            = STRATEGY_SMART,
-        events:       Optional[List[Dict[str, Any]]] = None,
+        target_date: date,
+        strategy: str = STRATEGY_SMART,
+        events: Optional[List[Dict[str, Any]]] = None,
     ) -> ExternalFactorsResult:
         """
         获取指定日期的完整外部因子集合。
@@ -181,7 +180,7 @@ class ExternalFactorsAdapter:
     async def _fetch_weather_factor(
         self,
         target_date: date,
-        result:      ExternalFactorsResult,
+        result: ExternalFactorsResult,
     ) -> float:
         """获取天气影响因子（非致命）。"""
         try:
@@ -195,9 +194,7 @@ class ExternalFactorsAdapter:
             # 温度影响
             temp_factor = 1.0
             if temperature is not None:
-                temp_factor = WeatherImpact.get_temperature_impact(
-                    temperature, self._restaurant_type
-                )
+                temp_factor = WeatherImpact.get_temperature_impact(temperature, self._restaurant_type)
 
             # 天气类型影响
             weather_type_factor = 1.0
@@ -206,11 +203,11 @@ class ExternalFactorsAdapter:
 
             combined = round(temp_factor * weather_type_factor, 3)
             result.weather = {
-                "temperature":    temperature,
-                "condition":      weather_type,
-                "impact_factor":  combined,
-                "temp_factor":    round(temp_factor, 3),
-                "type_factor":    round(weather_type_factor, 3),
+                "temperature": temperature,
+                "condition": weather_type,
+                "impact_factor": combined,
+                "temp_factor": round(temp_factor, 3),
+                "type_factor": round(weather_type_factor, 3),
             }
             return combined
 
@@ -222,15 +219,15 @@ class ExternalFactorsAdapter:
     def _fetch_holiday_factor(
         self,
         target_date: date,
-        result:      ExternalFactorsResult,
+        result: ExternalFactorsResult,
     ) -> float:
         """获取节假日影响因子（纯内存，不会失败）。"""
         factor = ChineseHolidays.get_holiday_impact_score(target_date)
         holiday_info = ChineseHolidays.get_holiday_info(target_date)
         if holiday_info:
             result.holiday = {
-                "name":          holiday_info.get("name", ""),
-                "type":          holiday_info.get("type", ""),
+                "name": holiday_info.get("name", ""),
+                "type": holiday_info.get("type", ""),
                 "impact_factor": round(factor, 3),
             }
         return factor
@@ -238,16 +235,16 @@ class ExternalFactorsAdapter:
     def _fetch_auspicious_factor(
         self,
         target_date: date,
-        result:      ExternalFactorsResult,
+        result: ExternalFactorsResult,
     ) -> float:
         """获取吉日需求因子（好日子；纯内存，不会失败）。"""
         try:
             info = self._auspicious_svc.get_info(target_date)
             if info.is_auspicious:
                 result.auspicious = {
-                    "label":         info.label,
+                    "label": info.label,
                     "demand_factor": info.demand_factor,
-                    "sources":       info.sources,
+                    "sources": info.sources,
                 }
                 return info.demand_factor
         except Exception as e:
@@ -269,7 +266,7 @@ class ExternalFactorsAdapter:
                 factor *= BusinessDistrictEvents.get_event_impact(event_type)
         if factor != 1.0:
             result.event = {
-                "events":        [e.get("type", "") for e in events],
+                "events": [e.get("type", "") for e in events],
                 "impact_factor": round(factor, 3),
             }
         return round(factor, 3)
@@ -278,11 +275,11 @@ class ExternalFactorsAdapter:
 
     @staticmethod
     def _compose(
-        strategy:          str,
-        weather_factor:    float,
-        holiday_factor:    float,
+        strategy: str,
+        weather_factor: float,
+        holiday_factor: float,
         auspicious_factor: float,
-        event_factor:      float,
+        event_factor: float,
     ) -> float:
         """
         按策略组合四类因子为单一复合系数。
@@ -307,8 +304,8 @@ class ExternalFactorsAdapter:
 
         else:  # STRATEGY_SMART（默认）
             demand_factors = [holiday_factor, auspicious_factor, event_factor]
-            max_demand     = max(demand_factors) if demand_factors else 1.0
-            result         = weather_factor * max_demand
+            max_demand = max(demand_factors) if demand_factors else 1.0
+            result = weather_factor * max_demand
 
         return round(result, 3)
 

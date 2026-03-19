@@ -80,14 +80,14 @@ class TestVoiceService:
 
     @pytest.mark.asyncio
     async def test_speech_to_text_default_provider(self):
-        """测试默认提供商语音识别"""
+        """测试未实现提供商返回模拟结果"""
         service = VoiceService(provider=VoiceProvider.GOOGLE)
         audio_data = b"fake_audio_data"
 
         result = await service.speech_to_text(audio_data)
 
         assert result["success"] is True
-        assert result["text"] == "查询今天的排班"
+        assert result["text"] == "模拟识别结果"
         assert result["language"] == "zh-CN"
 
     @pytest.mark.asyncio

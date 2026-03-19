@@ -26,8 +26,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-from src.models.bom import BOMTemplate, BOMItem
+from src.models.bom import BOMItem, BOMTemplate
 from src.models.dish import Dish, DishCategory
 from src.models.inventory import InventoryItem, InventoryStatus
 from src.services.bom_service import BOMService
@@ -90,31 +89,23 @@ class StoreOntologyReplicator:
 
         # 1. 克隆食材主档（InventoryItem）
         if include_inventory:
-            cloned_ings = await self._clone_ingredients(
-                source_store_id, target_store_id
-            )
+            cloned_ings = await self._clone_ingredients(source_store_id, target_store_id)
             report["ingredients_cloned"] = cloned_ings
 
         # 2. 克隆菜品主档（Dish）
-        cloned_dishes = await self._clone_dishes(
-            source_store_id, target_store_id, dish_filter
-        )
+        cloned_dishes = await self._clone_dishes(source_store_id, target_store_id, dish_filter)
         report["dishes_cloned"] = len(cloned_dishes)
 
         # 3. 克隆 BOM（激活版本）
         if include_bom:
-            bom_count = await self._clone_boms(
-                source_store_id, target_store_id, cloned_dishes
-            )
+            bom_count = await self._clone_boms(source_store_id, target_store_id, cloned_dishes)
             report["boms_cloned"] = bom_count
 
         await self.db.commit()
 
         # 4. Neo4j 本体同步
         try:
-            await self._sync_to_neo4j(
-                source_store_id, target_store_id, target_store_name
-            )
+            await self._sync_to_neo4j(source_store_id, target_store_id, target_store_name)
             report["neo4j_synced"] = True
         except Exception as e:
             report["errors"].append(f"Neo4j 同步失败（非致命）: {e}")
@@ -242,9 +233,7 @@ class StoreOntologyReplicator:
         count = 0
         for src in source_ings:
             # 检查目标门店是否已有相同 ID 的食材
-            existing_stmt = select(InventoryItem).where(
-                InventoryItem.id == src.id
-            )
+            existing_stmt = select(InventoryItem).where(InventoryItem.id == src.id)
             existing = await self.db.execute(existing_stmt)
             if existing.scalar_one_or_none():
                 continue  # 食材 ID 共享（供应商食材通用）

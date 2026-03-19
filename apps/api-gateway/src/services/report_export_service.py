@@ -2,22 +2,25 @@
 报表导出服务
 支持PDF和Excel格式导出
 """
-from typing import Dict, List, Any, Optional
-from datetime import datetime
-import io
+
 import csv
+import io
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 
 try:
     import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
+
     XLSX_AVAILABLE = True
 except ImportError:
     XLSX_AVAILABLE = False
 
-from src.models.finance import FinancialTransaction, FinancialReport
+from src.models.finance import FinancialReport, FinancialTransaction
 from src.services.finance_service import FinanceService
 
 
@@ -33,7 +36,7 @@ class ReportExportService:
         start_date: datetime,
         end_date: datetime,
         store_id: Optional[int] = None,
-        db: Optional[AsyncSession] = None
+        db: Optional[AsyncSession] = None,
     ) -> bytes:
         """
         导出报表为CSV格式
@@ -51,14 +54,10 @@ class ReportExportService:
         # 获取报表数据
         finance_service = FinanceService(db)
         if report_type == "income_statement":
-            data = await finance_service.get_income_statement(
-                start_date, end_date, store_id, db
-            )
+            data = await finance_service.get_income_statement(start_date, end_date, store_id, db)
             return self._generate_income_statement_csv(data, start_date, end_date)
         elif report_type == "cash_flow":
-            data = await finance_service.get_cash_flow_statement(
-                start_date, end_date, store_id, db
-            )
+            data = await finance_service.get_cash_flow_statement(start_date, end_date, store_id, db)
             return self._generate_cash_flow_csv(data, start_date, end_date)
         elif report_type == "transactions":
             data = await self._get_transactions(start_date, end_date, store_id, db)
@@ -66,10 +65,9 @@ class ReportExportService:
         else:
             raise ValueError(f"不支持的报表类型: {report_type}")
 
-    def _generate_income_statement_csv(
-        self, data: Dict[str, Any], start_date: datetime, end_date: datetime
-    ) -> bytes:
+    def _generate_income_statement_csv(self, data: Dict[str, Any], start_date: datetime, end_date: datetime) -> bytes:
         """生成损益表CSV"""
+
         def _num(*keys: str, default: float = 0.0) -> float:
             for key in keys:
                 value = data.get(key)
@@ -139,12 +137,11 @@ class ReportExportService:
         writer.writerow(["净利润", f"¥{net_profit:,.2f}"])
         writer.writerow(["净利润率", f"{net_profit_margin:.2f}%"])
 
-        return output.getvalue().encode('utf-8-sig')
+        return output.getvalue().encode("utf-8-sig")
 
-    def _generate_cash_flow_csv(
-        self, data: Dict[str, Any], start_date: datetime, end_date: datetime
-    ) -> bytes:
+    def _generate_cash_flow_csv(self, data: Dict[str, Any], start_date: datetime, end_date: datetime) -> bytes:
         """生成现金流量表CSV"""
+
         def _num(*keys: str, default: float = 0.0) -> float:
             for key in keys:
                 value = data.get(key)
@@ -186,7 +183,7 @@ class ReportExportService:
         writer.writerow(["期初现金", f"¥{_num('beginning_cash'):,.2f}"])
         writer.writerow(["期末现金", f"¥{_num('ending_cash'):,.2f}"])
 
-        return output.getvalue().encode('utf-8-sig')
+        return output.getvalue().encode("utf-8-sig")
 
     def _generate_transactions_csv(self, transactions: List[Dict[str, Any]]) -> bytes:
         """生成交易明细CSV"""
@@ -196,38 +193,31 @@ class ReportExportService:
         writer.writerow(["交易记录"])
         writer.writerow([])
         # 写入表头
-        writer.writerow([
-            "日期", "类型", "分类", "金额", "描述", "门店ID", "参考编号"
-        ])
+        writer.writerow(["日期", "类型", "分类", "金额", "描述", "门店ID", "参考编号"])
 
         # 写入数据
         for trans in transactions:
-            trans_date = trans.get('transaction_date') or trans.get('date') or datetime.utcnow()
-            writer.writerow([
-                trans_date.strftime('%Y-%m-%d %H:%M:%S') if hasattr(trans_date, "strftime") else str(trans_date),
-                trans.get('transaction_type', trans.get('type', '')),
-                trans.get('category', ''),
-                f"¥{float(trans.get('amount', 0)):,.2f}",
-                trans.get('description', ''),
-                trans.get('store_id', ''),
-                trans.get('reference_number', '')
-            ])
+            trans_date = trans.get("transaction_date") or trans.get("date") or datetime.utcnow()
+            writer.writerow(
+                [
+                    trans_date.strftime("%Y-%m-%d %H:%M:%S") if hasattr(trans_date, "strftime") else str(trans_date),
+                    trans.get("transaction_type", trans.get("type", "")),
+                    trans.get("category", ""),
+                    f"¥{float(trans.get('amount', 0)):,.2f}",
+                    trans.get("description", ""),
+                    trans.get("store_id", ""),
+                    trans.get("reference_number", ""),
+                ]
+            )
 
-        return output.getvalue().encode('utf-8-sig')
+        return output.getvalue().encode("utf-8-sig")
 
     async def _get_transactions(
-        self,
-        start_date: datetime,
-        end_date: datetime,
-        store_id: Optional[int],
-        db: AsyncSession
+        self, start_date: datetime, end_date: datetime, store_id: Optional[int], db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取交易明细"""
         query = select(FinancialTransaction).where(
-            and_(
-                FinancialTransaction.transaction_date >= start_date,
-                FinancialTransaction.transaction_date <= end_date
-            )
+            and_(FinancialTransaction.transaction_date >= start_date, FinancialTransaction.transaction_date <= end_date)
         )
 
         if store_id:
@@ -246,7 +236,7 @@ class ReportExportService:
                 "amount": t.amount,
                 "description": t.description,
                 "store_id": t.store_id,
-                "reference_number": t.reference_number
+                "reference_number": t.reference_number,
             }
             for t in transactions
         ]
@@ -257,7 +247,7 @@ class ReportExportService:
         start_date: datetime,
         end_date: datetime,
         store_id: Optional[int] = None,
-        db: Optional[AsyncSession] = None
+        db: Optional[AsyncSession] = None,
     ) -> bytes:
         """
         导出报表为 Excel (xlsx) 格式
@@ -290,15 +280,15 @@ class ReportExportService:
         if report_type == "income_statement":
             data = await finance_service.get_income_statement(start_date, end_date, store_id, db)
             ws.title = "损益表"
-            self._write_income_statement_xlsx(ws, data, start_date, end_date,
-                                               header_font, header_fill, section_font, section_fill,
-                                               center_align, right_align)
+            self._write_income_statement_xlsx(
+                ws, data, start_date, end_date, header_font, header_fill, section_font, section_fill, center_align, right_align
+            )
         elif report_type == "cash_flow":
             data = await finance_service.get_cash_flow_statement(start_date, end_date, store_id, db)
             ws.title = "现金流量表"
-            self._write_cash_flow_xlsx(ws, data, start_date, end_date,
-                                        header_font, header_fill, section_font, section_fill,
-                                        center_align, right_align)
+            self._write_cash_flow_xlsx(
+                ws, data, start_date, end_date, header_font, header_fill, section_font, section_fill, center_align, right_align
+            )
         elif report_type == "transactions":
             data = await self._get_transactions(start_date, end_date, store_id, db)
             ws.title = "交易明细"
@@ -310,9 +300,9 @@ class ReportExportService:
         wb.save(output)
         return output.getvalue()
 
-    def _write_income_statement_xlsx(self, ws, data, start_date, end_date,
-                                      header_font, header_fill, section_font, section_fill,
-                                      center_align, right_align):
+    def _write_income_statement_xlsx(
+        self, ws, data, start_date, end_date, header_font, header_fill, section_font, section_fill, center_align, right_align
+    ):
         """写入损益表到 Excel 工作表"""
         ws.column_dimensions["A"].width = 20
         ws.column_dimensions["B"].width = 18
@@ -365,9 +355,9 @@ class ReportExportService:
                 cell_b = ws.cell(row=i, column=2, value=f"¥{value:,.2f}" if isinstance(value, (int, float)) else value)
                 cell_b.alignment = right_align
 
-    def _write_cash_flow_xlsx(self, ws, data, start_date, end_date,
-                               header_font, header_fill, section_font, section_fill,
-                               center_align, right_align):
+    def _write_cash_flow_xlsx(
+        self, ws, data, start_date, end_date, header_font, header_fill, section_font, section_fill, center_align, right_align
+    ):
         """写入现金流量表到 Excel 工作表"""
         ws.column_dimensions["A"].width = 22
         ws.column_dimensions["B"].width = 18

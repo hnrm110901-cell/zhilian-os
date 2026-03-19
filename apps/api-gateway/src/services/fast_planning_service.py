@@ -31,29 +31,29 @@ logger = structlog.get_logger()
 
 # 按餐厅规模的人均服务能力（客/人/小时）
 _STAFF_CAPACITY = {
-    "cashier":   30,
-    "waiter":    15,
-    "chef":      20,
+    "cashier": 30,
+    "waiter": 15,
+    "chef": 20,
     "chef_senior": 15,
-    "delivery":  25,
+    "delivery": 25,
 }
 
 # 各渠道客流系数（基于堂食客流估算）
 _CHANNEL_RATIO = {
-    "dine_in":  0.60,
-    "takeout":  0.30,
-    "banquet":  0.10,
+    "dine_in": 0.60,
+    "takeout": 0.30,
+    "banquet": 0.10,
 }
 
 # 客流预测的星期系数（以周日=1.0为基准）
 _DOW_FACTOR = {
     0: 1.15,  # 周一
     1: 1.05,  # 周二
-    2: 1.0,   # 周三
-    3: 1.1,   # 周四
-    4: 1.4,   # 周五
-    5: 1.5,   # 周六
-    6: 1.3,   # 周日
+    2: 1.0,  # 周三
+    3: 1.1,  # 周四
+    4: 1.4,  # 周五
+    5: 1.5,  # 周六
+    6: 1.3,  # 周日
 }
 
 
@@ -81,7 +81,7 @@ class FastPlanningService:
 
     async def generate_initial_plan(
         self,
-        store_id:  str,
+        store_id: str,
         plan_date: date,
     ) -> Dict[str, Any]:
         """
@@ -98,14 +98,15 @@ class FastPlanningService:
              top_dishes, risk_flags, data_completeness}
         """
         import time
+
         t0 = time.time()
 
-        dow       = plan_date.weekday()
+        dow = plan_date.weekday()
         dow_factor = _DOW_FACTOR.get(dow, 1.0)
 
         # 历史基准客流
         base_footfall = await self._get_base_footfall(store_id, dow)
-        forecast      = int(base_footfall * dow_factor)
+        forecast = int(base_footfall * dow_factor)
 
         # L4 风险标记
         risk_flags = await self._get_risk_flags(store_id)
@@ -125,11 +126,11 @@ class FastPlanningService:
         )
         return {
             "forecast_footfall": forecast,
-            "base_footfall":     int(base_footfall),
-            "dow_factor":        dow_factor,
-            "day_of_week":       ["周一","周二","周三","周四","周五","周六","周日"][dow],
-            "top_dishes":        top_dishes[:5],
-            "risk_flags":        risk_flags,
+            "base_footfall": int(base_footfall),
+            "dow_factor": dow_factor,
+            "day_of_week": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][dow],
+            "top_dishes": top_dishes[:5],
+            "risk_flags": risk_flags,
             "data_completeness": completeness,
         }
 
@@ -137,10 +138,10 @@ class FastPlanningService:
 
     async def generate_procurement(
         self,
-        store_id:          str,
-        plan_date:         date,
+        store_id: str,
+        plan_date: date,
         forecast_footfall: int,
-        banquet_addons:    Optional[List[Dict[str, Any]]] = None,
+        banquet_addons: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         基于客流预测生成采购建议。
@@ -162,6 +163,7 @@ class FastPlanningService:
              total_cost, banquet_addon_cost, data_completeness}
         """
         import time
+
         t0 = time.time()
 
         items = await self._estimate_procurement_items(store_id, forecast_footfall)
@@ -173,12 +175,12 @@ class FastPlanningService:
             for addon in banquet_addons:
                 # 转换 addon 格式（BanquetPlanningEngine → FastPlanning 统一格式）
                 item = {
-                    "ingredient":     addon.get("item_name", addon.get("category", "宴会物料")),
-                    "qty":            float(addon.get("recommended_quantity") or 0),
-                    "unit":           addon.get("unit", "kg"),
+                    "ingredient": addon.get("item_name", addon.get("category", "宴会物料")),
+                    "qty": float(addon.get("recommended_quantity") or 0),
+                    "unit": addon.get("unit", "kg"),
                     "estimated_cost": self._estimate_addon_item_cost(addon),
-                    "urgency":        addon.get("alert_level", "normal"),
-                    "source":         "banquet_circuit_breaker",
+                    "urgency": addon.get("alert_level", "normal"),
+                    "source": "banquet_circuit_breaker",
                     "party_size_basis": addon.get("party_size_basis"),
                 }
                 banquet_addon_cost += item["estimated_cost"]
@@ -196,12 +198,12 @@ class FastPlanningService:
             elapsed=round(time.time() - t0, 2),
         )
         return {
-            "items":              items,
-            "total_cost":         round(total, 1),
-            "regular_cost":       round(regular_total, 1),
+            "items": items,
+            "total_cost": round(total, 1),
+            "regular_cost": round(regular_total, 1),
             "banquet_addon_cost": round(banquet_addon_cost, 1),
-            "forecast_footfall":  forecast_footfall,
-            "data_completeness":  0.65 if items else 0.2,
+            "forecast_footfall": forecast_footfall,
+            "data_completeness": 0.65 if items else 0.2,
             "note": "基于历史人均消耗 × 预测客流估算，请店长核实库存后确认",
         }
 
@@ -209,8 +211,8 @@ class FastPlanningService:
 
     async def generate_scheduling(
         self,
-        store_id:          str,
-        plan_date:         date,
+        store_id: str,
+        plan_date: date,
         forecast_footfall: int,
     ) -> Dict[str, Any]:
         """
@@ -226,49 +228,45 @@ class FastPlanningService:
         """
         import math
         import time
+
         t0 = time.time()
 
         peak = forecast_footfall * 0.4
         shifts = [
             {
-                "shift":       "早班",
-                "start_hour":  7,
-                "end_hour":    14,
+                "shift": "早班",
+                "start_hour": 7,
+                "end_hour": 14,
                 "roles": {
-                    "chef":    max(1, math.ceil(peak * 0.3 / _STAFF_CAPACITY["chef"])),
-                    "waiter":  max(1, math.ceil(peak * 0.3 / _STAFF_CAPACITY["waiter"])),
+                    "chef": max(1, math.ceil(peak * 0.3 / _STAFF_CAPACITY["chef"])),
+                    "waiter": max(1, math.ceil(peak * 0.3 / _STAFF_CAPACITY["waiter"])),
                     "cashier": 1,
                 },
             },
             {
-                "shift":       "午班",
-                "start_hour":  11,
-                "end_hour":    15,
+                "shift": "午班",
+                "start_hour": 11,
+                "end_hour": 15,
                 "roles": {
-                    "chef":    max(2, math.ceil(peak / _STAFF_CAPACITY["chef"])),
-                    "waiter":  max(2, math.ceil(peak / _STAFF_CAPACITY["waiter"])),
+                    "chef": max(2, math.ceil(peak / _STAFF_CAPACITY["chef"])),
+                    "waiter": max(2, math.ceil(peak / _STAFF_CAPACITY["waiter"])),
                     "cashier": 1,
                 },
             },
             {
-                "shift":       "晚班",
-                "start_hour":  17,
-                "end_hour":    22,
+                "shift": "晚班",
+                "start_hour": 17,
+                "end_hour": 22,
                 "roles": {
-                    "chef":    max(2, math.ceil(peak / _STAFF_CAPACITY["chef"])),
-                    "waiter":  max(2, math.ceil(peak / _STAFF_CAPACITY["waiter"])),
+                    "chef": max(2, math.ceil(peak / _STAFF_CAPACITY["chef"])),
+                    "waiter": max(2, math.ceil(peak / _STAFF_CAPACITY["waiter"])),
                     "cashier": 1,
                 },
             },
         ]
 
-        total_staff = sum(
-            sum(s["roles"].values()) for s in shifts
-        )
-        labor_hours = sum(
-            (s["end_hour"] - s["start_hour"]) * sum(s["roles"].values())
-            for s in shifts
-        )
+        total_staff = sum(sum(s["roles"].values()) for s in shifts)
+        labor_hours = sum((s["end_hour"] - s["start_hour"]) * sum(s["roles"].values()) for s in shifts)
 
         logger.info(
             "排班建议生成",
@@ -277,11 +275,11 @@ class FastPlanningService:
             elapsed=round(time.time() - t0, 2),
         )
         return {
-            "shifts":                shifts,
-            "total_staff":           total_staff,
+            "shifts": shifts,
+            "total_staff": total_staff,
             "estimated_labor_hours": labor_hours,
-            "forecast_footfall":     forecast_footfall,
-            "data_completeness":     0.6,
+            "forecast_footfall": forecast_footfall,
+            "data_completeness": 0.6,
             "note": "基于峰值客流估算，请结合员工实际情况调整",
         }
 
@@ -289,7 +287,7 @@ class FastPlanningService:
 
     async def generate_menu_plan(
         self,
-        store_id:  str,
+        store_id: str,
         plan_date: date,
     ) -> Dict[str, Any]:
         """
@@ -301,15 +299,16 @@ class FastPlanningService:
             {featured, stop_sell, price_adjustments, data_completeness}
         """
         import time
+
         t0 = time.time()
 
         # L4 废损/质量维度的建议
-        waste_actions  = await self._get_l4_actions(store_id, "waste")
+        waste_actions = await self._get_l4_actions(store_id, "waste")
         quality_actions = await self._get_l4_actions(store_id, "quality")
 
         # TOP 菜品（主推）
         top_dishes = await self._get_top_dishes(store_id, days=7)
-        featured   = [d["dish_name"] for d in top_dishes[:3]]
+        featured = [d["dish_name"] for d in top_dishes[:3]]
 
         # 低销量菜品（停售候选）
         stop_sell = await self._get_low_sales_dishes(store_id, days=7)
@@ -322,11 +321,11 @@ class FastPlanningService:
             elapsed=round(time.time() - t0, 2),
         )
         return {
-            "featured":          featured,
-            "stop_sell":         stop_sell[:3],
-            "price_adjustments": [],   # 需要更精确的价格弹性数据，快速模式暂不生成
-            "waste_alerts":      waste_actions[:2],
-            "quality_alerts":    quality_actions[:2],
+            "featured": featured,
+            "stop_sell": stop_sell[:3],
+            "price_adjustments": [],  # 需要更精确的价格弹性数据，快速模式暂不生成
+            "waste_alerts": waste_actions[:2],
+            "quality_alerts": quality_actions[:2],
             "data_completeness": 0.7,
             "note": "主推建议基于近7天销量TOP菜品，停售建议请结合库存确认",
         }
@@ -335,7 +334,7 @@ class FastPlanningService:
 
     async def generate_marketing_plan(
         self,
-        store_id:  str,
+        store_id: str,
         plan_date: date,
         menu_plan: Optional[Dict] = None,
     ) -> Dict[str, Any]:
@@ -346,16 +345,14 @@ class FastPlanningService:
             {push_messages, target_segments, promo_items}
         """
         import time
+
         t0 = time.time()
 
         featured = (menu_plan or {}).get("featured", [])
-        promo_items = [
-            {"dish": d, "discount": 0, "reason": "今日主推，高评分菜品"}
-            for d in featured[:2]
-        ]
+        promo_items = [{"dish": d, "discount": 0, "reason": "今日主推，高评分菜品"} for d in featured[:2]]
 
         dow = plan_date.weekday()
-        if dow in (4, 5):   # 周五/六流量大
+        if dow in (4, 5):  # 周五/六流量大
             target_segments = ["vip_members", "nearby_users"]
             push_time = "17:30"
         else:
@@ -364,9 +361,7 @@ class FastPlanningService:
 
         push_messages = []
         if featured:
-            push_messages.append(
-                f"【今日主推】{' · '.join(featured[:2])}，欢迎预约！"
-            )
+            push_messages.append(f"【今日主推】{' · '.join(featured[:2])}，欢迎预约！")
 
         logger.info(
             "营销方案生成",
@@ -374,9 +369,9 @@ class FastPlanningService:
             elapsed=round(time.time() - t0, 2),
         )
         return {
-            "push_messages":    push_messages,
-            "target_segments":  target_segments,
-            "promo_items":      promo_items,
+            "push_messages": push_messages,
+            "target_segments": target_segments,
+            "promo_items": promo_items,
             "suggested_push_time": push_time,
             "data_completeness": 0.5,
             "note": "快速模式仅提供基础营销方向，精确模式可结合会员数据优化",
@@ -388,12 +383,11 @@ class FastPlanningService:
         """取近 4 周同星期的历史客流均值"""
         try:
             from src.models.cross_store import CrossStoreMetric
+
             since = date.today() - timedelta(days=28)
-            stmt  = select(
-                func.avg(CrossStoreMetric.value)
-            ).where(
+            stmt = select(func.avg(CrossStoreMetric.value)).where(
                 and_(
-                    CrossStoreMetric.store_id    == store_id,
+                    CrossStoreMetric.store_id == store_id,
                     CrossStoreMetric.metric_name == "daily_footfall",
                     CrossStoreMetric.metric_date >= since,
                     func.extract("dow", CrossStoreMetric.metric_date) == dow,
@@ -408,12 +402,13 @@ class FastPlanningService:
         """取 L4 最新 P1/P2 报告作为风险标记文字"""
         try:
             from src.models.reasoning import ReasoningReport
+
             since = date.today() - timedelta(days=3)
-            stmt  = (
+            stmt = (
                 select(ReasoningReport)
                 .where(
                     and_(
-                        ReasoningReport.store_id  == store_id,
+                        ReasoningReport.store_id == store_id,
                         ReasoningReport.severity.in_(["P1", "P2"]),
                         ReasoningReport.report_date >= since,
                         ReasoningReport.is_actioned == False,  # noqa: E712
@@ -423,10 +418,7 @@ class FastPlanningService:
                 .limit(5)
             )
             reports = (await self.db.execute(stmt)).scalars().all()
-            return [
-                f"{r.severity} {r.dimension}: {r.root_cause or '异常'} (置信度{r.confidence:.0%})"
-                for r in reports
-            ]
+            return [f"{r.severity} {r.dimension}: {r.root_cause or '异常'} (置信度{r.confidence:.0%})" for r in reports]
         except Exception:
             return []
 
@@ -434,15 +426,16 @@ class FastPlanningService:
         """近 N 天销量 TOP 菜品（从 cross_store_metrics 取 dish_sales_rank）"""
         try:
             from src.models.cross_store import CrossStoreMetric
+
             since = date.today() - timedelta(days=days)
-            stmt  = (
+            stmt = (
                 select(
                     CrossStoreMetric.metric_name,
                     func.avg(CrossStoreMetric.value).label("avg_sales"),
                 )
                 .where(
                     and_(
-                        CrossStoreMetric.store_id    == store_id,
+                        CrossStoreMetric.store_id == store_id,
                         CrossStoreMetric.metric_name.like("dish_sales_%"),
                         CrossStoreMetric.metric_date >= since,
                     )
@@ -466,15 +459,16 @@ class FastPlanningService:
         """近 N 天销量最低的菜品（停售候选）"""
         try:
             from src.models.cross_store import CrossStoreMetric
+
             since = date.today() - timedelta(days=days)
-            stmt  = (
+            stmt = (
                 select(
                     CrossStoreMetric.metric_name,
                     func.avg(CrossStoreMetric.value).label("avg_sales"),
                 )
                 .where(
                     and_(
-                        CrossStoreMetric.store_id    == store_id,
+                        CrossStoreMetric.store_id == store_id,
                         CrossStoreMetric.metric_name.like("dish_sales_%"),
                         CrossStoreMetric.metric_date >= since,
                     )
@@ -489,30 +483,30 @@ class FastPlanningService:
         except Exception:
             return []
 
-    async def _estimate_procurement_items(
-        self, store_id: str, forecast_footfall: int
-    ) -> List[Dict]:
+    async def _estimate_procurement_items(self, store_id: str, forecast_footfall: int) -> List[Dict]:
         """估算采购清单（基于客流 × 品类系数）"""
         # 默认品类系数（克/人）和参考单价（元/公斤）
         DEFAULT_CATEGORIES = [
-            {"ingredient": "猪肉",   "grams_per_guest": 80,  "price_per_kg": 28, "unit": "kg"},
-            {"ingredient": "鸡肉",   "grams_per_guest": 60,  "price_per_kg": 22, "unit": "kg"},
-            {"ingredient": "蔬菜类", "grams_per_guest": 150, "price_per_kg": 8,  "unit": "kg"},
-            {"ingredient": "大米",   "grams_per_guest": 120, "price_per_kg": 6,  "unit": "kg"},
-            {"ingredient": "食用油", "grams_per_guest": 15,  "price_per_kg": 16, "unit": "kg"},
-            {"ingredient": "调味料", "grams_per_guest": 20,  "price_per_kg": 30, "unit": "kg"},
+            {"ingredient": "猪肉", "grams_per_guest": 80, "price_per_kg": 28, "unit": "kg"},
+            {"ingredient": "鸡肉", "grams_per_guest": 60, "price_per_kg": 22, "unit": "kg"},
+            {"ingredient": "蔬菜类", "grams_per_guest": 150, "price_per_kg": 8, "unit": "kg"},
+            {"ingredient": "大米", "grams_per_guest": 120, "price_per_kg": 6, "unit": "kg"},
+            {"ingredient": "食用油", "grams_per_guest": 15, "price_per_kg": 16, "unit": "kg"},
+            {"ingredient": "调味料", "grams_per_guest": 20, "price_per_kg": 30, "unit": "kg"},
         ]
         items = []
         for cat in DEFAULT_CATEGORIES:
             qty = round(forecast_footfall * cat["grams_per_guest"] / 1000, 1)
             cost = round(qty * cat["price_per_kg"], 1)
-            items.append({
-                "ingredient":      cat["ingredient"],
-                "qty":             qty,
-                "unit":            cat["unit"],
-                "estimated_cost":  cost,
-                "urgency":         "normal",
-            })
+            items.append(
+                {
+                    "ingredient": cat["ingredient"],
+                    "qty": qty,
+                    "unit": cat["unit"],
+                    "estimated_cost": cost,
+                    "urgency": "normal",
+                }
+            )
         return items
 
     @staticmethod
@@ -524,17 +518,17 @@ class FastPlanningService:
         实际价格应由 SupplierService 更新。
         """
         _UNIT_PRICE: Dict[str, float] = {
-            "premium_meat":  80.0,
-            "seafood":       120.0,
-            "poultry":       35.0,
-            "vegetables":    8.0,
-            "rice_staples":  5.0,
-            "condiments":    20.0,
-            "beverages":     15.0,
-            "desserts":      30.0,
+            "premium_meat": 80.0,
+            "seafood": 120.0,
+            "poultry": 35.0,
+            "vegetables": 8.0,
+            "rice_staples": 5.0,
+            "condiments": 20.0,
+            "beverages": 15.0,
+            "desserts": 30.0,
         }
-        cat   = addon.get("category", "")
-        qty   = float(addon.get("recommended_quantity") or 0)
+        cat = addon.get("category", "")
+        qty = float(addon.get("recommended_quantity") or 0)
         price = _UNIT_PRICE.get(cat, 20.0)
         return round(qty * price, 2)
 
@@ -542,11 +536,12 @@ class FastPlanningService:
         """取 L4 某维度最新推理报告的 recommended_actions"""
         try:
             from src.models.reasoning import ReasoningReport
+
             stmt = (
                 select(ReasoningReport)
                 .where(
                     and_(
-                        ReasoningReport.store_id  == store_id,
+                        ReasoningReport.store_id == store_id,
                         ReasoningReport.dimension == dimension,
                         ReasoningReport.severity.in_(["P1", "P2", "P3"]),
                     )

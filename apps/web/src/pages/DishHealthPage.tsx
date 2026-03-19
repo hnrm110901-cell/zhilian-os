@@ -43,7 +43,7 @@ const COMPONENT_LABELS: Record<string, string> = {
   forecast:      '预测成熟度',
 };
 
-const DEFAULT_STORE  = 'S001';
+const DEFAULT_STORE = localStorage.getItem('store_id') || '';
 const DEFAULT_PERIOD = dayjs().subtract(1, 'month').format('YYYY-MM');
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────

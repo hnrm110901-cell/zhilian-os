@@ -146,7 +146,6 @@ const DailyHubPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Space>
           <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
-            <Option value="STORE001">STORE001</Option>
           </Select>
           <Button icon={<ReloadOutlined />} onClick={loadAll} loading={loading}>刷新</Button>
         </Space>

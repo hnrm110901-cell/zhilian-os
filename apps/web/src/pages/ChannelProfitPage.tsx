@@ -47,7 +47,7 @@ const CHANNEL_NAMES: Record<string, string> = {
 const ChannelProfitPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [items, setItems] = useState<ChannelDish[]>([]);
   const [labelFilter, setLabelFilter] = useState<string>('all');
 
@@ -178,7 +178,6 @@ const ChannelProfitPage: React.FC = () => {
               ? stores.map((s: any) => (
                   <Option key={s.id || s.store_id} value={s.id || s.store_id}>{s.name}</Option>
                 ))
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
         </Space>

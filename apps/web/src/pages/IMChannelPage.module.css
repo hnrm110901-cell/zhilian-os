@@ -1,0 +1,284 @@
+.page {
+  padding: 0;
+}
+
+.pageHeader {
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.pageDesc {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* ── 渠道卡片 ── */
+.channelGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  .channelGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.channelCard {
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--bg-raised, #fff);
+  border: 1px solid var(--border, rgba(0,0,0,.06));
+  transition: box-shadow .2s;
+}
+
+.channelCard:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.08);
+}
+
+.channelCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.channelNameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.channelIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.iconWecom {
+  background: linear-gradient(135deg, #07c160, #06ad56);
+}
+
+.iconDingtalk {
+  background: linear-gradient(135deg, #3296fa, #1677ff);
+}
+
+.iconFeishu {
+  background: linear-gradient(135deg, #3370ff, #2b5fd9);
+}
+
+.channelName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.channelMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.metaLabel {
+  color: var(--text-tertiary);
+}
+
+.metaValue {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.webhookUrl {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: var(--bg-sunken, rgba(0,0,0,.03));
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.channelActions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 中部Tab区 ── */
+.tabSection {
+  margin-bottom: 24px;
+}
+
+/* ── 渠道配置Tab ── */
+.configGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .configGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.configCard {
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--bg-raised, #fff);
+  border: 1px solid var(--border, rgba(0,0,0,.06));
+}
+
+.configCardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.configCardIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #fff;
+}
+
+.formGroup {
+  margin-bottom: 14px;
+}
+
+.formLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.formInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border, rgba(0,0,0,.1));
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-sunken, #fafafa);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color .2s;
+  box-sizing: border-box;
+}
+
+.formInput:focus {
+  border-color: var(--accent);
+}
+
+.formHint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+/* ── 底部统计 ── */
+.statsSection {
+  margin-top: 8px;
+}
+
+.statsTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 表格内Badge样式 ── */
+.statusDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.dotSuccess {
+  background: #52c41a;
+}
+
+.dotWarning {
+  background: #faad14;
+}
+
+.dotError {
+  background: #ff4d4f;
+}
+
+.channelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badgeWecom {
+  background: rgba(7, 193, 96, .1);
+  color: #07c160;
+}
+
+.badgeDingtalk {
+  background: rgba(50, 150, 250, .1);
+  color: #3296fa;
+}
+
+.badgeFeishu {
+  background: rgba(51, 112, 255, .1);
+  color: #3370ff;
+}
+
+.durationCell {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}

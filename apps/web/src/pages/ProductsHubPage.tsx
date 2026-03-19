@@ -100,7 +100,7 @@ const ProductsHubPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [stores,        setStores]        = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || 'S001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
 
   const [bffLoading,   setBffLoading]   = useState(true);
   const [foodCost,     setFoodCost]     = useState<FoodCost | null>(null);
@@ -254,7 +254,7 @@ const ProductsHubPage: React.FC = () => {
 
   const storeOptions = stores.length > 0
     ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
-    : [{ value: 'S001', label: 'S001 示例门店' }];
+    : [];
 
   // ── Render ────────────────────────────────────────────────────────────────────
 

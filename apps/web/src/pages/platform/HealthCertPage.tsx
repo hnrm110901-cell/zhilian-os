@@ -13,8 +13,9 @@
  *   POST   /api/v1/health-certs/auto-update — 批量状态更新
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { Alert, message } from 'antd';
 import {
-  ZCard, ZBadge, ZButton, ZEmpty, ZAlert, ZSkeleton, ZModal,
+  ZCard, ZBadge, ZButton, ZEmpty, ZSkeleton, ZModal,
 } from '../../design-system/components';
 import type { ZTableColumn } from '../../design-system/components';
 import ZTable from '../../design-system/components/ZTable';
@@ -101,6 +102,12 @@ const HealthCertPage: React.FC = () => {
   const [filterStore, setFilterStore] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [storeList, setStoreList] = useState<any[]>([]);
+  useEffect(() => {
+    apiClient.get('/api/v1/stores').then((res: any) => {
+      setStoreList(res.stores || res || []);
+    }).catch(() => {});
+  }, []);
 
   // 创建/编辑 Modal
   const [showModal, setShowModal] = useState(false);
@@ -143,7 +150,7 @@ const HealthCertPage: React.FC = () => {
       setTotal(listRes.total);
       setStats(statsRes);
     } catch (err) {
-      console.error('加载健康证数据失败', err);
+      message.error('加载健康证数据失败');
     } finally {
       setLoading(false);
     }
@@ -160,7 +167,7 @@ const HealthCertPage: React.FC = () => {
       });
       fetchData();
     } catch (err) {
-      console.error('批量更新失败', err);
+      message.error('批量更新失败');
     }
   };
 
@@ -171,7 +178,7 @@ const HealthCertPage: React.FC = () => {
       await apiClient.delete(`/api/v1/health-certs/${id}`);
       fetchData();
     } catch (err) {
-      console.error('删除失败', err);
+      message.error('删除失败');
     }
   };
 
@@ -404,9 +411,7 @@ const HealthCertPage: React.FC = () => {
       {/* 过期预警 */}
       {!loading && expiredCount > 0 && (
         <div className={styles.alertBanner}>
-          <ZAlert variant="error">
-            {`有 ${expiredCount} 名员工健康证已过期，请尽快安排续办！`}
-          </ZAlert>
+          <Alert type="error" message={`有 ${expiredCount} 名员工健康证已过期，请尽快安排续办！`} />
         </div>
       )}
 
@@ -418,9 +423,9 @@ const HealthCertPage: React.FC = () => {
           onChange={e => { setFilterStore(e.target.value); setPage(1); }}
         >
           <option value="">全部门店</option>
-          <option value="S001">S001</option>
-          <option value="S002">S002</option>
-          <option value="S003">S003</option>
+          {storeList.map((s: any) => (
+            <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
+          ))}
         </select>
         <select
           className={styles.filterSelect}
@@ -477,7 +482,7 @@ const HealthCertPage: React.FC = () => {
         }
       >
         <div className={styles.modalBody}>
-          {modalErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{modalErr}</ZAlert>}
+          {modalErr && <Alert type="error" message={modalErr} className={styles.modalErr} />}
 
           {/* 员工信息 */}
           <div className={styles.fieldGrid}>
@@ -503,8 +508,13 @@ const HealthCertPage: React.FC = () => {
               <label className={styles.fieldLabel}>
                 门店ID{!editingId && <span className={styles.fieldRequired}>*</span>}
               </label>
-              <input className={styles.fieldInput} value={formStoreId}
-                onChange={e => setFormStoreId(e.target.value)} placeholder="如 S001" />
+              <select className={styles.fieldInput} value={formStoreId}
+                onChange={e => setFormStoreId(e.target.value)}>
+                <option value="">选择门店</option>
+                {storeList.map((s: any) => (
+                  <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
+                ))}
+              </select>
             </div>
             <div className={styles.fieldRow}>
               <label className={styles.fieldLabel}>证件编号</label>

@@ -6,20 +6,22 @@
 - 锁位单（宴会场地锁定确认）
 - 支持分享链接 + JSON数据（前端渲染PDF/图片）
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
-from datetime import datetime
+
 import hashlib
 import uuid
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.reservation import Reservation, ReservationStatus
-from ..models.reservation_pre_order import ReservationPreOrder, PreOrderStatus
+from ..models.reservation_pre_order import PreOrderStatus, ReservationPreOrder
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 
 router = APIRouter()
 
@@ -36,40 +38,40 @@ async def generate_receipt(
 
     返回完整的预订信息 + 预排菜清单 + 分享token。
     """
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预订不存在")
 
     # 生成短链token（基于reservation_id的确定性哈希，幂等）
-    share_token = hashlib.sha256(
-        f"receipt:{reservation_id}:{r.store_id}".encode()
-    ).hexdigest()[:16]
+    share_token = hashlib.sha256(f"receipt:{reservation_id}:{r.store_id}".encode()).hexdigest()[:16]
 
     # 获取预排菜
     pre_order_result = await session.execute(
-        select(ReservationPreOrder).where(
+        select(ReservationPreOrder)
+        .where(
             and_(
                 ReservationPreOrder.reservation_id == reservation_id,
                 ReservationPreOrder.status != PreOrderStatus.CANCELLED,
             )
-        ).order_by(ReservationPreOrder.sort_order)
+        )
+        .order_by(ReservationPreOrder.sort_order)
     )
     pre_orders = pre_order_result.scalars().all()
 
     pre_order_items = []
     pre_order_total = 0
     for po in pre_orders:
-        pre_order_items.append({
-            "dish_name": po.dish_name,
-            "quantity": po.quantity,
-            "unit_price_yuan": round(po.unit_price / 100, 2),
-            "subtotal_yuan": round(po.subtotal / 100, 2),
-            "taste_note": po.taste_note,
-            "serving_size": po.serving_size,
-        })
+        pre_order_items.append(
+            {
+                "dish_name": po.dish_name,
+                "quantity": po.quantity,
+                "unit_price_yuan": round(po.unit_price / 100, 2),
+                "subtotal_yuan": round(po.subtotal / 100, 2),
+                "taste_note": po.taste_note,
+                "serving_size": po.serving_size,
+            }
+        )
         pre_order_total += po.subtotal
 
     # 构建单据数据
@@ -79,38 +81,30 @@ async def generate_receipt(
         "receipt_number": f"RCT-{reservation_id}",
         "share_token": share_token,
         "generated_at": datetime.utcnow().isoformat(),
-
         # 预订信息
         "reservation_id": str(r.id),
         "store_id": r.store_id,
         "status": r.status.value if hasattr(r.status, "value") else str(r.status),
-
         # 客户信息
         "customer_name": r.customer_name,
         "customer_phone": _mask_phone(r.customer_phone),
         "party_size": r.party_size,
-
         # 时间地点
         "reservation_date": r.reservation_date.isoformat() if r.reservation_date else None,
         "reservation_time": r.reservation_time.strftime("%H:%M") if r.reservation_time else None,
         "table_number": r.table_number,
         "room_name": r.room_name,
-
         # 类型
         "reservation_type": r.reservation_type.value if hasattr(r.reservation_type, "value") else str(r.reservation_type),
-
         # 特殊需求
         "special_requests": r.special_requests,
         "dietary_restrictions": r.dietary_restrictions,
-
         # 金额
         "estimated_budget_yuan": round(r.estimated_budget / 100, 2) if r.estimated_budget else None,
         "deposit_paid_yuan": round(r.deposit_paid / 100, 2) if r.deposit_paid else None,
-
         # 预排菜
         "pre_order_items": pre_order_items,
         "pre_order_total_yuan": round(pre_order_total / 100, 2),
-
         # 备注
         "notes": r.notes,
     }
@@ -145,16 +139,12 @@ async def get_share_data(
 
     仅包含：门店+时间+人数+桌号，不含敏感信息。
     """
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     r = result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预订不存在")
 
-    share_token = hashlib.sha256(
-        f"receipt:{reservation_id}:{r.store_id}".encode()
-    ).hexdigest()[:16]
+    share_token = hashlib.sha256(f"receipt:{reservation_id}:{r.store_id}".encode()).hexdigest()[:16]
 
     return {
         "share_token": share_token,

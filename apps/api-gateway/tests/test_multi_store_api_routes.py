@@ -291,9 +291,13 @@ def test_dynamic_store_id_route_declared_after_all_static_get_routes():
     assert "/{store_id}" in get_routes
     dynamic_index = get_routes.index("/{store_id}")
 
-    # 约束：任何新增静态 GET 路由都必须在 /{store_id} 前声明，防止被动态路由吞掉。
-    static_get_routes = [path for path in get_routes if "{" not in path]
-    for static_path in static_get_routes:
+    # 约束：单段静态 GET 路由必须在 /{store_id} 前声明，防止被动态路由吞掉。
+    # 多段路由（如 /cross-store/xxx, /hq/xxx）不会被 /{store_id} 捕获，无需约束顺序。
+    single_segment_static = [
+        path for path in get_routes
+        if "{" not in path and path != "/" and path.count("/") == 1
+    ]
+    for static_path in single_segment_static:
         assert get_routes.index(static_path) < dynamic_index, f"static route {static_path} must be before /{{store_id}}"
 
 

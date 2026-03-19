@@ -485,7 +485,7 @@ const BudgetTab: React.FC<{ storeId: string }> = ({ storeId }) => {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 const FctPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
 
   useEffect(() => {
@@ -494,7 +494,7 @@ const FctPage: React.FC = () => {
         const res = await apiClient.get('/api/v1/stores');
         const list: any[] = res.stores || res || [];
         setStores(list);
-        if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
+        if (list.length > 0) setStoreId(list[0].store_id || list[0].id || '');
       } catch { /* ignore */ }
     };
     loadStores();
@@ -512,7 +512,6 @@ const FctPage: React.FC = () => {
         <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
           {stores.length > 0
             ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
-            : <Option value="STORE001">STORE001</Option>}
         </Select>
       </div>
 
