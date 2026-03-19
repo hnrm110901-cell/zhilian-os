@@ -698,10 +698,7 @@ from .social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
 # HR Phase 4 — 培训认证/师徒制
 from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
 
-# HR架构重构 M1 — Person-Assignment-Contract + 知识OS层
-from .person import Person
-from .assignment import Assignment, AssignmentStatus, EmploymentType
-from .person_contract import PersonContract
+# HR架构重构 — 旧 M1 models 已移入 hr/ 目录（上方 z54 区块导入）
 from .skill_node import SkillNode
 from .achievement import Achievement
 from .behavior_pattern import BehaviorPattern

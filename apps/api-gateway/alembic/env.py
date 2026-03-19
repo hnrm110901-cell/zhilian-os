@@ -54,10 +54,10 @@ import src.models.social_insurance  # noqa: F401
 import src.models.employee_growth  # noqa: F401
 import src.models.brand_im_config  # noqa: F401
 
-# HR架构重构 M1 — Person-Assignment-Contract + 知识OS层
-import src.models.person  # noqa: F401
-import src.models.assignment  # noqa: F401
-import src.models.person_contract  # noqa: F401
+# HR架构重构 — 三层模型（hr/ 目录为主模型，旧 models/person.py 为兼容）
+import src.models.hr.person  # noqa: F401
+import src.models.hr.employment_assignment  # noqa: F401
+import src.models.hr.employment_contract  # noqa: F401
 import src.models.skill_node  # noqa: F401
 import src.models.achievement  # noqa: F401
 import src.models.behavior_pattern  # noqa: F401

@@ -302,16 +302,22 @@ class ZhilianOpenAPI:
 
         from sqlalchemy import func, select
         from src.core.database import get_db_session
-        from src.models.employee import Employee
+        from src.models.hr.person import Person
+        from src.models.hr.employment_assignment import EmploymentAssignment
+        from sqlalchemy import and_
 
         async with get_db_session() as session:
             result = await session.execute(
-                select(Employee.position, func.count(Employee.id).label("cnt"))
+                select(EmploymentAssignment.position, func.count(Person.id).label("cnt"))
+                .join(EmploymentAssignment, and_(
+                    EmploymentAssignment.person_id == Person.id,
+                    EmploymentAssignment.status == "active",
+                ))
                 .where(
-                    Employee.store_id == store_id,
-                    Employee.is_active == True,
+                    Person.store_id == store_id,
+                    Person.is_active == True,
                 )
-                .group_by(Employee.position)
+                .group_by(EmploymentAssignment.position)
             )
             rows = result.all()
 
