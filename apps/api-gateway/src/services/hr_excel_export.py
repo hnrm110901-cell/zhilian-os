@@ -16,7 +16,6 @@ from openpyxl.utils import get_column_letter
 from sqlalchemy import Integer, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import AttendanceLog
-from src.models.employee import Employee  # 花名册/小时工导出仍需完整 Employee 字段
 from src.models.hr.person import Person
 from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.employee_lifecycle import ChangeType, EmployeeChange
@@ -383,65 +382,83 @@ class HRExcelExporter:
         _apply_header_style(ws, 2, len(headers))
 
         result = await db.execute(
-            select(Employee)
-            .where(
-                Employee.store_id == store_id,
-            )
-            .order_by(Employee.is_active.desc(), Employee.name)
+            select(Person, EmploymentAssignment)
+            .outerjoin(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
+            .where(Person.store_id == store_id)
+            .order_by(Person.is_active.desc(), Person.name)
         )
-        employees = result.scalars().all()
+        rows = result.all()
 
         emp_type_map = {
             "regular": "正式",
+            "full_time": "正式",
             "part_time": "兼职",
             "intern": "实习",
             "trainee": "培训",
             "rehire": "返聘",
             "temp": "临时",
             "outsource": "外包",
+            "outsourced": "外包",
             "outsource_flex": "灵活用工",
+            "hourly": "小时工",
+            "dispatched": "派遣",
+            "partner": "合伙人",
         }
         status_map = {
             "trial": "试岗",
             "probation": "试用",
             "regular": "正式",
+            "senior": "资深",
+            "lead": "组长",
+            "manager": "管理",
             "resigned": "离职",
         }
 
-        for i, emp in enumerate(employees, start=3):
+        from datetime import date as _date
+        for i, (person, assignment) in enumerate(rows, start=3):
+            legacy_id = person.legacy_employee_id or str(person.id)
+            position = assignment.position if assignment else ""
+            grade = assignment.grade_level if assignment else ""
+            emp_type = assignment.employment_type if assignment else ""
+            hire_date = assignment.start_date if assignment else None
+            work_hour = assignment.work_hour_type if assignment else ""
+            seniority = ((_date.today() - hire_date).days // 30) if hire_date else ""
             data = [
-                emp.id,
-                emp.name,
-                emp.gender or "",
-                emp.position or "",
-                emp.grade_level or "",
-                emp_type_map.get(emp.employment_type, emp.employment_type or ""),
-                status_map.get(emp.employment_status, emp.employment_status or ""),
-                str(emp.hire_date) if emp.hire_date else "",
-                str(emp.regular_date) if emp.regular_date else "",
-                emp.seniority_months or "",
-                emp.phone or "",
-                emp.email or "",
-                str(emp.birth_date) if emp.birth_date else "",
-                emp.ethnicity or "",
-                emp.education or "",
-                emp.graduation_school or "",
-                emp.major or "",
-                emp.hukou_type or "",
-                emp.hukou_location or "",
-                emp.political_status or "",
-                emp.emergency_contact or "",
-                emp.emergency_phone or "",
-                emp.emergency_relation or "",
-                emp.bank_name or "",
-                emp.bank_branch or "",
-                str(emp.health_cert_expiry) if emp.health_cert_expiry else "",
-                str(emp.id_card_expiry) if emp.id_card_expiry else "",
-                emp.background_check or "",
-                emp.work_hour_type or "",
-                emp.accommodation or "",
-                "是" if emp.union_member else "否",
-                emp.professional_cert or "",
+                legacy_id,
+                person.name,
+                person.gender or "",
+                position or "",
+                grade or "",
+                emp_type_map.get(emp_type, emp_type or ""),
+                status_map.get(person.career_stage, person.career_stage or ""),
+                str(hire_date) if hire_date else "",
+                person.regular_date or "",
+                seniority,
+                person.phone or "",
+                person.email or "",
+                str(person.birth_date) if person.birth_date else "",
+                person.ethnicity or "",
+                person.education or "",
+                person.graduation_school or "",
+                person.major or "",
+                person.hukou_type or "",
+                person.hukou_location or "",
+                person.political_status or "",
+                person.emergency_contact_name or "",
+                person.emergency_phone or "",
+                person.emergency_relation or "",
+                person.bank_name or "",
+                person.bank_branch or "",
+                str(person.health_cert_expiry) if person.health_cert_expiry else "",
+                str(person.id_card_expiry) if person.id_card_expiry else "",
+                person.background_check or "",
+                work_hour or "",
+                person.accommodation or "",
+                "是" if person.union_member else "否",
+                person.professional_cert or "",
             ]
             for col, val in enumerate(data, 1):
                 ws.cell(row=i, column=col, value=val)
@@ -466,17 +483,19 @@ class HRExcelExporter:
         """Sheet 1: 工资异动表"""
         ws = wb.create_sheet("工资异动表")
 
-        # 新进员工
+        # 新进员工（通过 EmploymentAssignment.start_date 作为入职日期）
         new_result = await db.execute(
-            select(Employee).where(
+            select(Person, EmploymentAssignment)
+            .join(EmploymentAssignment, EmploymentAssignment.person_id == Person.id)
+            .where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.hire_date >= month_start,
-                    Employee.hire_date <= month_end,
+                    Person.store_id == store_id,
+                    EmploymentAssignment.start_date >= month_start,
+                    EmploymentAssignment.start_date <= month_end,
                 )
             )
         )
-        new_employees = new_result.scalars().all()
+        new_rows = new_result.all()
 
         # 离职
         resign_result = await db.execute(
@@ -529,13 +548,18 @@ class HRExcelExporter:
             ws.cell(row=row, column=col, value=h)
         _apply_header_style(ws, row, len(sub_headers))
         row += 1
-        for emp in new_employees:
-            data = [emp.name, emp.id, emp.position or "", str(emp.hire_date) if emp.hire_date else ""]
+        for person, assignment in new_rows:
+            data = [
+                person.name,
+                person.legacy_employee_id or str(person.id),
+                assignment.position or "" if assignment else "",
+                str(assignment.start_date) if assignment else "",
+            ]
             for col, val in enumerate(data, 1):
                 ws.cell(row=row, column=col, value=val)
             _apply_data_style(ws, row, len(sub_headers))
             row += 1
-        if not new_employees:
+        if not new_rows:
             ws.cell(row=row, column=1, value="本月无新入职")
             row += 1
 
@@ -592,7 +616,7 @@ class HRExcelExporter:
         ws.cell(row=row, column=1, value="汇总")
         ws.cell(row=row, column=1).font = Font(name="微软雅黑", bold=True, size=11)
         row += 1
-        ws.cell(row=row, column=1, value=f"新入职: {len(new_employees)}人")
+        ws.cell(row=row, column=1, value=f"新入职: {len(new_rows)}人")
         ws.cell(row=row, column=3, value=f"离职: {len(resignations)}人")
         ws.cell(row=row, column=5, value=f"调薪: {len(adjustments)}人")
 
@@ -774,15 +798,20 @@ class HRExcelExporter:
         ws = wb.create_sheet("灵活用工考勤")
 
         result = await db.execute(
-            select(Employee).where(
+            select(Person, EmploymentAssignment)
+            .join(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
+            .where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
-                    Employee.employment_type.in_(["part_time", "temp", "outsource_flex"]),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
+                    EmploymentAssignment.employment_type.in_(["part_time", "temp", "outsource_flex", "hourly"]),
                 )
             )
         )
-        workers = result.scalars().all()
+        worker_rows = result.all()
 
         _write_title_row(ws, f"{title_prefix} 小时工/灵活用工考勤", 6)
 
@@ -800,11 +829,12 @@ class HRExcelExporter:
         row = 3
         total_days = 0
         total_pay = 0.0
-        for w in workers:
+        for person, assignment in worker_rows:
+            legacy_id = person.legacy_employee_id or str(person.id)
             att_result = await db.execute(
                 select(func.count(AttendanceLog.id)).where(
                     and_(
-                        AttendanceLog.employee_id == w.id,
+                        AttendanceLog.employee_id == legacy_id,
                         AttendanceLog.work_date >= month_start,
                         AttendanceLog.work_date <= month_end,
                         AttendanceLog.status.in_(["normal", "late"]),
@@ -812,13 +842,13 @@ class HRExcelExporter:
                 )
             )
             days = att_result.scalar() or 0
-            daily_wage = _fen_to_yuan(w.daily_wage_standard_fen)
+            daily_wage = _fen_to_yuan(assignment.daily_wage_standard_fen if assignment else 0)
             pay = days * daily_wage
 
             data = [
-                w.name,
-                w.id,
-                emp_type_map.get(w.employment_type, w.employment_type or ""),
+                person.name,
+                legacy_id,
+                emp_type_map.get(assignment.employment_type if assignment else "", ""),
                 days,
                 daily_wage,
                 pay,
@@ -832,7 +862,7 @@ class HRExcelExporter:
             total_pay += pay
             row += 1
 
-        if not workers:
+        if not worker_rows:
             ws.cell(row=row, column=1, value="本月无灵活用工人员")
             row += 1
         else:

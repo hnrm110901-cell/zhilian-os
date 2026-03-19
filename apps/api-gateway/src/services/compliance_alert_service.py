@@ -14,7 +14,8 @@ from typing import Any, Dict, List
 import structlog
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.employee_contract import EmployeeContract
 from src.models.store import Store
 
@@ -39,33 +40,39 @@ class ComplianceAlertService:
         """
         today = date.today()
         threshold_30 = today + timedelta(days=30)
-        threshold_7 = today + timedelta(days=7)
 
         result = await db.execute(
-            select(Employee)
+            select(Person, EmploymentAssignment.position)
+            .outerjoin(
+                EmploymentAssignment,
+                and_(
+                    EmploymentAssignment.person_id == Person.id,
+                    EmploymentAssignment.status == "active",
+                ),
+            )
             .where(
                 and_(
-                    Employee.store_id == self.store_id,
-                    Employee.is_active.is_(True),
-                    Employee.health_cert_expiry.isnot(None),
-                    Employee.health_cert_expiry <= threshold_30,
+                    Person.store_id == self.store_id,
+                    Person.is_active.is_(True),
+                    Person.health_cert_expiry.isnot(None),
+                    Person.health_cert_expiry <= threshold_30,
                 )
             )
-            .order_by(Employee.health_cert_expiry)
+            .order_by(Person.health_cert_expiry)
         )
-        employees = result.scalars().all()
+        rows = result.all()
 
         expired = []
         critical = []
         warning = []
 
-        for emp in employees:
-            days_left = (emp.health_cert_expiry - today).days
+        for person, position in rows:
+            days_left = (person.health_cert_expiry - today).days
             item = {
-                "employee_id": emp.id,
-                "employee_name": emp.name,
-                "position": emp.position,
-                "health_cert_expiry": str(emp.health_cert_expiry),
+                "employee_id": person.legacy_employee_id or str(person.id),
+                "employee_name": person.name,
+                "position": position,
+                "health_cert_expiry": str(person.health_cert_expiry),
                 "days_remaining": days_left,
             }
             if days_left <= 0:
@@ -95,8 +102,15 @@ class ComplianceAlertService:
         threshold_60 = today + timedelta(days=60)
 
         result = await db.execute(
-            select(EmployeeContract, Employee.name, Employee.position)
-            .join(Employee, EmployeeContract.employee_id == Employee.id)
+            select(EmployeeContract, Person.name, EmploymentAssignment.position)
+            .join(Person, Person.legacy_employee_id == EmployeeContract.employee_id)
+            .outerjoin(
+                EmploymentAssignment,
+                and_(
+                    EmploymentAssignment.person_id == Person.id,
+                    EmploymentAssignment.status == "active",
+                ),
+            )
             .where(
                 and_(
                     EmployeeContract.store_id == self.store_id,
@@ -140,27 +154,27 @@ class ComplianceAlertService:
         threshold = today + timedelta(days=60)
 
         result = await db.execute(
-            select(Employee)
+            select(Person)
             .where(
                 and_(
-                    Employee.store_id == self.store_id,
-                    Employee.is_active.is_(True),
-                    Employee.id_card_expiry.isnot(None),
-                    Employee.id_card_expiry <= threshold,
+                    Person.store_id == self.store_id,
+                    Person.is_active.is_(True),
+                    Person.id_card_expiry.isnot(None),
+                    Person.id_card_expiry <= threshold,
                 )
             )
-            .order_by(Employee.id_card_expiry)
+            .order_by(Person.id_card_expiry)
         )
-        employees = result.scalars().all()
+        persons = result.scalars().all()
 
         items = []
-        for emp in employees:
-            days_left = (emp.id_card_expiry - today).days
+        for person in persons:
+            days_left = (person.id_card_expiry - today).days
             items.append(
                 {
-                    "employee_id": emp.id,
-                    "employee_name": emp.name,
-                    "id_card_expiry": str(emp.id_card_expiry),
+                    "employee_id": person.legacy_employee_id or str(person.id),
+                    "employee_name": person.name,
+                    "id_card_expiry": str(person.id_card_expiry),
                     "days_remaining": days_left,
                     "level": "expired" if days_left <= 0 else "critical" if days_left <= 7 else "warning",
                 }
@@ -236,13 +250,21 @@ class ComplianceAlertService:
             from src.services.im_message_service import IMMessageService
 
             msg_svc = IMMessageService(db)
-            # 查找店长
+            # 查找店长（通过 EmploymentAssignment.position 匹配）
             manager_result = await db.execute(
-                select(Employee).where(
+                select(Person)
+                .join(
+                    EmploymentAssignment,
                     and_(
-                        Employee.store_id == self.store_id,
-                        Employee.position.in_(["store_manager", "manager", "店长"]),
-                        Employee.is_active.is_(True),
+                        EmploymentAssignment.person_id == Person.id,
+                        EmploymentAssignment.status == "active",
+                        EmploymentAssignment.position.in_(["store_manager", "manager", "店长"]),
+                    ),
+                )
+                .where(
+                    and_(
+                        Person.store_id == self.store_id,
+                        Person.is_active.is_(True),
                     )
                 )
             )

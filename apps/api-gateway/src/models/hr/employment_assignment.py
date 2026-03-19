@@ -1,6 +1,6 @@
 """EmploymentAssignment — 在岗关系（Person × OrgNode × 岗位）"""
 import uuid
-from sqlalchemy import Column, String, Date, ForeignKey, TIMESTAMP, text
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import UUID
 from ..base import Base
 
@@ -28,6 +28,12 @@ class EmploymentAssignment(Base):
     status = Column(String(20), nullable=False, default="active",
                     server_default="'active'",
                     comment="active/ended/suspended")
+    # z65 就业属性
+    daily_wage_standard_fen = Column(Integer, nullable=True,
+                                     comment="日薪标准（分），用于小时工/灵活用工薪资计算")
+    work_hour_type = Column(String(30), nullable=True,
+                            comment="工时类型：standard/flexible/shift")
+    grade_level = Column(String(30), nullable=True, comment="职级")
     # 软引用：入职/离职流程创建 assignment，不反向强FK以避免循环依赖
     onboarding_process_id = Column(UUID(as_uuid=True), nullable=True)
     offboarding_process_id = Column(UUID(as_uuid=True), nullable=True)

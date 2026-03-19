@@ -20,14 +20,21 @@ import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.crypto import field_crypto
-from src.models.employee import Employee
+from src.models.hr.person import Person
 from src.models.sensitive_audit_log import SensitiveDataAuditLog
 
 logger = structlog.get_logger()
 
-# 允许加密的字段白名单 → (Employee 属性名, 脱敏类型)
+# 允许加密的字段白名单 → (API字段名, 脱敏类型)
 _SENSITIVE_FIELDS: dict[str, str] = {
     "id_card_no": "id_card",
+    "bank_account": "bank_account",
+    "phone": "phone",
+}
+
+# API 字段名 → Person 模型属性名（id_card_no 在 Person 上叫 id_number）
+_FIELD_MAP: dict[str, str] = {
+    "id_card_no": "id_number",
     "bank_account": "bank_account",
     "phone": "phone",
 }
@@ -59,14 +66,15 @@ class SensitiveDataService:
         self._validate_field(field_name)
 
         # 查员工
-        employee = await self._get_employee(db, employee_id)
+        person = await self._get_person(db, employee_id)
+        model_attr = _FIELD_MAP[field_name]
 
         # 加密
         encrypted = field_crypto.encrypt(plaintext)
 
         # 写入
-        setattr(employee, field_name, encrypted)
-        db.add(employee)
+        setattr(person, model_attr, encrypted)
+        db.add(person)
 
         # 审计日志
         audit = SensitiveDataAuditLog(
@@ -76,7 +84,7 @@ class SensitiveDataService:
             action="write",
             ip_address=ip_address,
             user_agent=user_agent,
-            store_id=employee.store_id,
+            store_id=person.store_id,
             detail=f"字段已{'加密' if field_crypto.enabled else '明文'}写入",
         )
         db.add(audit)
@@ -113,9 +121,10 @@ class SensitiveDataService:
             解密后的明文值
         """
         self._validate_field(field_name)
-        employee = await self._get_employee(db, employee_id)
+        person = await self._get_person(db, employee_id)
+        model_attr = _FIELD_MAP[field_name]
 
-        raw_value = getattr(employee, field_name, None) or ""
+        raw_value = getattr(person, model_attr, None) or ""
         plaintext = field_crypto.decrypt(raw_value)
 
         # 审计日志
@@ -126,7 +135,7 @@ class SensitiveDataService:
             action="read",
             ip_address=ip_address,
             user_agent=user_agent,
-            store_id=employee.store_id,
+            store_id=person.store_id,
         )
         db.add(audit)
         await db.flush()
@@ -150,9 +159,10 @@ class SensitiveDataService:
     ) -> str:
         """获取脱敏后的字段值（不记录审计，用于列表展示）"""
         self._validate_field(field_name)
-        employee = await self._get_employee(db, employee_id)
+        person = await self._get_person(db, employee_id)
+        model_attr = _FIELD_MAP[field_name]
 
-        raw_value = getattr(employee, field_name, None) or ""
+        raw_value = getattr(person, model_attr, None) or ""
         plaintext = field_crypto.decrypt(raw_value)
         mask_type = _SENSITIVE_FIELDS[field_name]
         return field_crypto.mask(plaintext, mask_type)
@@ -163,10 +173,11 @@ class SensitiveDataService:
         employee_id: str,
     ) -> dict:
         """批量获取所有敏感字段的脱敏值（列表页用）"""
-        employee = await self._get_employee(db, employee_id)
+        person = await self._get_person(db, employee_id)
         result = {}
         for field_name, mask_type in _SENSITIVE_FIELDS.items():
-            raw_value = getattr(employee, field_name, None) or ""
+            model_attr = _FIELD_MAP[field_name]
+            raw_value = getattr(person, model_attr, None) or ""
             plaintext = field_crypto.decrypt(raw_value)
             result[field_name] = field_crypto.mask(plaintext, mask_type)
         return result
@@ -198,33 +209,34 @@ class SensitiveDataService:
                 "error": "FIELD_ENCRYPTION_KEY 未配置，无法执行加密迁移",
             }
 
-        stmt = select(Employee)
+        stmt = select(Person)
         if store_id:
-            stmt = stmt.where(Employee.store_id == store_id)
+            stmt = stmt.where(Person.store_id == store_id)
 
         result = await db.execute(stmt)
-        employees = result.scalars().all()
+        persons = result.scalars().all()
 
-        total_scanned = len(employees)
+        total_scanned = len(persons)
         encrypted_count = 0
         field_counts: dict[str, int] = {f: 0 for f in _SENSITIVE_FIELDS}
 
-        for emp in employees:
+        for person in persons:
             changed = False
             for field_name in _SENSITIVE_FIELDS:
-                raw_value = getattr(emp, field_name, None)
+                model_attr = _FIELD_MAP[field_name]
+                raw_value = getattr(person, model_attr, None)
                 if not raw_value:
                     continue
                 if field_crypto.is_encrypted(raw_value):
                     continue
                 # 明文 → 加密
                 encrypted = field_crypto.encrypt(raw_value)
-                setattr(emp, field_name, encrypted)
+                setattr(person, model_attr, encrypted)
                 field_counts[field_name] += 1
                 changed = True
 
             if changed:
-                db.add(emp)
+                db.add(person)
                 encrypted_count += 1
 
         # 审计日志
@@ -262,13 +274,14 @@ class SensitiveDataService:
             raise ValueError(f"不支持的敏感字段: {field_name}，" f"允许值: {list(_SENSITIVE_FIELDS.keys())}")
 
     @staticmethod
-    async def _get_employee(db: AsyncSession, employee_id: str) -> Employee:
-        stmt = select(Employee).where(Employee.id == employee_id)
+    async def _get_person(db: AsyncSession, employee_id: str) -> Person:
+        """通过 legacy_employee_id 桥接查找 Person"""
+        stmt = select(Person).where(Person.legacy_employee_id == str(employee_id))
         result = await db.execute(stmt)
-        employee = result.scalar_one_or_none()
-        if not employee:
+        person = result.scalar_one_or_none()
+        if not person:
             raise LookupError(f"员工不存在: {employee_id}")
-        return employee
+        return person
 
 
 # 全局单例
