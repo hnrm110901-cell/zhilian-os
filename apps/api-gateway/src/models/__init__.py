@@ -479,33 +479,6 @@ from .ingredient_master import IngredientMaster
 from .inventory_ext import InventoryBatch, InventoryCount
 from .purchase_order_item import PurchaseOrderItem
 from .daily_summary import DailyRevenueSummary, DailyWasteSummary, DailyPnlSummary
-    # P1 — 识客 + 菜品偏好
-    "MemberCheckIn",
-    "MemberDishPreference",
-    # HR架构重构 M1
-    "Person",
-    "Assignment",
-    "AssignmentStatus",
-    "EmploymentType",
-    "PersonContract",
-    "SkillNode",
-    "Achievement",
-    "BehaviorPattern",
-    "RetentionSignal",
-    "KnowledgeCapture",
-    # P2 — 服务券 + 发券ROI
-    "ServiceVoucherTemplate",
-    "ServiceVoucher",
-    "CouponDistribution",
-    "CouponRedemption",
-    "CouponRoiDaily",
-    # P3 — 营销任务体系
-    "MarketingTask",
-    "MarketingTaskTarget",
-    "MarketingTaskAssignment",
-    "MarketingTaskExecution",
-    "MarketingTaskStats",
-]
 
 from .agent_collab import AgentCollabSnapshot, AgentConflict, GlobalOptimizationLog
 from .agent_okr import AgentOKRSnapshot, AgentResponseLog
