@@ -17,6 +17,10 @@ class EmploymentAssignment(Base):
                          nullable=False, index=True)
     # 引用job_standards.id，无强FK（跨模块，避免循环依赖）
     job_standard_id = Column(UUID(as_uuid=True), nullable=True)
+    position = Column(String(50), nullable=True,
+                      comment="岗位名称（厨师/服务员/收银等），z64 补回 Chain-B 字段")
+    department = Column(String(50), nullable=True,
+                        comment="部门（前厅/后厨/管理）")
     employment_type = Column(String(30), nullable=False,
                              comment="full_time/hourly/outsourced/dispatched/partner")
     start_date = Column(Date, nullable=False)

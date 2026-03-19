@@ -19,6 +19,7 @@ Smart Schedule Service — 智能排班服务
 import json
 import uuid
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,10 +27,26 @@ import structlog
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import ShiftTemplate
-from src.models.employee import Employee
+from src.models.hr.employment_assignment import EmploymentAssignment
+from src.models.hr.person import Person
 from src.models.leave import LeaveRequest, LeaveRequestStatus
 from src.models.schedule import Schedule, Shift
 from src.models.schedule_demand import StoreStaffingDemand
+
+
+@dataclass
+class EmployeeView:
+    """排班视图：Person + EmploymentAssignment 合并（替代旧 Employee 对象）。
+
+    属性名与旧 Employee 保持兼容，降低迁移风险。
+    """
+    id: str               # assignment.id（排班以任职关系为键）
+    person_id: str        # person.id
+    name: str             # person.name
+    position: str         # assignment.position or employment_type
+    employment_status: str = "active"    # assignment.status 映射值
+    store_id: Optional[str] = None       # person.store_id（过渡期兼容）
+    preferences: Dict[str, Any] = field(default_factory=dict)
 
 logger = structlog.get_logger()
 
@@ -1096,7 +1113,7 @@ class SmartScheduleService:
         self,
         shifts: List[Any],
         schedules: List[Any],
-        emp_map: Dict[str, Employee],
+        emp_map: Dict[str, EmployeeView],
     ) -> List[Dict[str, Any]]:
         """
         扫描现有排班中的劳动法违规项。
@@ -1261,21 +1278,34 @@ class SmartScheduleService:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def _get_store_employees(self, db: AsyncSession, store_id: str) -> List[Employee]:
-        """获取门店所有在职员工"""
+    async def _get_store_employees(self, db: AsyncSession, store_id: str) -> List[EmployeeView]:
+        """获取门店所有在职员工（基于 Person + EmploymentAssignment 三层模型）"""
         stmt = (
-            select(Employee)
+            select(Person, EmploymentAssignment)
+            .join(EmploymentAssignment, EmploymentAssignment.person_id == Person.id)
             .where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
-                    Employee.employment_status.in_(["regular", "probation", "trial"]),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
+                    EmploymentAssignment.status == "active",
                 )
             )
-            .order_by(Employee.position, Employee.name)
+            .order_by(EmploymentAssignment.position, Person.name)
         )
         result = await db.execute(stmt)
-        return list(result.scalars().all())
+        rows = result.all()
+        return [
+            EmployeeView(
+                id=str(assignment.id),
+                person_id=str(person.id),
+                name=person.name,
+                position=assignment.position or assignment.employment_type or "waiter",
+                employment_status="active",
+                store_id=person.store_id,
+                preferences=person.preferences or {},
+            )
+            for person, assignment in rows
+        ]
 
     async def _get_approved_leaves(
         self,
@@ -1382,7 +1412,7 @@ class SmartScheduleService:
 
     def _build_employee_tracker(
         self,
-        employees: List[Employee],
+        employees: List[EmployeeView],
         leaves: List[LeaveRequest],
         prev_shifts: List[Dict[str, Any]],
         week_start: date,
@@ -1826,10 +1856,10 @@ class SmartScheduleService:
         """
         if isinstance(employee_or_dict, dict):
             return bool(employee_or_dict.get("is_minor", False))
-        # Employee 对象
-        if employee_or_dict.birth_date:
-            age = (date.today() - employee_or_dict.birth_date).days / 365.25
-            return age < 18
+        # EmployeeView 对象 — 无 birth_date 字段，从 preferences 读取
+        prefs = getattr(employee_or_dict, "preferences", {}) or {}
+        if prefs.get("is_minor"):
+            return True
         return False
 
     def _is_restricted_from_night(self, candidate: Dict[str, Any]) -> Optional[str]:
@@ -1877,7 +1907,7 @@ class SmartScheduleService:
             end_minutes += 24 * 60
         return (end_minutes - start_minutes) / 60
 
-    def _calculate_fairness_score(self, tracker: Dict[str, Dict[str, Any]], employees: List[Employee]) -> float:
+    def _calculate_fairness_score(self, tracker: Dict[str, Dict[str, Any]], employees: List[EmployeeView]) -> float:
         """
         计算公平性得分（0~1）。
         基于本周各员工排班天数和周末班次的标准差。

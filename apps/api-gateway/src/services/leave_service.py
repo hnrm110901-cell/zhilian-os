@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.employee import Employee
+from src.models.hr.person import Person
 from src.models.leave import (
     LeaveBalance,
     LeaveCategory,
@@ -69,10 +69,12 @@ class LeaveService(BaseService):
 
         await db.flush()
 
-        # 发起审批
+        # 发起审批（通过 Person.legacy_employee_id 桥接查询姓名）
         approval_svc = HRApprovalService(store_id=store_id)
-        emp = await db.get(Employee, employee_id)
-        emp_name = emp.name if emp else employee_id
+        person_result = await db.execute(
+            select(Person.name).where(Person.legacy_employee_id == str(employee_id))
+        )
+        emp_name = person_result.scalar_one_or_none() or str(employee_id)
 
         instance = await approval_svc.create_instance(
             db,
@@ -183,8 +185,8 @@ class LeaveService(BaseService):
             conditions.append(LeaveRequest.start_date >= date(year, m, 1))
 
         result = await db.execute(
-            select(LeaveRequest, Employee.name)
-            .join(Employee, LeaveRequest.employee_id == Employee.id)
+            select(LeaveRequest, Person.name)
+            .join(Person, Person.legacy_employee_id == LeaveRequest.employee_id, isouter=True)
             .where(and_(*conditions))
             .order_by(LeaveRequest.created_at.desc())
             .limit(100)
@@ -194,7 +196,7 @@ class LeaveService(BaseService):
             {
                 "id": str(req.id),
                 "employee_id": req.employee_id,
-                "employee_name": name,
+                "employee_name": name or req.employee_id,
                 "leave_category": req.leave_category.value if req.leave_category else "",
                 "status": req.status.value if req.status else "",
                 "start_date": str(req.start_date),

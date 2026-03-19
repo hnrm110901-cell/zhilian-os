@@ -11,7 +11,6 @@ import structlog
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.orm import selectinload
 from src.core.database import get_db_session
-from src.models.employee import Employee
 from src.models.schedule import Schedule, Shift
 
 logger = structlog.get_logger()

@@ -22,7 +22,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.brand_im_config import BrandIMConfig, IMPlatform
-from ..models.employee import Employee
+from ..models.hr.person import Person
 from ..services.im_sync_service import DingTalkAdapter, WeChatWorkAdapter
 
 logger = structlog.get_logger()
@@ -97,11 +97,11 @@ class IMAttendanceSyncService:
         store_ids = [r[0] for r in store_result.all()]
 
         emp_result = await self.db.execute(
-            select(Employee).where(
+            select(Person).where(
                 and_(
-                    Employee.store_id.in_(store_ids),
-                    Employee.wechat_userid.isnot(None),
-                    Employee.is_active.is_(True),
+                    Person.store_id.in_(store_ids),
+                    Person.wechat_userid.isnot(None),
+                    Person.is_active.is_(True),
                 )
             )
         )
@@ -167,11 +167,11 @@ class IMAttendanceSyncService:
         store_ids = [r[0] for r in store_result.all()]
 
         emp_result = await self.db.execute(
-            select(Employee).where(
+            select(Person).where(
                 and_(
-                    Employee.store_id.in_(store_ids),
-                    Employee.dingtalk_userid.isnot(None),
-                    Employee.is_active.is_(True),
+                    Person.store_id.in_(store_ids),
+                    Person.dingtalk_userid.isnot(None),
+                    Person.is_active.is_(True),
                 )
             )
         )
@@ -242,13 +242,17 @@ class IMAttendanceSyncService:
         if not checkin_time:
             return
 
-        # 查找员工
+        # 查找人员（通过 Person IM 字段）
         if platform == "wechat_work":
-            emp_result = await self.db.execute(select(Employee).where(Employee.wechat_userid == userid))
+            person_result = await self.db.execute(
+                select(Person).where(Person.wechat_userid == userid)
+            )
         else:
-            emp_result = await self.db.execute(select(Employee).where(Employee.dingtalk_userid == userid))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+            person_result = await self.db.execute(
+                select(Person).where(Person.dingtalk_userid == userid)
+            )
+        person = person_result.scalar_one_or_none()
+        if not person:
             return
 
         # 写入考勤记录（如果模型存在）
@@ -257,11 +261,12 @@ class IMAttendanceSyncService:
 
             attendance_date = checkin_time.date()
 
-            # 检查是否已存在
+            # 检查是否已存在（过渡期：仍使用 legacy_employee_id 作为 employee_id）
+            legacy_id = person.legacy_employee_id or str(person.id)
             existing = await self.db.execute(
                 select(AttendanceRecord).where(
                     and_(
-                        AttendanceRecord.employee_id == employee.id,
+                        AttendanceRecord.employee_id == legacy_id,
                         AttendanceRecord.attendance_date == attendance_date,
                     )
                 )
@@ -282,8 +287,8 @@ class IMAttendanceSyncService:
                     status = "early_leave"
 
             att = AttendanceRecord(
-                employee_id=employee.id,
-                store_id=employee.store_id,
+                employee_id=legacy_id,
+                store_id=person.store_id,
                 attendance_date=attendance_date,
                 check_in_time=checkin_time,
                 status=status,
