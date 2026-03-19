@@ -71,6 +71,7 @@ class AttendanceRule(Base, TimestampMixin):
     """考勤规则 — 按品牌/门店/用工类型差异化配置"""
 
     __tablename__ = "attendance_rules"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     brand_id = Column(String(50), nullable=False, index=True)
