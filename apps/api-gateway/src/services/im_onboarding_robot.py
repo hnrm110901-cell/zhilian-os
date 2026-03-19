@@ -21,7 +21,8 @@ import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.employee_growth import EmployeeGrowthPlan, EmployeeMilestone, GrowthPlanStatus, MilestoneType
 from ..models.store import Store
 from ..services.im_message_service import IMMessageService
@@ -90,39 +91,56 @@ class IMOnboardingRobot:
         3. 创建入职成长计划（含任务清单）
         4. 推送 IM 欢迎消息 + 任务清单
         """
-        # 查询员工
-        emp_result = await self.db.execute(select(Employee).where(Employee.id == employee_id))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+        # 通过 legacy_employee_id 查 Person
+        person_result = await self.db.execute(
+            select(Person).where(Person.legacy_employee_id == str(employee_id))
+        )
+        person = person_result.scalar_one_or_none()
+        if not person:
             return {"error": f"员工 {employee_id} 不存在"}
 
         # 查门店名称
-        store_result = await self.db.execute(select(Store).where(Store.id == employee.store_id))
+        store_result = await self.db.execute(select(Store).where(Store.id == person.store_id))
         store = store_result.scalar_one_or_none()
-        store_name = store.name if store else employee.store_id
+        store_name = store.name if store else (person.store_id or employee_id)
 
         # 获取品牌ID
         if not brand_id and store:
             brand_id = store.brand_id
 
+        # 查当前岗位（EmploymentAssignment，过渡期可能不存在）
+        assign_result = await self.db.execute(
+            select(EmploymentAssignment)
+            .where(
+                and_(
+                    EmploymentAssignment.person_id == person.id,
+                    EmploymentAssignment.status == "active",
+                )
+            )
+            .order_by(EmploymentAssignment.start_date.desc())
+            .limit(1)
+        )
+        assignment = assign_result.scalar_one_or_none()
+        position = assignment.position if assignment else None
+
         # 1. 创建入职里程碑
-        milestone = await self._create_onboard_milestone(employee, store_name)
+        milestone = await self._create_onboard_milestone(person, position, store_name)
 
         # 2. 创建入职成长计划
-        plan = await self._create_onboarding_plan(employee)
+        plan = await self._create_onboarding_plan(person, position)
 
         await self.db.flush()
 
         # 3. 推送 IM 消息
-        im_userid = employee.wechat_userid or employee.dingtalk_userid
+        im_userid = person.wechat_userid or person.dingtalk_userid
         send_result = {"sent": False}
         if im_userid:
             send_result = await self._push_onboarding_message(
                 brand_id,
                 im_userid,
-                employee.name,
+                person.name,
                 store_name,
-                employee.position,
+                position,
                 plan,
             )
 
@@ -131,15 +149,15 @@ class IMOnboardingRobot:
         logger.info(
             "onboarding_robot.triggered",
             employee_id=employee_id,
-            store_id=employee.store_id,
-            position=employee.position,
+            store_id=person.store_id,
+            position=position,
             task_count=plan.total_tasks if plan else 0,
             im_sent=send_result.get("sent", False),
         )
 
         return {
             "employee_id": employee_id,
-            "employee_name": employee.name,
+            "employee_name": person.name,
             "store_name": store_name,
             "milestone_id": str(milestone.id) if milestone else None,
             "plan_id": str(plan.id) if plan else None,
@@ -149,17 +167,18 @@ class IMOnboardingRobot:
 
     async def _create_onboard_milestone(
         self,
-        employee: Employee,
+        person: Person,
+        position: Optional[str],
         store_name: str,
     ) -> EmployeeMilestone:
         """创建入职里程碑"""
         milestone = EmployeeMilestone(
             id=uuid.uuid4(),
-            store_id=employee.store_id,
-            employee_id=employee.id,
+            store_id=person.store_id,
+            employee_id=person.legacy_employee_id or str(person.id),
             milestone_type=MilestoneType.ONBOARD,
             title=f"欢迎加入{store_name}",
-            description=f"{employee.name} 入职 {employee.position or '岗位'}",
+            description=f"{person.name} 入职 {position or '岗位'}",
             achieved_at=date.today(),
             badge_icon="🎉",
             notified=True,
@@ -169,10 +188,11 @@ class IMOnboardingRobot:
 
     async def _create_onboarding_plan(
         self,
-        employee: Employee,
+        person: Person,
+        position: Optional[str],
     ) -> EmployeeGrowthPlan:
         """创建入职成长计划（含结构化任务清单）"""
-        position = employee.position or "waiter"
+        position = position or "waiter"
         position_tasks = ONBOARDING_TASKS_BY_POSITION.get(position, [])
         if not position_tasks:
             # 未匹配到岗位时用服务员任务
@@ -205,9 +225,9 @@ class IMOnboardingRobot:
 
         plan = EmployeeGrowthPlan(
             id=uuid.uuid4(),
-            store_id=employee.store_id,
-            employee_id=employee.id,
-            plan_name=f"入职引导计划（{employee.name}）",
+            store_id=person.store_id,
+            employee_id=person.legacy_employee_id or str(person.id),
+            plan_name=f"入职引导计划（{person.name}）",
             status=GrowthPlanStatus.ACTIVE,
             tasks=all_tasks,
             total_tasks=len(all_tasks),
@@ -287,26 +307,31 @@ class IMOnboardingRobot:
         reminded = 0
 
         for plan in plans:
-            emp_result = await self.db.execute(
-                select(Employee).where(and_(Employee.id == plan.employee_id, Employee.is_active.is_(True)))
+            person_result = await self.db.execute(
+                select(Person).where(
+                    and_(
+                        Person.legacy_employee_id == str(plan.employee_id),
+                        Person.is_active.is_(True),
+                    )
+                )
             )
-            emp = emp_result.scalar_one_or_none()
-            if not emp:
+            person = person_result.scalar_one_or_none()
+            if not person:
                 continue
 
-            im_userid = emp.wechat_userid or emp.dingtalk_userid
+            im_userid = person.wechat_userid or person.dingtalk_userid
             if not im_userid:
                 continue
 
             # 获取品牌ID
-            store_result = await self.db.execute(select(Store.brand_id).where(Store.id == emp.store_id))
+            store_result = await self.db.execute(select(Store.brand_id).where(Store.id == person.store_id))
             store_brand = store_result.scalar_one_or_none()
             emp_brand_id = brand_id or store_brand
 
             pending = plan.total_tasks - plan.completed_tasks
             content = (
                 f"### 入职任务提醒\n\n"
-                f"**{emp.name}** 您好，您还有 **{pending}项** 入职任务待完成。\n\n"
+                f"**{person.name}** 您好，您还有 **{pending}项** 入职任务待完成。\n\n"
                 f"入职已满 {days_threshold} 天，请尽快完成剩余任务：\n\n"
             )
             tasks = plan.tasks or []
@@ -325,7 +350,7 @@ class IMOnboardingRobot:
                 )
                 reminded += 1
             except Exception as e:
-                logger.warning("onboarding_remind.failed", employee_id=emp.id, error=str(e))
+                logger.warning("onboarding_remind.failed", employee_id=plan.employee_id, error=str(e))
 
         return {"reminded": reminded, "total_pending": len(plans)}
 

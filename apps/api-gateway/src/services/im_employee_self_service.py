@@ -21,7 +21,8 @@ import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.user import User
 
 logger = structlog.get_logger()
@@ -45,8 +46,8 @@ class IMEmployeeSelfService:
         Returns:
             {"type": "markdown", "title": str, "content": str}
         """
-        employee, user = await self._resolve_employee(im_userid, platform)
-        if not employee:
+        person, user = await self._resolve_employee(im_userid, platform)
+        if not person:
             return {
                 "type": "text",
                 "content": "未找到您的员工信息，请联系管理员确认通讯录同步状态。",
@@ -56,32 +57,32 @@ class IMEmployeeSelfService:
 
         # 排班查询
         if any(k in cmd for k in ["排班", "班次", "上班"]):
-            return await self._query_schedule(employee)
+            return await self._query_schedule(person)
 
         # 请假
         if any(k in cmd for k in ["请假", "休假", "病假", "事假", "年假"]):
-            return await self._leave_guide(employee, cmd)
+            return await self._leave_guide(person, cmd)
 
         # 调班
         if any(k in cmd for k in ["调班", "换班", "代班"]):
-            return await self._shift_swap_guide(employee)
+            return await self._shift_swap_guide(person)
 
         # 工资条
         if any(k in cmd for k in ["工资", "薪资", "薪酬", "工资条"]):
-            return await self._payslip_info(employee)
+            return await self._payslip_info(person)
 
         # 考勤
         if any(k in cmd for k in ["考勤", "打卡", "出勤", "迟到"]):
-            return await self._attendance_summary(employee)
+            return await self._attendance_summary(person)
 
         # 个人信息
         if any(k in cmd for k in ["个人信息", "我的信息", "我是谁"]):
-            return self._personal_info(employee)
+            return await self._personal_info(person)
 
         return {
             "type": "text",
             "content": (
-                f"{employee.name}您好！我可以帮您：\n"
+                f"{person.name}您好！我可以帮您：\n"
                 "1. 回复「排班」查看本周排班\n"
                 "2. 回复「请假」提交请假申请\n"
                 "3. 回复「调班」申请调班\n"
@@ -91,14 +92,14 @@ class IMEmployeeSelfService:
             ),
         }
 
-    async def _resolve_employee(self, im_userid: str, platform: str) -> Tuple[Optional[Employee], Optional[User]]:
-        """根据 IM userid 查找 Employee + User"""
+    async def _resolve_employee(self, im_userid: str, platform: str) -> Tuple[Optional[Person], Optional[User]]:
+        """根据 IM userid 查找 Person + User"""
         if platform == "wechat_work":
-            emp_result = await self.db.execute(select(Employee).where(Employee.wechat_userid == im_userid))
+            person_result = await self.db.execute(select(Person).where(Person.wechat_userid == im_userid))
         else:
-            emp_result = await self.db.execute(select(Employee).where(Employee.dingtalk_userid == im_userid))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+            person_result = await self.db.execute(select(Person).where(Person.dingtalk_userid == im_userid))
+        person = person_result.scalar_one_or_none()
+        if not person:
             return None, None
 
         # 查对应 User
@@ -107,13 +108,31 @@ class IMEmployeeSelfService:
         else:
             user_result = await self.db.execute(select(User).where(User.dingtalk_user_id == im_userid))
         user = user_result.scalar_one_or_none()
-        return employee, user
+        return person, user
 
-    async def _query_schedule(self, employee: Employee) -> Dict[str, Any]:
+    async def _get_current_position(self, person: Person) -> Optional[str]:
+        """查询当前在岗关系获取岗位名称（过渡期辅助方法）"""
+        assign_result = await self.db.execute(
+            select(EmploymentAssignment)
+            .where(
+                and_(
+                    EmploymentAssignment.person_id == person.id,
+                    EmploymentAssignment.status == "active",
+                )
+            )
+            .order_by(EmploymentAssignment.start_date.desc())
+            .limit(1)
+        )
+        assignment = assign_result.scalar_one_or_none()
+        return assignment.position if assignment else None
+
+    async def _query_schedule(self, person: Person) -> Dict[str, Any]:
         """查询本周排班"""
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
         week_end = week_start + timedelta(days=6)
+        # legacy_employee_id 用于匹配现有排班表的 employee_id 字段
+        legacy_id = person.legacy_employee_id or str(person.id)
 
         try:
             from ..models.schedule import Schedule
@@ -122,7 +141,7 @@ class IMEmployeeSelfService:
                 select(Schedule)
                 .where(
                     and_(
-                        Schedule.employee_id == employee.id,
+                        Schedule.employee_id == legacy_id,
                         Schedule.date >= week_start,
                         Schedule.date <= week_end,
                     )
@@ -137,7 +156,7 @@ class IMEmployeeSelfService:
                     "title": "本周排班",
                     "content": (
                         f"### 本周排班 ({week_start} ~ {week_end})\n\n"
-                        f"**{employee.name}** 本周暂无排班记录。\n\n"
+                        f"**{person.name}** 本周暂无排班记录。\n\n"
                         f"如有疑问请联系您的店长。"
                     ),
                 }
@@ -160,10 +179,10 @@ class IMEmployeeSelfService:
             logger.warning("im_self_service.schedule_query_failed", error=str(e))
             return {
                 "type": "text",
-                "content": f"{employee.name}，排班查询暂时不可用，请稍后再试。",
+                "content": f"{person.name}，排班查询暂时不可用，请稍后再试。",
             }
 
-    async def _leave_guide(self, employee: Employee, cmd: str) -> Dict[str, Any]:
+    async def _leave_guide(self, person: Person, cmd: str) -> Dict[str, Any]:
         """请假引导"""
         leave_types = {
             "病假": "sick_leave",
@@ -179,7 +198,7 @@ class IMEmployeeSelfService:
                 detected_type = name
                 break
 
-        content = f"### 请假申请\n\n**{employee.name}**，请通过以下方式提交请假：\n\n"
+        content = f"### 请假申请\n\n**{person.name}**，请通过以下方式提交请假：\n\n"
 
         if detected_type:
             content += f"检测到您要请 **{detected_type}**\n\n"
@@ -193,11 +212,11 @@ class IMEmployeeSelfService:
 
         return {"type": "markdown", "title": "请假申请", "content": content}
 
-    async def _shift_swap_guide(self, employee: Employee) -> Dict[str, Any]:
+    async def _shift_swap_guide(self, person: Person) -> Dict[str, Any]:
         """调班引导"""
         content = (
             f"### 调班申请\n\n"
-            f"**{employee.name}**，调班流程：\n\n"
+            f"**{person.name}**，调班流程：\n\n"
             f"1. 先与同事协商确认可互换班次\n"
             f"2. 登录屯象OS → 排班管理 → 申请调班\n"
             f"3. 填写调换日期、班次、互换同事\n"
@@ -206,7 +225,7 @@ class IMEmployeeSelfService:
         )
         return {"type": "markdown", "title": "调班申请", "content": content}
 
-    async def _payslip_info(self, employee: Employee) -> Dict[str, Any]:
+    async def _payslip_info(self, person: Person) -> Dict[str, Any]:
         """工资条信息"""
         today = date.today()
         if today.day < 10:
@@ -216,7 +235,7 @@ class IMEmployeeSelfService:
 
         content = (
             f"### {month} 工资条\n\n"
-            f"**{employee.name}**，为保护您的隐私，"
+            f"**{person.name}**，为保护您的隐私，"
             f"工资条详情需登录系统查看：\n\n"
             f"1. 登录屯象OS → 薪酬管理 → 我的工资条\n"
             f"2. 身份验证后可查看完整明细\n\n"
@@ -224,10 +243,11 @@ class IMEmployeeSelfService:
         )
         return {"type": "markdown", "title": "工资条查询", "content": content}
 
-    async def _attendance_summary(self, employee: Employee) -> Dict[str, Any]:
+    async def _attendance_summary(self, person: Person) -> Dict[str, Any]:
         """考勤统计"""
         today = date.today()
         month_start = today.replace(day=1)
+        legacy_id = person.legacy_employee_id or str(person.id)
 
         try:
             from ..models.hr_attendance import AttendanceRecord
@@ -235,7 +255,7 @@ class IMEmployeeSelfService:
             result = await self.db.execute(
                 select(AttendanceRecord).where(
                     and_(
-                        AttendanceRecord.employee_id == employee.id,
+                        AttendanceRecord.employee_id == legacy_id,
                         AttendanceRecord.attendance_date >= month_start,
                         AttendanceRecord.attendance_date <= today,
                     )
@@ -251,7 +271,7 @@ class IMEmployeeSelfService:
 
             content = (
                 f"### {today.strftime('%Y年%m月')} 考勤统计\n\n"
-                f"**{employee.name}**\n\n"
+                f"**{person.name}**\n\n"
                 f"- 应出勤：{total} 天\n"
                 f"- 正常：{present} 天\n"
                 f"- 迟到：{late} 次\n"
@@ -265,20 +285,20 @@ class IMEmployeeSelfService:
             logger.warning("im_self_service.attendance_failed", error=str(e))
             return {
                 "type": "text",
-                "content": f"{employee.name}，考勤数据查询暂时不可用，请稍后再试。",
+                "content": f"{person.name}，考勤数据查询暂时不可用，请稍后再试。",
             }
 
-    def _personal_info(self, employee: Employee) -> Dict[str, Any]:
-        """个人信息"""
+    async def _personal_info(self, person: Person) -> Dict[str, Any]:
+        """个人信息（异步，需查询当前岗位）"""
+        position = await self._get_current_position(person)
         content = (
             f"### 个人信息\n\n"
-            f"**姓名**：{employee.name}\n\n"
-            f"**工号**：{employee.id}\n\n"
-            f"**岗位**：{employee.position or '-'}\n\n"
-            f"**门店**：{employee.store_id}\n\n"
-            f"**入职日期**：{employee.hire_date or '-'}\n\n"
-            f"**状态**：{'在职' if employee.is_active else '离职'}\n\n"
-            f"**手机**：{employee.phone or '-'}\n\n"
+            f"**姓名**：{person.name}\n\n"
+            f"**工号**：{person.legacy_employee_id or str(person.id)}\n\n"
+            f"**岗位**：{position or '-'}\n\n"
+            f"**门店**：{person.store_id or '-'}\n\n"
+            f"**状态**：{'在职' if person.is_active else '离职'}\n\n"
+            f"**手机**：{person.phone or '-'}\n\n"
             f"如需修改个人信息，请联系HR。"
         )
         return {"type": "markdown", "title": "个人信息", "content": content}

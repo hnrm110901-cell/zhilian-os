@@ -20,7 +20,7 @@ import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.employee import Employee
+from ..models.hr.person import Person
 from ..models.employee_growth import EmployeeMilestone, EmployeeSkill, MilestoneType, SkillLevel
 from ..models.store import Store
 from ..services.im_message_service import IMMessageService
@@ -128,18 +128,20 @@ class IMMilestoneNotifier:
         if milestone.notified:
             return {"already_notified": True, "milestone_id": milestone_id}
 
-        # 查员工
-        emp_result = await self.db.execute(select(Employee).where(Employee.id == milestone.employee_id))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+        # 通过 legacy_employee_id 查 Person
+        person_result = await self.db.execute(
+            select(Person).where(Person.legacy_employee_id == str(milestone.employee_id))
+        )
+        person = person_result.scalar_one_or_none()
+        if not person:
             return {"error": f"员工 {milestone.employee_id} 不存在"}
 
-        im_userid = employee.wechat_userid or employee.dingtalk_userid
+        im_userid = person.wechat_userid or person.dingtalk_userid
         if not im_userid:
-            return {"error": "员工未绑定IM账号", "employee_id": employee.id}
+            return {"error": "员工未绑定IM账号", "employee_id": milestone.employee_id}
 
         # 获取品牌ID
-        store_result = await self.db.execute(select(Store.brand_id).where(Store.id == employee.store_id))
+        store_result = await self.db.execute(select(Store.brand_id).where(Store.id == person.store_id))
         brand_id = store_result.scalar_one_or_none()
 
         # 构建推送内容
@@ -152,7 +154,7 @@ class IMMilestoneNotifier:
 
         content = self._build_milestone_content(
             milestone,
-            employee.name,
+            person.name,
             emoji,
             template["title_prefix"],
         )
@@ -173,7 +175,7 @@ class IMMilestoneNotifier:
 
             logger.info(
                 "milestone_notifier.sent",
-                employee_id=employee.id,
+                employee_id=milestone.employee_id,
                 milestone_type=(
                     milestone.milestone_type.value
                     if hasattr(milestone.milestone_type, "value")
@@ -183,7 +185,7 @@ class IMMilestoneNotifier:
 
             return {
                 "notified": True,
-                "employee_name": employee.name,
+                "employee_name": person.name,
                 "milestone_type": str(milestone.milestone_type),
                 "title": milestone.title,
             }
@@ -202,16 +204,18 @@ class IMMilestoneNotifier:
         技能升级时推送庆祝消息。
         通常由 hr_growth API 在评估技能时调用。
         """
-        emp_result = await self.db.execute(select(Employee).where(Employee.id == employee_id))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+        person_result = await self.db.execute(
+            select(Person).where(Person.legacy_employee_id == str(employee_id))
+        )
+        person = person_result.scalar_one_or_none()
+        if not person:
             return {"error": f"员工 {employee_id} 不存在"}
 
-        im_userid = employee.wechat_userid or employee.dingtalk_userid
+        im_userid = person.wechat_userid or person.dingtalk_userid
         if not im_userid:
             return {"error": "员工未绑定IM账号"}
 
-        store_result = await self.db.execute(select(Store.brand_id).where(Store.id == employee.store_id))
+        store_result = await self.db.execute(select(Store.brand_id).where(Store.id == person.store_id))
         brand_id = store_result.scalar_one_or_none()
 
         # 技能等级中文
@@ -223,7 +227,7 @@ class IMMilestoneNotifier:
 
         content = (
             f"### 🏅 技能认证通过\n\n"
-            f"**{employee.name}** 恭喜！您的技能已升级：\n\n"
+            f"**{person.name}** 恭喜！您的技能已升级：\n\n"
             f"- **技能**: {skill_name}\n"
             f"- **新等级**: {level_label}\n"
         )
