@@ -26,7 +26,8 @@ import structlog
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.employee_metric import EmployeeMetricRecord
 from src.models.order import Order, OrderItem
 from src.models.store import Store
@@ -121,11 +122,16 @@ class PerformanceComputeService:
         """
         # 找到该门店的店长（position='store_manager'）
         mgr_res = await session.execute(
-            select(Employee).where(
+            select(Person)
+            .join(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+                EmploymentAssignment.position == "store_manager",
+            ))
+            .where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.position == "store_manager",
-                    Employee.is_active.is_(True),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
         )
@@ -168,7 +174,7 @@ class PerformanceComputeService:
 
         # 在职员工数
         emp_count_res = await session.execute(
-            select(func.count(Employee.id)).where(and_(Employee.store_id == store_id, Employee.is_active.is_(True)))
+            select(func.count(Person.id)).where(and_(Person.store_id == store_id, Person.is_active.is_(True)))
         )
         emp_count = emp_count_res.scalar() or 1
 
@@ -196,11 +202,12 @@ class PerformanceComputeService:
 
         rows = []
         for manager in managers:
+            legacy_id = manager.legacy_employee_id or str(manager.id)
             for metric_id, value in metric_values.items():
                 target = DEFAULT_TARGETS.get(metric_id)
                 rows.append(
                     {
-                        "employee_id": manager.id,
+                        "employee_id": legacy_id,
                         "store_id": store_id,
                         "metric_id": metric_id,
                         "period_start": period_start,
@@ -291,11 +298,16 @@ class PerformanceComputeService:
           waste_rate     = AVG(ABS(variance_pct))
         """
         kitchen_res = await session.execute(
-            select(Employee).where(
+            select(Person)
+            .join(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+                EmploymentAssignment.position == "kitchen",
+            ))
+            .where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.position == "kitchen",
-                    Employee.is_active.is_(True),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
         )
@@ -338,11 +350,12 @@ class PerformanceComputeService:
 
         rows = []
         for staff in kitchen_staff:
+            legacy_id = staff.legacy_employee_id or str(staff.id)
             for metric_id, value in metric_values.items():
                 target = DEFAULT_TARGETS.get(metric_id)
                 rows.append(
                     {
-                        "employee_id": staff.id,
+                        "employee_id": legacy_id,
                         "store_id": store_id,
                         "metric_id": metric_id,
                         "period_start": period_start,

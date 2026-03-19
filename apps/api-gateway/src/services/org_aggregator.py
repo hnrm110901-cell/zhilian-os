@@ -204,15 +204,15 @@ class OrgAggregator:
             return 0.0
 
     async def _aggregate_headcount(self, store_ids: list[str]) -> int:
-        """从 employees 汇总在职人数"""
+        """从 persons 汇总在职人数"""
         if not store_ids:
             return 0
         try:
-            from src.models.employee import Employee
+            from src.models.hr.person import Person
             result = await self.db.execute(
-                select(func.count(Employee.id)).where(
-                    Employee.store_id.in_(store_ids),
-                    Employee.is_active == True,
+                select(func.count(Person.id)).where(
+                    Person.store_id.in_(store_ids),
+                    Person.is_active == True,
                 )
             )
             return int(result.scalar() or 0)

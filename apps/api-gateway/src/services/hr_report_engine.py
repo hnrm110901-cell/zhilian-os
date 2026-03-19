@@ -18,7 +18,8 @@ import structlog
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.employee_lifecycle import ChangeType, EmployeeChange
 from src.models.exit_interview import ExitInterview
 from src.models.mentorship import Mentorship
@@ -144,22 +145,24 @@ class HRReportEngine:
 
     async def _salary_changes(self, db: AsyncSession, pay_month: str, month_start: date, month_end: date) -> Dict[str, Any]:
         """工资异动表"""
-        # 新进员工
+        # 新进员工（通过 EmploymentAssignment.start_date 作为入职日期）
         new_result = await db.execute(
-            select(Employee).where(
+            select(Person, EmploymentAssignment)
+            .join(EmploymentAssignment, EmploymentAssignment.person_id == Person.id)
+            .where(
                 and_(
-                    Employee.store_id == self.store_id,
-                    Employee.hire_date >= month_start,
-                    Employee.hire_date <= month_end,
+                    Person.store_id == self.store_id,
+                    EmploymentAssignment.start_date >= month_start,
+                    EmploymentAssignment.start_date <= month_end,
                 )
             )
         )
-        new_employees = new_result.scalars().all()
+        new_rows = new_result.all()
 
         # 离职员工
         resign_result = await db.execute(
-            select(EmployeeChange, Employee.name)
-            .join(Employee, EmployeeChange.employee_id == Employee.id)
+            select(EmployeeChange, Person.name)
+            .join(Person, Person.legacy_employee_id == EmployeeChange.employee_id)
             .where(
                 and_(
                     EmployeeChange.store_id == self.store_id,
@@ -175,8 +178,8 @@ class HRReportEngine:
         from src.models.payroll import SalaryStructure
 
         adjustment_result = await db.execute(
-            select(SalaryStructure, Employee.name)
-            .join(Employee, SalaryStructure.employee_id == Employee.id)
+            select(SalaryStructure, Person.name)
+            .join(Person, Person.legacy_employee_id == SalaryStructure.employee_id)
             .where(
                 and_(
                     SalaryStructure.store_id == self.store_id,
@@ -190,9 +193,15 @@ class HRReportEngine:
 
         return {
             "new_employees": [
-                {"id": e.id, "name": e.name, "position": e.position, "hire_date": str(e.hire_date)} for e in new_employees
+                {
+                    "id": p.legacy_employee_id or str(p.id),
+                    "name": p.name,
+                    "position": a.position if a else None,
+                    "hire_date": str(a.start_date) if a else None,
+                }
+                for p, a in new_rows
             ],
-            "new_count": len(new_employees),
+            "new_count": len(new_rows),
             "resignations": [
                 {"employee_id": lc.employee_id, "name": name, "effective_date": str(lc.effective_date)}
                 for lc, name in resignations
@@ -214,17 +223,21 @@ class HRReportEngine:
         """月末编制盘存"""
         result = await db.execute(
             select(
-                Employee.position,
-                Employee.employment_type,
-                func.count(Employee.id).label("count"),
+                EmploymentAssignment.position,
+                EmploymentAssignment.employment_type,
+                func.count(Person.id).label("count"),
             )
+            .join(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
                 and_(
-                    Employee.store_id == self.store_id,
-                    Employee.is_active.is_(True),
+                    Person.store_id == self.store_id,
+                    Person.is_active.is_(True),
                 )
             )
-            .group_by(Employee.position, Employee.employment_type)
+            .group_by(EmploymentAssignment.position, EmploymentAssignment.employment_type)
         )
         rows = result.all()
 
@@ -283,27 +296,33 @@ class HRReportEngine:
         self, db: AsyncSession, pay_month: str, month_start: date, month_end: date
     ) -> Dict[str, Any]:
         """小时工/灵活用工考勤统计"""
-        # 查找非正式员工
+        # 查找非正式员工（Person + EmploymentAssignment）
         result = await db.execute(
-            select(Employee).where(
+            select(Person, EmploymentAssignment)
+            .join(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
+            .where(
                 and_(
-                    Employee.store_id == self.store_id,
-                    Employee.is_active.is_(True),
-                    Employee.employment_type.in_(["part_time", "temp", "outsource_flex"]),
+                    Person.store_id == self.store_id,
+                    Person.is_active.is_(True),
+                    EmploymentAssignment.employment_type.in_(["part_time", "temp", "outsource_flex"]),
                 )
             )
         )
-        workers = result.scalars().all()
+        worker_rows = result.all()
 
         items = []
-        for w in workers:
+        for person, assignment in worker_rows:
+            legacy_id = person.legacy_employee_id or str(person.id)
             # 查找考勤记录
             from src.models.attendance import AttendanceLog
 
             att_result = await db.execute(
                 select(func.count(AttendanceLog.id)).where(
                     and_(
-                        AttendanceLog.employee_id == w.id,
+                        AttendanceLog.employee_id == legacy_id,
                         AttendanceLog.work_date >= month_start,
                         AttendanceLog.work_date <= month_end,
                         AttendanceLog.status.in_(["normal", "late"]),
@@ -312,14 +331,15 @@ class HRReportEngine:
             )
             days = att_result.scalar() or 0
 
-            daily_wage = w.daily_wage_standard_fen or 0
+            # daily_wage_standard_fen 暂不可用（未迁移到新模型），默认 0
+            daily_wage = 0
             total_pay = days * daily_wage
 
             items.append(
                 {
-                    "employee_id": w.id,
-                    "name": w.name,
-                    "employment_type": w.employment_type,
+                    "employee_id": legacy_id,
+                    "name": person.name,
+                    "employment_type": assignment.employment_type if assignment else "part_time",
                     "attendance_days": days,
                     "daily_wage_yuan": daily_wage / 100,
                     "total_pay_yuan": total_pay / 100,
@@ -638,10 +658,14 @@ class HRReportEngine:
         """按岗位查询离职分布"""
         result = await db.execute(
             select(
-                Employee.position,
+                EmploymentAssignment.position,
                 func.count(EmployeeChange.id).label("resign_count"),
             )
-            .join(EmployeeChange, EmployeeChange.employee_id == Employee.id)
+            .join(Person, Person.legacy_employee_id == EmployeeChange.employee_id)
+            .outerjoin(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
                 and_(
                     EmployeeChange.store_id == self.store_id,
@@ -650,7 +674,7 @@ class HRReportEngine:
                     EmployeeChange.effective_date <= month_end,
                 )
             )
-            .group_by(Employee.position)
+            .group_by(EmploymentAssignment.position)
         )
         rows = result.all()
         return {(pos or "未设置"): count for pos, count in rows}

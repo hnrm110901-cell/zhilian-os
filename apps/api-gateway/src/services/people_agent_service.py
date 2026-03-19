@@ -17,7 +17,8 @@ from typing import List, Optional
 
 from sqlalchemy import and_, case, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.order import Order
 from src.models.schedule import Schedule, Shift
 
@@ -116,9 +117,9 @@ class PeopleAgentService:
         # 在职员工数
         active_count = (
             await db.scalar(
-                select(func.count(Employee.id)).where(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
+                select(func.count(Person.id)).where(
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
             or 0
@@ -126,12 +127,16 @@ class PeopleAgentService:
 
         # 按岗位分布
         position_stmt = (
-            select(Employee.position, func.count(Employee.id))
+            select(EmploymentAssignment.position, func.count(Person.id))
+            .join(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
-                Employee.store_id == store_id,
-                Employee.is_active.is_(True),
+                Person.store_id == store_id,
+                Person.is_active.is_(True),
             )
-            .group_by(Employee.position)
+            .group_by(EmploymentAssignment.position)
         )
         pos_result = await db.execute(position_stmt)
         position_dist = {(row[0] or "未分类"): row[1] for row in pos_result.all()}

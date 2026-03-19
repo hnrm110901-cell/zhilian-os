@@ -16,7 +16,9 @@ from openpyxl.utils import get_column_letter
 from sqlalchemy import Integer, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import AttendanceLog
-from src.models.employee import Employee
+from src.models.employee import Employee  # 花名册/小时工导出仍需完整 Employee 字段
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.employee_lifecycle import ChangeType, EmployeeChange
 from src.models.exit_interview import ExitInterview
 from src.models.mentorship import Mentorship
@@ -170,15 +172,19 @@ class HRExcelExporter:
 
         # 数据
         result = await db.execute(
-            select(PayrollRecord, Employee.name, Employee.position)
-            .join(Employee, PayrollRecord.employee_id == Employee.id)
+            select(PayrollRecord, Person.name, EmploymentAssignment.position)
+            .join(Person, Person.legacy_employee_id == PayrollRecord.employee_id)
+            .outerjoin(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
                 and_(
                     PayrollRecord.store_id == store_id,
                     PayrollRecord.pay_month == month,
                 )
             )
-            .order_by(Employee.name)
+            .order_by(Person.name)
         )
         rows = result.all()
 
@@ -258,19 +264,20 @@ class HRExcelExporter:
 
         # 查询在职员工
         emp_result = await db.execute(
-            select(Employee)
+            select(Person)
             .where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
-            .order_by(Employee.name)
+            .order_by(Person.name)
         )
-        employees = emp_result.scalars().all()
+        persons = emp_result.scalars().all()
 
         row_idx = 3
-        for emp in employees:
+        for person in persons:
+            legacy_id = person.legacy_employee_id or str(person.id)
             # 查询考勤汇总
             att_result = await db.execute(
                 select(
@@ -286,7 +293,7 @@ class HRExcelExporter:
                     func.coalesce(func.sum(AttendanceLog.overtime_hours), 0).label("ot_hours"),
                 ).where(
                     and_(
-                        AttendanceLog.employee_id == emp.id,
+                        AttendanceLog.employee_id == legacy_id,
                         AttendanceLog.store_id == store_id,
                         AttendanceLog.work_date >= month_start,
                         AttendanceLog.work_date <= month_end,
@@ -304,8 +311,8 @@ class HRExcelExporter:
             attendance_rate = attended / workdays if workdays > 0 else 0
 
             data = [
-                emp.name,
-                emp.id,
+                person.name,
+                legacy_id,
                 workdays,
                 attended,
                 late_count,
@@ -473,8 +480,12 @@ class HRExcelExporter:
 
         # 离职
         resign_result = await db.execute(
-            select(EmployeeChange, Employee.name, Employee.position)
-            .join(Employee, EmployeeChange.employee_id == Employee.id)
+            select(EmployeeChange, Person.name, EmploymentAssignment.position)
+            .join(Person, Person.legacy_employee_id == EmployeeChange.employee_id)
+            .outerjoin(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
                 and_(
                     EmployeeChange.store_id == store_id,
@@ -488,8 +499,12 @@ class HRExcelExporter:
 
         # 调薪
         adj_result = await db.execute(
-            select(SalaryStructure, Employee.name, Employee.position)
-            .join(Employee, SalaryStructure.employee_id == Employee.id)
+            select(SalaryStructure, Person.name, EmploymentAssignment.position)
+            .join(Person, Person.legacy_employee_id == SalaryStructure.employee_id)
+            .outerjoin(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
                 and_(
                     SalaryStructure.store_id == store_id,
@@ -596,17 +611,21 @@ class HRExcelExporter:
 
         result = await db.execute(
             select(
-                Employee.position,
-                Employee.employment_type,
-                func.count(Employee.id).label("count"),
+                EmploymentAssignment.position,
+                EmploymentAssignment.employment_type,
+                func.count(Person.id).label("count"),
             )
+            .join(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
-            .group_by(Employee.position, Employee.employment_type)
+            .group_by(EmploymentAssignment.position, EmploymentAssignment.employment_type)
         )
         rows = result.all()
 
@@ -977,8 +996,12 @@ class HRExcelExporter:
 
         # 本月新增参保
         new_result = await db.execute(
-            select(EmployeeSocialInsurance, Employee.name, Employee.position)
-            .join(Employee, EmployeeSocialInsurance.employee_id == Employee.id)
+            select(EmployeeSocialInsurance, Person.name, EmploymentAssignment.position)
+            .join(Person, Person.legacy_employee_id == EmployeeSocialInsurance.employee_id)
+            .outerjoin(EmploymentAssignment, and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ))
             .where(
                 and_(
                     EmployeeSocialInsurance.effective_year == year,

@@ -206,7 +206,7 @@ class StoreHealthService:
                 "target_date": str,
             }
         """
-        from src.models.employee import Employee
+        from src.models.hr.person import Person
         from src.models.store import Store
         from src.services.food_cost_service import FoodCostService
 
@@ -238,10 +238,10 @@ class StoreHealthService:
 
         # 3. 在职员工数
         staff_row = await db.execute(
-            select(func.count(Employee.id)).where(
+            select(func.count(Person.id)).where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.is_active == True,
+                    Person.store_id == store_id,
+                    Person.is_active == True,
                 )
             )
         )

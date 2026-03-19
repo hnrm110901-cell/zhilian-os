@@ -12,7 +12,8 @@ import structlog
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 from src.core.database import get_db_session
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.kpi import KPI, KPIRecord
 from src.models.order import Order, OrderStatus
 
@@ -169,16 +170,31 @@ class ServiceQualityService:
             else:
                 start_dt = datetime.fromisoformat(start_date)
 
-            # 查询员工
-            employees_stmt = select(Employee).where(Employee.store_id == self.store_id)
+            # 查询员工（Person + EmploymentAssignment）
+            employees_stmt = (
+                select(Person, EmploymentAssignment)
+                .outerjoin(
+                    EmploymentAssignment,
+                    and_(
+                        EmploymentAssignment.person_id == Person.id,
+                        EmploymentAssignment.status == "active",
+                    ),
+                )
+                .where(
+                    and_(
+                        Person.store_id == self.store_id,
+                        Person.is_active.is_(True),
+                    )
+                )
+            )
             if staff_id:
-                employees_stmt = employees_stmt.where(Employee.id == staff_id)
+                employees_stmt = employees_stmt.where(Person.legacy_employee_id == str(staff_id))
 
             employees_result = await session.execute(employees_stmt)
-            employees = employees_result.scalars().all()
+            rows = employees_result.all()
 
             performance_list = []
-            for employee in employees:
+            for person, assignment in rows:
                 # 查询该门店服务类KPI记录，计算平均达成率作为员工绩效参考
                 kpi_result = await session.execute(
                     select(
@@ -207,13 +223,13 @@ class ServiceQualityService:
                 )
                 total_orders = order_result.scalar() or 0
                 # 按员工数均分
-                total_employees = len(employees) or 1
+                total_employees = len(rows) or 1
                 per_employee_orders = total_orders // total_employees
 
                 performance = {
-                    "staff_id": employee.id,
-                    "staff_name": employee.name,
-                    "position": employee.position,
+                    "staff_id": person.legacy_employee_id or str(person.id),
+                    "staff_name": person.name,
+                    "position": assignment.position if assignment else None,
                     "period": {"start_date": start_dt.isoformat(), "end_date": end_dt.isoformat()},
                     "metrics": {
                         "total_services": per_employee_orders,

@@ -18,7 +18,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.bom import BOMTemplate
 from src.models.dish import Dish
-from src.models.employee import Employee
+from src.models.hr.person import Person
 from src.models.inventory import InventoryItem
 from src.models.store import Store
 
@@ -137,9 +137,9 @@ class TenantReplicatorService:
 
         employee_count = (
             await db.scalar(
-                select(func.count(Employee.id)).where(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
+                select(func.count(Person.id)).where(
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
             or 0

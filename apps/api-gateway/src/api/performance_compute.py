@@ -21,7 +21,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_role
-from src.models.employee import Employee
+from src.models.hr.person import Person
 from src.models.employee_metric import EmployeeMetricRecord
 from src.models.user import User, UserRole
 from src.services.performance_compute_service import PerformanceComputeService
@@ -124,8 +124,8 @@ async def get_metrics(
         conditions.append(EmployeeMetricRecord.metric_id == metric_id)
 
     result = await db.execute(
-        select(EmployeeMetricRecord, Employee.name)
-        .join(Employee, Employee.id == EmployeeMetricRecord.employee_id, isouter=True)
+        select(EmployeeMetricRecord, Person.name)
+        .join(Person, Person.legacy_employee_id == EmployeeMetricRecord.employee_id, isouter=True)
         .where(and_(*conditions))
         .order_by(EmployeeMetricRecord.employee_id, EmployeeMetricRecord.metric_id)
     )
