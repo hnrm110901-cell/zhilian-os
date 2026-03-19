@@ -16,7 +16,8 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import AttendanceLog
 from src.models.commission import CommissionRecord
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.payroll import PayrollRecord, PayrollStatus, SalaryStructure, TaxDeclaration, TaxStatus
 from src.models.reward_penalty import RewardPenaltyRecord, RewardPenaltyStatus, RewardPenaltyType
 from src.models.salary_item import SalaryItemDefinition
@@ -134,7 +135,9 @@ class PayrollService(BaseService):
     async def _resolve_rules(
         self,
         db: AsyncSession,
-        employee: Employee,
+        position: Optional[str],
+        employment_type: str,
+        seniority_months: int,
         store_id: str,
         brand_id: str,
         attendance_days: int,
@@ -144,8 +147,6 @@ class PayrollService(BaseService):
         返回解析后的规则值字典，同时作为 rule_snapshot 存入工资单。
         """
         engine = HRRuleEngine(brand_id=brand_id, store_id=store_id)
-        position = employee.position
-        employment_type = employee.employment_type
 
         # 考勤扣款规则
         late_deduction_per_time = await engine.get_late_deduction_fen(db, position, employment_type)
@@ -154,9 +155,6 @@ class PayrollService(BaseService):
 
         # 加班倍数
         overtime_rates = await engine.get_overtime_rates(db, position)
-
-        # 工龄补贴
-        seniority_months = employee.seniority_months or 0
         seniority_subsidy = await engine.get_seniority_subsidy_fen(db, seniority_months, position)
 
         # 全勤奖
@@ -208,18 +206,35 @@ class PayrollService(BaseService):
         if not structure:
             raise ValueError(f"员工 {employee_id} 无生效薪资方案")
 
-        # 获取员工信息（含岗位、用工类型、工龄）
-        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+        # 获取员工信息（Person + EmploymentAssignment）
+        person_result = await db.execute(
+            select(Person).where(Person.legacy_employee_id == str(employee_id))
+        )
+        person = person_result.scalar_one_or_none()
+        if not person:
             raise ValueError(f"员工 {employee_id} 不存在")
+
+        assign_result = await db.execute(
+            select(EmploymentAssignment)
+            .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+            .order_by(EmploymentAssignment.start_date.asc())
+            .limit(1)
+        )
+        assignment = assign_result.scalar_one_or_none()
+        position = assignment.position if assignment else None
+        employment_type = assignment.employment_type if assignment else "full_time"
+        seniority_months = (
+            (date.today() - assignment.start_date).days // 30
+            if (assignment and assignment.start_date)
+            else 0
+        )
 
         # 获取品牌ID
         brand_id = await self._get_brand_id(db, store_id)
 
         # 2. 检查是否使用公式引擎模式
         if await self._has_salary_item_definitions(db, brand_id):
-            return await self._calculate_with_formula_engine(db, employee, structure, pay_month, store_id, brand_id)
+            return await self._calculate_with_formula_engine(db, employee_id, structure, pay_month, store_id, brand_id)
 
         # 3. 标准模式：查询考勤
         year, month = int(pay_month[:4]), int(pay_month[5:7])
@@ -232,9 +247,11 @@ class PayrollService(BaseService):
         # 4. 通过HRRuleEngine解析业务规则
         rules = await self._resolve_rules(
             db,
-            employee,
-            store_id,
-            brand_id,
+            position=position,
+            employment_type=employment_type,
+            seniority_months=seniority_months,
+            store_id=store_id,
+            brand_id=brand_id,
             attendance_days=attendance.get("attendance_days", 0),
         )
 
@@ -403,7 +420,7 @@ class PayrollService(BaseService):
     async def _calculate_with_formula_engine(
         self,
         db: AsyncSession,
-        employee: Employee,
+        employee_id: str,
         structure: SalaryStructure,
         pay_month: str,
         store_id: str,
@@ -415,21 +432,21 @@ class PayrollService(BaseService):
         此方法负责将结果同步到PayrollRecord。
         """
         formula_engine = SalaryFormulaEngine(brand_id=brand_id)
-        result = await formula_engine.calculate_employee_salary(db, employee.id, pay_month, store_id)
+        result = await formula_engine.calculate_employee_salary(db, employee_id, pay_month, store_id)
 
         # 获取考勤摘要（用于PayrollRecord统计字段）
         year, month = int(pay_month[:4]), int(pay_month[5:7])
         month_start = date(year, month, 1)
         month_end = date(year, month, calendar.monthrange(year, month)[1])
-        attendance = await self._get_attendance_summary(db, employee.id, month_start, month_end)
+        attendance = await self._get_attendance_summary(db, employee_id, month_start, month_end)
 
         # 社保公积金
-        social, housing = await self._calculate_social_insurance(db, employee.id, year, structure)
+        social, housing = await self._calculate_social_insurance(db, employee_id, year, structure)
 
         # 个税
         tax_fen = await self._calculate_monthly_tax(
             db,
-            employee.id,
+            employee_id,
             pay_month,
             max(0, result["total_income_fen"]),
             social,
@@ -508,7 +525,7 @@ class PayrollService(BaseService):
         await db.flush()
         logger.info(
             "payroll_calculated",
-            employee_id=employee.id,
+            employee_id=employee_id,
             pay_month=pay_month,
             calc_mode="formula_engine",
             net_yuan=net / 100,
@@ -518,32 +535,33 @@ class PayrollService(BaseService):
     async def batch_calculate(self, db: AsyncSession, store_id: str, pay_month: str) -> Dict[str, Any]:
         """批量算薪：为门店所有在职员工计算指定月份工资"""
         result = await db.execute(
-            select(Employee).where(
+            select(Person).where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
         )
-        employees = result.scalars().all()
+        persons = result.scalars().all()
 
         success = 0
         failed = []
         total_net_fen = 0
 
-        for emp in employees:
+        for person in persons:
+            legacy_id = person.legacy_employee_id or str(person.id)
             try:
-                record = await self.calculate_payroll(db, emp.id, pay_month)
+                record = await self.calculate_payroll(db, legacy_id, pay_month)
                 success += 1
                 total_net_fen += record.net_salary_fen
             except Exception as e:
-                failed.append({"employee_id": emp.id, "name": emp.name, "error": str(e)})
-                logger.warning("payroll_calc_failed", employee_id=emp.id, error=str(e))
+                failed.append({"employee_id": legacy_id, "name": person.name, "error": str(e)})
+                logger.warning("payroll_calc_failed", employee_id=legacy_id, error=str(e))
 
         return {
             "store_id": store_id,
             "pay_month": pay_month,
-            "total_employees": len(employees),
+            "total_employees": len(persons),
             "success": success,
             "failed": failed,
             "total_net_salary_yuan": total_net_fen / 100,
@@ -582,15 +600,22 @@ class PayrollService(BaseService):
     async def get_payroll_list(self, db: AsyncSession, store_id: str, pay_month: str) -> List[Dict[str, Any]]:
         """获取门店月度工资表"""
         result = await db.execute(
-            select(PayrollRecord, Employee.name, Employee.position)
-            .join(Employee, PayrollRecord.employee_id == Employee.id)
+            select(PayrollRecord, Person.name, EmploymentAssignment.position)
+            .join(Person, Person.legacy_employee_id == PayrollRecord.employee_id)
+            .outerjoin(
+                EmploymentAssignment,
+                and_(
+                    EmploymentAssignment.person_id == Person.id,
+                    EmploymentAssignment.status == "active",
+                ),
+            )
             .where(
                 and_(
                     PayrollRecord.store_id == store_id,
                     PayrollRecord.pay_month == pay_month,
                 )
             )
-            .order_by(Employee.name)
+            .order_by(Person.name)
         )
         rows = result.all()
         items = []

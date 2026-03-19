@@ -22,7 +22,8 @@ from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import AttendanceLog
 from src.models.city_wage_config import CityWageConfig
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.payroll import SalaryStructure
 from src.models.salary_item import SalaryItemDefinition, SalaryItemRecord
 
@@ -272,11 +273,28 @@ class SalaryFormulaEngine:
         为员工计算指定月份的全部薪酬项
         返回：{items: [{item_name, amount_fen, category}], total_income_fen, total_deduction_fen, net_fen}
         """
-        # 1. 加载员工信息
-        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+        # 1. 加载员工信息（Person + EmploymentAssignment）
+        from types import SimpleNamespace
+        person_result = await db.execute(
+            select(Person).where(Person.legacy_employee_id == str(employee_id))
+        )
+        person = person_result.scalar_one_or_none()
+        if not person:
             raise ValueError(f"员工 {employee_id} 不存在")
+        assign_result = await db.execute(
+            select(EmploymentAssignment)
+            .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+            .order_by(EmploymentAssignment.start_date.asc())
+            .limit(1)
+        )
+        asgn = assign_result.scalar_one_or_none()
+        seniority_months = (date.today() - asgn.start_date).days // 30 if (asgn and asgn.start_date) else 0
+        employee = SimpleNamespace(
+            id=employee_id,
+            name=person.name,
+            daily_wage_standard_fen=0,  # 过渡期：日薪标准暂不迁移，公式引擎中此变量返回0
+            seniority_months=seniority_months,
+        )
 
         # 2. 加载薪资结构
         ss_result = await db.execute(
@@ -378,10 +396,27 @@ class SalaryFormulaEngine:
         store_id: str,
     ) -> Dict[str, Any]:
         """模拟计算（不写DB，用于调试公式）"""
-        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
-        employee = emp_result.scalar_one_or_none()
-        if not employee:
+        from types import SimpleNamespace
+        person_result = await db.execute(
+            select(Person).where(Person.legacy_employee_id == str(employee_id))
+        )
+        person = person_result.scalar_one_or_none()
+        if not person:
             raise ValueError(f"员工 {employee_id} 不存在")
+        assign_result = await db.execute(
+            select(EmploymentAssignment)
+            .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+            .order_by(EmploymentAssignment.start_date.asc())
+            .limit(1)
+        )
+        asgn = assign_result.scalar_one_or_none()
+        seniority_months = (date.today() - asgn.start_date).days // 30 if (asgn and asgn.start_date) else 0
+        employee = SimpleNamespace(
+            id=employee_id,
+            name=person.name,
+            daily_wage_standard_fen=0,
+            seniority_months=seniority_months,
+        )
 
         ss_result = await db.execute(
             select(SalaryStructure).where(
@@ -1052,7 +1087,7 @@ class SalaryFormulaEngine:
         logger.warning("unknown_salary_variable", var_name=var_name)
         return 0.0
 
-    def _calc_seniority_subsidy(self, employee: Employee) -> int:
+    def _calc_seniority_subsidy(self, employee) -> int:
         """计算工龄补贴（阶梯式）"""
         months = employee.seniority_months or 0
         for low, high, amount in SENIORITY_SUBSIDY_TABLE:

@@ -13,7 +13,8 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import AttendanceLog
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.leave import LeaveBalance, LeaveCategory
 from src.models.payroll import PayrollRecord, PayrollStatus
 from src.models.settlement import SettlementRecord, SettlementStatus
@@ -325,10 +326,37 @@ class SettlementService:
 
     # ── 内部计算方法 ──────────────────────────────────────
 
-    async def _get_employee(self, db: AsyncSession, employee_id: str) -> Optional[Employee]:
-        """获取员工信息"""
-        result = await db.execute(select(Employee).where(Employee.id == employee_id))
-        return result.scalar_one_or_none()
+    async def _get_employee(self, db: AsyncSession, employee_id: str):
+        """获取员工信息（Person + EmploymentAssignment，返回 duck-typed 对象）"""
+        from types import SimpleNamespace
+
+        person_result = await db.execute(
+            select(Person).where(Person.legacy_employee_id == str(employee_id))
+        )
+        person = person_result.scalar_one_or_none()
+        if not person:
+            return None
+
+        # 入职日期来自最早的 EmploymentAssignment.start_date
+        assign_result = await db.execute(
+            select(EmploymentAssignment)
+            .where(EmploymentAssignment.person_id == person.id)
+            .order_by(EmploymentAssignment.start_date.asc())
+            .limit(1)
+        )
+        assignment = assign_result.scalar_one_or_none()
+        hire_date = assignment.start_date if assignment else None
+        seniority_months = (date.today() - hire_date).days // 30 if hire_date else 0
+
+        return SimpleNamespace(
+            id=employee_id,
+            name=person.name,
+            hire_date=hire_date,
+            # daily_wage_standard_fen 过渡期暂用 0，SalaryStructure 已是主要工资基准
+            daily_wage_standard_fen=0,
+            seniority_months=seniority_months,
+            store_id=person.store_id,
+        )
 
     async def _calc_last_month_salary(
         self,

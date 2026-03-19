@@ -46,12 +46,12 @@ class PayslipService:
             "attendance": {"work_days": 22, "overtime_hours": 8, "late_count": 1},
         }
         """
-        from src.models.employee import Employee
+        from src.models.hr.person import Person
         from src.models.payroll import PayrollRecord
         from src.models.salary_item import SalaryItemRecord
 
-        # 查询员工信息
-        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
+        # 查询员工信息（通过 legacy_employee_id 桥接）
+        emp_result = await db.execute(select(Person).where(Person.legacy_employee_id == str(employee_id)))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             logger.warning("payslip.employee_not_found", employee_id=employee_id)
@@ -108,11 +108,11 @@ class PayslipService:
         if not deduction_items:
             deduction_items = self._build_deduction_from_payroll(payroll)
 
-        # 组装返回数据
+        # 组装返回数据（employee_id 为 legacy string，position 来自 employee_id 入参时已通过 EmploymentAssignment 解析）
         data = {
             "employee_name": employee.name,
-            "employee_id": employee.id,
-            "position": employee.position or "",
+            "employee_id": employee_id,
+            "position": "",  # position 已移至 EmploymentAssignment，工资条暂不展示
             "pay_month": pay_month,
             "department": "",  # 可扩展从组织架构获取
             "income_items": income_items,
@@ -420,13 +420,13 @@ class PayslipService:
         2. 通过IMMessageService推送
         3. 记录推送状态到payslip_records
         """
-        from src.models.employee import Employee
+        from src.models.hr.person import Person
         from src.models.payslip import PayslipRecord
         from src.models.store import Store
         from src.services.im_message_service import IMMessageService
 
-        # 获取员工信息
-        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
+        # 获取员工信息（通过 legacy_employee_id 桥接）
+        emp_result = await db.execute(select(Person).where(Person.legacy_employee_id == str(employee_id)))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             return {"pushed": False, "error": f"Employee {employee_id} not found"}
@@ -510,13 +510,14 @@ class PayslipService:
 
     async def batch_push_payslips(self, db: AsyncSession, pay_month: str) -> dict:
         """批量推送工资条到全店在职员工"""
-        from src.models.employee import Employee
+        from src.models.hr.person import Person
 
         result = await db.execute(
-            select(Employee.id).where(
+            select(Person.legacy_employee_id).where(
                 and_(
-                    Employee.store_id == self.store_id,
-                    Employee.is_active.is_(True),
+                    Person.store_id == self.store_id,
+                    Person.is_active.is_(True),
+                    Person.legacy_employee_id.isnot(None),
                 )
             )
         )
@@ -581,12 +582,12 @@ class PayslipService:
 
     async def get_push_status(self, db: AsyncSession, pay_month: str) -> List[dict]:
         """查询指定月份全店推送状态"""
-        from src.models.employee import Employee
+        from src.models.hr.person import Person
         from src.models.payslip import PayslipRecord
 
         result = await db.execute(
-            select(PayslipRecord, Employee.name)
-            .outerjoin(Employee, PayslipRecord.employee_id == Employee.id)
+            select(PayslipRecord, Person.name)
+            .outerjoin(Person, Person.legacy_employee_id == PayslipRecord.employee_id)
             .where(
                 and_(
                     PayslipRecord.store_id == self.store_id,
