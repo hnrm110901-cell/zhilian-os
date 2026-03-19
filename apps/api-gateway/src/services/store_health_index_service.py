@@ -93,8 +93,10 @@ async def _get_operational_score(store_id: str, db: AsyncSession) -> Optional[fl
     """从 StoreHealthService 获取运营健康分（0-100）"""
     try:
         from src.services.store_health_service import StoreHealthService
-        result = await StoreHealthService.get_store_score(store_id=store_id, db=db)
-        return float(result.get("health_score", 0)) if result else None
+        result = await StoreHealthService.get_store_score(
+            store_id=store_id, target_date=date.today(), db=db
+        )
+        return float(result.get("score", 0)) if result else None
     except Exception as exc:
         logger.warning("health_index.operational_failed", store_id=store_id, error=str(exc))
         return None

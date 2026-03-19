@@ -109,19 +109,23 @@ class TestComputePriorityScore:
 
     def test_score_is_between_0_and_100(self):
         c = self._make_candidate()
-        score = compute_priority_score(c, monthly_revenue_yuan=100_000)
+        score, _ = compute_priority_score(c, monthly_revenue_yuan=100_000)
         assert 0.0 <= score <= 100.0
 
     def test_higher_saving_gives_higher_score(self):
         c_low  = self._make_candidate(saving=100)
         c_high = self._make_candidate(saving=5000)
         monthly_rev = 100_000
-        assert compute_priority_score(c_high, monthly_rev) > compute_priority_score(c_low, monthly_rev)
+        score_low,  _ = compute_priority_score(c_low,  monthly_rev)
+        score_high, _ = compute_priority_score(c_high, monthly_rev)
+        assert score_high > score_low
 
     def test_lower_urgency_hours_gives_higher_score(self):
         c_urgent = self._make_candidate(urgency=0.5)
         c_later  = self._make_candidate(urgency=10.0)
-        assert compute_priority_score(c_urgent) > compute_priority_score(c_later)
+        score_urgent, _ = compute_priority_score(c_urgent)
+        score_later,  _ = compute_priority_score(c_later)
+        assert score_urgent > score_later
 
     def test_weights_sum_to_one(self):
         # 满分候选：saving=月营收，urgency=0，confidence=1.0，easy
@@ -131,7 +135,7 @@ class TestComputePriorityScore:
             confidence=1.0, urgency_hours=0.0,
             execution_difficulty="easy", decision_window_label="立即",
         )
-        score = compute_priority_score(c, monthly_revenue_yuan=100_000)
+        score, _ = compute_priority_score(c, monthly_revenue_yuan=100_000)
         assert score == 100.0
 
 
@@ -254,6 +258,7 @@ async def test_get_top3_top3_limit():
 
     engine = DecisionPriorityEngine(store_id="S001")
     db = AsyncMock()
+    db.get = AsyncMock(return_value=None)   # 权重学习返回默认值
 
     # 返回5个库存告警
     mock_items = []
