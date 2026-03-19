@@ -75,7 +75,8 @@ class PinzhiAdapter:
                 if method.upper() == "GET":
                     response = await self.client.get(endpoint, params=params)
                 elif method.upper() == "POST":
-                    response = await self.client.post(endpoint, json=data)
+                    # 品智接口要求 multipart/form-data，不是 application/json
+                    response = await self.client.post(endpoint, data=data)
                 else:
                     raise ValueError(f"不支持的HTTP方法: {method}")
 
@@ -297,7 +298,7 @@ class PinzhiAdapter:
             page=page_index,
         )
 
-        response = await self._request("GET", "/pinzhi/orderNew.do", params=params)
+        response = await self._request("POST", "/pinzhi/orderNew.do", data=params)
         return response.get("res", [])
 
     async def query_order_summary(

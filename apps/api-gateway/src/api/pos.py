@@ -53,18 +53,27 @@ async def get_orders(
         start_date = end_date - timedelta(days=int(os.getenv("POS_DEFAULT_QUERY_DAYS", "7")))
 
     try:
-        orders = await pos_service.get_orders(
-            store_id=store_id,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
-            limit=limit,
-        )
+        # 品智 orderNew.do 只支持单日查询（businessDate），需逐日循环
+        all_orders: List[dict] = []
+        current = start_date.date() if hasattr(start_date, 'date') else start_date
+        end_d = end_date.date() if hasattr(end_date, 'date') else end_date
+        while current <= end_d:
+            result = await pos_service.query_orders(
+                ognid=store_id,
+                begin_date=current.strftime("%Y-%m-%d"),
+                page_size=min(limit, 200),
+            )
+            all_orders.extend(result.get("orders", []))
+            current += timedelta(days=1)
+
+        # 按状态过滤（品智接口不支持状态参数，需在应用层过滤）
+        if status:
+            all_orders = [o for o in all_orders if o.get("billStatus") == status.value]
 
         return {
             "success": True,
-            "data": orders,
-            "count": len(orders),
+            "data": all_orders,
+            "count": len(all_orders),
             "filters": {
                 "store_id": store_id,
                 "status": status.value if status else None,
