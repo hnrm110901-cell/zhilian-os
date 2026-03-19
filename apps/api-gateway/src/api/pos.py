@@ -53,17 +53,22 @@ async def get_orders(
         start_date = end_date - timedelta(days=int(os.getenv("POS_DEFAULT_QUERY_DAYS", "7")))
 
     try:
+        # 从 external_systems 表获取该门店的 POS 适配器和品智 ognid
+        adapter, pinzhi_ognid = await pos_service.get_adapter_for_store(store_id, db)
+        if not pinzhi_ognid:
+            raise HTTPException(status_code=400, detail=f"门店 {store_id} 未配置品智 ognid")
+
         # 品智 orderNew.do 只支持单日查询（businessDate），需逐日循环
         all_orders: List[dict] = []
         current = start_date.date() if hasattr(start_date, 'date') else start_date
         end_d = end_date.date() if hasattr(end_date, 'date') else end_date
         while current <= end_d:
-            result = await pos_service.query_orders(
-                ognid=store_id,
-                begin_date=current.strftime("%Y-%m-%d"),
+            orders = await adapter.query_orders(
+                ognid=pinzhi_ognid,
+                business_date=current.strftime("%Y-%m-%d"),
                 page_size=min(limit, 200),
             )
-            all_orders.extend(result.get("orders", []))
+            all_orders.extend(orders)
             current += timedelta(days=1)
 
         # 按状态过滤（品智接口不支持状态参数，需在应用层过滤）
@@ -81,6 +86,8 @@ async def get_orders(
                 "end_date": end_date.isoformat(),
             },
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取订单失败: {str(e)}")
 
@@ -93,82 +100,18 @@ async def get_order_detail(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    获取订单详情
-
-    Args:
-        order_id: 订单ID
-        store_id: 门店ID
-
-    Returns:
-        订单详细信息
+    获取订单详情 — 从本地 DB 查询（POS Webhook 已落库的订单）
     """
-    pos_service = POSService()
-
-    try:
-        order = await pos_service.get_order_detail(order_id, store_id)
-
-        if not order:
-            raise HTTPException(status_code=404, detail="订单不存在")
-
-        return {
-            "success": True,
-            "data": order,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取订单详情失败: {str(e)}")
-
-
-@router.get("/inventory")
-async def get_inventory(
-    store_id: str = Query(..., description="门店ID"),
-    low_stock_only: bool = Query(False, description="仅显示低库存商品"),
-    category: Optional[str] = Query(None, description="商品分类"),
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    获取库存信息
-
-    Args:
-        store_id: 门店ID
-        low_stock_only: 是否仅显示低库存商品
-        category: 商品分类（可选）
-
-    Returns:
-        库存列表
-    """
-    pos_service = POSService()
-
-    try:
-        inventory = await pos_service.get_inventory(
-            store_id=store_id,
-            low_stock_only=low_stock_only,
-            category=category,
-        )
-
-        # 统计库存状态
-        total_items = len(inventory)
-        low_stock_items = sum(1 for item in inventory if item.get("is_low_stock", False))
-        out_of_stock_items = sum(1 for item in inventory if item.get("quantity", 0) == 0)
-
-        return {
-            "success": True,
-            "data": inventory,
-            "summary": {
-                "total_items": total_items,
-                "low_stock_items": low_stock_items,
-                "out_of_stock_items": out_of_stock_items,
-            },
-            "filters": {
-                "store_id": store_id,
-                "low_stock_only": low_stock_only,
-                "category": category,
-            },
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取库存失败: {str(e)}")
+    result = await db.execute(select(Order).where(Order.id == order_id, Order.store_id == store_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    return {"success": True, "data": {
+        "id": str(order.id), "store_id": order.store_id,
+        "status": order.status, "total_amount": order.total_amount,
+        "final_amount": order.final_amount, "order_time": str(order.order_time),
+        "table_number": order.table_number,
+    }}
 
 
 @router.get("/stores/{store_id}/status")
@@ -178,110 +121,66 @@ async def get_store_status(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    查询门店状态
-
-    Args:
-        store_id: 门店ID
-
-    Returns:
-        门店状态信息
+    查询门店 POS 连接状态 — 从 external_systems 读取同步状态
     """
-    pos_service = POSService()
+    from sqlalchemy import select as sa_select
+    from src.models.integration import ExternalSystem
 
-    try:
-        status = await pos_service.get_store_status(store_id)
+    result = await db.execute(
+        sa_select(ExternalSystem).where(
+            ExternalSystem.store_id == store_id,
+            ExternalSystem.type == "pos",
+        )
+    )
+    system = result.scalar_one_or_none()
+    if not system:
+        raise HTTPException(status_code=404, detail="门店未配置 POS 系统")
 
-        if not status:
-            raise HTTPException(status_code=404, detail="门店不存在")
-
-        return {
-            "success": True,
-            "data": status,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取门店状态失败: {str(e)}")
+    return {"success": True, "data": {
+        "store_id": store_id,
+        "provider": system.provider,
+        "status": system.status,
+        "last_sync_at": str(system.last_sync_at) if system.last_sync_at else None,
+        "last_sync_status": system.last_sync_status,
+        "sync_enabled": system.sync_enabled,
+    }}
 
 
 @router.get("/sales/summary")
 async def get_sales_summary(
     store_id: str = Query(..., description="门店ID"),
-    start_date: Optional[datetime] = Query(None, description="开始日期"),
-    end_date: Optional[datetime] = Query(None, description="结束日期"),
+    date: Optional[str] = Query(None, description="营业日（yyyy-MM-dd），默认昨天"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    获取销售汇总
-
-    Args:
-        store_id: 门店ID
-        start_date: 开始日期（可选，默认今天）
-        end_date: 结束日期（可选，默认今天）
-
-    Returns:
-        销售汇总数据
+    获取销售汇总 — 调用品智 queryOrderSummary + queryOgnDailyBizData
     """
+    if not date:
+        date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
     pos_service = POSService()
-
-    # 设置默认日期范围（今天）
-    if not end_date:
-        end_date = datetime.now()
-    if not start_date:
-        start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
-
     try:
-        summary = await pos_service.get_sales_summary(
-            store_id=store_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        adapter, pinzhi_ognid = await pos_service.get_adapter_for_store(store_id, db)
+        if not pinzhi_ognid:
+            raise HTTPException(status_code=400, detail=f"门店 {store_id} 未配置品智 ognid")
+
+        summary = await adapter.query_order_summary(pinzhi_ognid, date)
+        biz_data = await adapter.query_ogn_daily_biz_data(date, ognid=pinzhi_ognid)
 
         return {
             "success": True,
-            "data": summary,
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
+            "data": {
+                "summary": summary,
+                "biz_data": biz_data,
             },
+            "date": date,
+            "store_id": store_id,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取销售汇总失败: {str(e)}")
-
-
-@router.post("/sync")
-async def sync_pos_data(
-    store_id: str = Query(..., description="门店ID"),
-    sync_type: str = Query("all", description="同步类型: all, orders, inventory, products"),
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    同步POS数据
-
-    Args:
-        store_id: 门店ID
-        sync_type: 同步类型（all, orders, inventory, products）
-
-    Returns:
-        同步结果
-    """
-    pos_service = POSService()
-
-    try:
-        result = await pos_service.sync_data(
-            store_id=store_id,
-            sync_type=sync_type,
-        )
-
-        return {
-            "success": True,
-            "data": result,
-            "message": f"POS数据同步完成: {sync_type}",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"同步POS数据失败: {str(e)}")
 
 
 @router.get("/health")
@@ -290,22 +189,25 @@ async def pos_health_check(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    POS系统健康检查
-
-    Args:
-        store_id: 门店ID
-
-    Returns:
-        健康状态
+    POS系统健康检查 — 调用品智 run_all_checks 检测全部接口连通性
     """
     pos_service = POSService()
 
     try:
-        health = await pos_service.health_check(store_id)
-
+        adapter, pinzhi_ognid = await pos_service.get_adapter_for_store(store_id, db)
+        results = await adapter.run_all_checks(
+            business_date=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+            ognid=pinzhi_ognid,
+        )
+        ok_count = sum(1 for r in results if r["ok"])
         return {
             "success": True,
-            "data": health,
+            "data": {
+                "store_id": store_id,
+                "pinzhi_ognid": pinzhi_ognid,
+                "checks": results,
+                "summary": f"{ok_count}/{len(results)} 接口正常",
+            },
             "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:

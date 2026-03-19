@@ -34,9 +34,11 @@ class POSService:
 
     def __init__(self):
         self._adapter: Optional[Any] = None
+        # 按 base_url+token 缓存适配器，避免重复创建
+        self._adapters: Dict[str, Any] = {}
 
     def _get_adapter(self) -> Any:
-        """获取或创建POS适配器实例"""
+        """获取或创建POS适配器实例（全局环境变量方式，兼容旧调用）"""
         if not PINZHI_AVAILABLE:
             raise RuntimeError("PinzhiAdapter is not available")
         if self._adapter is None:
@@ -49,6 +51,46 @@ class POSService:
             self._adapter = PinzhiAdapter(config)
             logger.info("POS适配器初始化成功")
         return self._adapter
+
+    async def get_adapter_for_store(self, store_id: str, db) -> tuple:
+        """
+        从 external_systems 表查找门店的 POS 配置，返回 (adapter, pinzhi_oms_id)。
+        签名使用 api_key（商户级 token），而非 api_secret（门店级 token）。
+        """
+        if not PINZHI_AVAILABLE:
+            raise RuntimeError("PinzhiAdapter is not available")
+
+        from sqlalchemy import select
+        from ..models.integration import ExternalSystem
+
+        result = await db.execute(
+            select(ExternalSystem).where(
+                ExternalSystem.store_id == store_id,
+                ExternalSystem.type == "pos",
+                ExternalSystem.status == "active",
+            )
+        )
+        system = result.scalar_one_or_none()
+        if not system:
+            raise ValueError(f"门店 {store_id} 未配置 POS 系统")
+
+        base_url = system.api_endpoint
+        # api_key 是商户级 token，用于签名；api_secret 是门店级 token
+        signing_token = system.api_key
+        config_json = system.config or {}
+        pinzhi_oms_id = str(config_json.get("pinzhi_oms_id", ""))
+
+        cache_key = f"{base_url}:{signing_token}"
+        if cache_key not in self._adapters:
+            self._adapters[cache_key] = PinzhiAdapter({
+                "base_url": base_url,
+                "token": signing_token,
+                "timeout": int(os.getenv("PINZHI_TIMEOUT", "15")),
+                "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
+            })
+            logger.info("POS适配器初始化（DB配置）", store_id=store_id, base_url=base_url)
+
+        return self._adapters[cache_key], pinzhi_oms_id
 
     async def get_stores(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
         """
