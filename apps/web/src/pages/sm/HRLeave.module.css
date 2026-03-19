@@ -1,0 +1,11 @@
+.page { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.header { display: flex; align-items: center; justify-content: space-between; }
+.title { font-size: 1.25rem; font-weight: 600; }
+.balanceRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.form { display: flex; flex-direction: column; gap: var(--space-3); }
+.field { display: flex; flex-direction: column; gap: var(--space-1); }
+.label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; }
+.select { padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.875rem; background: var(--surface); color: var(--text-primary); }
+.btnRow { display: flex; gap: var(--space-3); justify-content: flex-end; }
+.simResult { margin-top: var(--space-2); }
+.submitMsg { margin-top: var(--space-2); font-size: 0.85rem; color: var(--accent); }

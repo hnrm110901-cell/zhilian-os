@@ -4,13 +4,14 @@ import { useSwipe } from '../hooks/useSwipe';
 import styles from './StoreManagerLayout.module.css';
 
 const NAV_ITEMS = [
-  { to: '/sm',             label: '简报',   icon: '📋' },
-  { to: '/sm/patrol',      label: '巡店',   icon: '🔍' },
-  { to: '/sm/hr',          label: '人力',   icon: '👥' },
-  { to: '/sm/decisions',   label: 'AI决策', icon: '🤖' },
-  { to: '/sm/members',           label: '识客',   icon: '👤' },
-  { to: '/sm/marketing-tasks',   label: '营销',   icon: '📣' },
-  { to: '/sm/profile',           label: '我的',   icon: '🙍' },
+  { to: '/sm',                    label: '简报',   icon: '📋' },
+  { to: '/sm/daily-dashboard',    label: '日清',   icon: '📊' },
+  { to: '/sm/patrol',             label: '巡店',   icon: '🔍' },
+  { to: '/sm/hr',                 label: '人力',   icon: '👥' },
+  { to: '/sm/decisions',          label: 'AI决策', icon: '🤖' },
+  { to: '/sm/members',            label: '识客',   icon: '👤' },
+  { to: '/sm/marketing-tasks',    label: '营销',   icon: '📣' },
+  { to: '/sm/profile',            label: '我的',   icon: '🙍' },
 ];
 
 export default function StoreManagerLayout() {

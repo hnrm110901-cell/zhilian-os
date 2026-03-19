@@ -163,6 +163,17 @@ from .supplier_b2b import B2BPurchaseItem, B2BPurchaseOrder
 
 # Batch 2 — 智能决策层
 from .supplier_intelligence import SupplierScorecard
+from .review_action import ReviewActionRule, ReviewActionLog
+from .compliance_engine import ComplianceScore, ComplianceAlert
+# Batch 3 — 自动化闭环层
+from .auto_procurement import ProcurementRule, ProcurementExecution
+from .financial_closing import DailyClosingReport
+# 岗位标准化知识库 + 员工成长
+from .job_standard import JobStandard
+from .job_sop import JobSOP
+from .employee_job_binding import EmployeeJobBinding
+from .employee_growth_trace import EmployeeGrowthTrace
+from .org_permission import OrgPermission, OrgPermissionLevel
 from .supply_chain import PurchaseOrder, Supplier
 from .task import Task, TaskPriority, TaskStatus
 from .tri_reconciliation import TriReconciliationRecord
@@ -415,6 +426,59 @@ __all__ = [
     "PayslipRecord",
     # HR — 操作审计日志
     "OperationAuditLog",
+    # 组织层级
+    "OrgNode",
+    "OrgNodeType",
+    "StoreType",
+    "OperationMode",
+    "OrgConfig",
+    "ConfigKey",
+    "OrgPermission",
+    "OrgPermissionLevel",
+    # HR domain models (z54)
+    "Person",
+    "EmploymentAssignment",
+    "EmploymentContract",
+    "EmployeeIdMap",
+    "AttendanceRule",
+    "KpiTemplate",
+    # HR Knowledge OS models (z55)
+    "HrKnowledgeRule",
+    "SkillNode",
+    "BehaviorPattern",
+    "PersonAchievement",
+    "RetentionSignal",
+    "KnowledgeCapture",
+]
+
+from .business_intel import (
+    BizMetricSnapshot, RevenueAlert, KpiScorecard, OrderForecast,
+    BizDecision, ScenarioRecord, BizIntelLog,
+    AnomalyLevelEnum, KpiStatusEnum, DecisionPriorityEnum,
+    ScenarioTypeEnum, BizIntelAgentTypeEnum, DecisionStatusEnum,
+)
+from .people_agent import (
+    PeopleShiftRecord, PeoplePerformanceScore, PeopleLaborCostRecord,
+    PeopleAttendanceAlert, PeopleStaffingDecision, PeopleAgentLog,
+)
+from .ops_flow_agent import (
+    OpsChainEvent, OpsChainLinkage, OpsOrderAnomaly,
+    OpsInventoryAlert, OpsQualityRecord, OpsFlowDecision, OpsFlowAgentLog,
+)
+from .agent_okr import AgentResponseLog, AgentOKRSnapshot
+from .agent_collab import AgentConflict, GlobalOptimizationLog, AgentCollabSnapshot
+from .cost_truth import CostTruthDaily, CostTruthDishDetail, CostVarianceAttribution
+from .fct_advanced import (
+    FCTBankAccount, FCTBankTransaction, FCTBankMatchRule,
+    FCTEntity, FCTConsolidationRun, FCTIntercompanyItem,
+    FCTTaxDeclaration, FCTTaxExtractRule,
+)
+# Data Dictionary models — 数据字典补齐
+from .organization import Group, Brand, Region
+from .ingredient_master import IngredientMaster
+from .inventory_ext import InventoryBatch, InventoryCount
+from .purchase_order_item import PurchaseOrderItem
+from .daily_summary import DailyRevenueSummary, DailyWasteSummary, DailyPnlSummary
     # P1 — 识客 + 菜品偏好
     "MemberCheckIn",
     "MemberDishPreference",
@@ -484,6 +548,77 @@ from .consumer_id_mapping import ConsumerIdMapping, IdType
 
 # Sprint 1 — CDP 地基层
 from .consumer_identity import ConsumerIdentity
+from .consumer_id_mapping import ConsumerIdMapping, IdType
+# HR 模块 — 薪酬/假勤/审批/招聘/绩效/合同/生命周期（部分 model 文件尚未实现，跳过缺失项）
+try:
+    from .payroll import (
+        SalaryStructure, PayrollRecord, TaxDeclaration,
+        PayrollStatus, SalaryType, TaxStatus,
+    )
+    from .approval_flow import (
+        ApprovalFlowTemplate, ApprovalInstance, ApprovalNodeRecord,
+        ApprovalType, ApprovalStatus as HRApprovalStatus, ApprovalNodeType,
+    )
+    from .leave import (
+        LeaveTypeConfig, LeaveBalance, LeaveRequest, OvertimeRequest,
+        LeaveCategory, LeaveRequestStatus, OvertimeType, OvertimeRequestStatus,
+    )
+    from .employee_lifecycle import EmployeeChange, ChangeType
+    from .recruitment import (
+        JobPosting, Candidate, Interview, Offer,
+        JobStatus, CandidateStage, InterviewResult, OfferStatus,
+    )
+    from .performance_review import (
+        PerformanceTemplate, PerformanceReview,
+        ReviewCycle, ReviewStatus, ReviewLevel,
+    )
+    from .employee_contract import EmployeeContract, ContractType, ContractStatus
+    # HR Phase 4 — 培训认证/师徒制
+    from .training import TrainingCourse, TrainingEnrollment, TrainingExam, ExamAttempt
+    from .mentorship import Mentorship
+    # HR W1-2 — 敏感数据审计日志
+    from .sensitive_audit_log import SensitiveDataAuditLog
+    # HR W2-2 — 离职结算
+    from .settlement import SettlementRecord, SettlementStatus, SeparationType, CompensationType
+    # HR W2-3 — 工资条推送记录
+    from .payslip import PayslipRecord
+    # HR — 操作审计日志
+    from .operation_audit_log import OperationAuditLog
+except ImportError:
+    pass  # HR model files not yet created — skip gracefully
+
+# 组织层级
+from .org_node import OrgNode, OrgNodeType, StoreType, OperationMode
+from .org_config import OrgConfig, ConfigKey
+
+# 日清日结 + 周复盘模块
+from .daily_metric import StoreDailyMetric
+from .daily_settlement import StoreDailySettlement
+from .warning_rule import WarningRule
+from .warning_record import WarningRecord
+from .action_task import ActionTask
+from .weekly_review import WeeklyReview, WeeklyReviewItem
+from .data_quality_check import DataQualityCheckRecord
+
+# HR domain models (z54)
+from .hr import (
+    Person,
+    EmploymentAssignment,
+    EmploymentContract,
+    EmployeeIdMap,
+    AttendanceRule,
+    KpiTemplate,
+)
+
+# HR Knowledge OS models (z55)
+from .hr_knowledge import (
+    HrKnowledgeRule,
+    SkillNode,
+    BehaviorPattern,
+    PersonAchievement,
+    RetentionSignal,
+    KnowledgeCapture,
+)
 
 # P1 — 识客 + 菜品偏好
 from .member_check_in import MemberCheckIn

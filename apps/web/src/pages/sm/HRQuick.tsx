@@ -1,207 +1,187 @@
-/**
- * 店长HR快捷操作页（移动端）
- * 路由：/sm/hr
- * 功能：待审批列表（一键批/驳）+ 今日出勤概览 + 快捷入口
- */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../../services/api';
+import { ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty } from '../../design-system/components';
+import apiClient from '../../services/api';
 import styles from './HRQuick.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || '';
-
-interface PendingLeave {
-  id: string;
-  employee_id: string;
-  employee_name: string;
-  leave_category: string;
-  start_date: string;
-  end_date: string;
-  leave_days: number;
-  reason: string;
+interface RiskPerson {
+  person_id: string;
+  person_name?: string;
+  risk_score: number;
+  intervention?: { action: string };
 }
 
-interface HRStats {
-  total_active_employees: number;
-  pending_leave_requests: number;
-  contracts_expiring_30d: number;
-  month_onboard: number;
-  month_resign: number;
-  attendance_rate_pct: number;
+interface SkillRec {
+  skill_name: string;
+  category?: string;
+  expected_yuan?: number;
 }
 
-const LEAVE_LABELS: Record<string, string> = {
-  annual: '年假', sick: '病假', personal: '事假',
-  maternity: '产假', paternity: '陪产假', marriage: '婚假',
-  bereavement: '丧假', compensatory: '调休', other: '其他',
-};
+interface BffData {
+  store_id: string;
+  retention: {
+    high_risk_count: number;
+    persons: RiskPerson[];
+    recommendations: { action: string; expected_yuan?: number }[];
+  } | null;
+  skill_gaps: {
+    total_potential_yuan: number;
+    top_recommendations: SkillRec[];
+  } | null;
+}
 
-const SmHRQuick: React.FC = () => {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState<HRStats | null>(null);
-  const [pendingLeaves, setPendingLeaves] = useState<PendingLeave[]>([]);
+function riskBadgeType(score: number): 'critical' | 'warning' | 'info' {
+  if (score >= 0.7) return 'critical';
+  if (score >= 0.4) return 'warning';
+  return 'info';
+}
+
+function riskLabel(score: number): string {
+  if (score >= 0.7) return '高风险';
+  if (score >= 0.4) return '中风险';
+  return '低风险';
+}
+
+export default function HRQuick() {
+  const [data, setData] = useState<BffData | null>(null);
   const [loading, setLoading] = useState(true);
+  const storeId = localStorage.getItem('store_id') || 'STORE001';
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [overview, leaves] = await Promise.all([
-        apiClient.get<HRStats>(`/api/v1/hr/dashboard/overview?store_id=${STORE_ID}`),
-        apiClient.get<{ items: PendingLeave[] }>(`/api/v1/hr/leave/requests?store_id=${STORE_ID}&status=pending`),
-      ]);
-      setStats(overview);
-      setPendingLeaves(leaves.items || []);
-    } catch { /* silent */ }
-    setLoading(false);
-  }, []);
+      const resp = await apiClient.get(`/api/v1/hr/bff/sm/${storeId}`);
+      setData(resp as BffData);
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [storeId]);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleApprove = async (id: string) => {
-    try {
-      await apiClient.post(`/api/v1/hr/leave/requests/${id}/approve`, {
-        approver_id: 'current_user',
-      });
-      setPendingLeaves(prev => prev.filter(l => l.id !== id));
-    } catch { /* silent */ }
-  };
-
-  const handleReject = async (id: string) => {
-    try {
-      await apiClient.post(`/api/v1/hr/leave/requests/${id}/reject`, {
-        approver_id: 'current_user',
-        reason: '店长驳回',
-      });
-      setPendingLeaves(prev => prev.filter(l => l.id !== id));
-    } catch { /* silent */ }
-  };
-
-  if (loading) {
-    return <div className={styles.page}><div className={styles.empty}>加载中...</div></div>;
-  }
+  const highRiskCount = data?.retention?.high_risk_count ?? 0;
+  const gapCount = data?.skill_gaps?.top_recommendations?.length ?? 0;
+  const potentialYuan = data?.skill_gaps?.total_potential_yuan ?? 0;
+  const persons = data?.retention?.persons ?? [];
+  const recs = data?.skill_gaps?.top_recommendations ?? [];
 
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>人力管理</h1>
-        <p className={styles.subtitle}>员工假勤 · 审批 · 人力概况</p>
-      </div>
-
-      {/* 关键指标 */}
-      {stats && (
-        <div className={styles.statRow}>
-          <div className={styles.statItem}>
-            <div className={styles.statNum}>{stats.total_active_employees}</div>
-            <div className={styles.statLabel}>在职</div>
-          </div>
-          <div className={styles.statItem}>
-            <div className={`${styles.statNum} ${styles.statNumMint}`}>
-              {stats.attendance_rate_pct}%
-            </div>
-            <div className={styles.statLabel}>出勤率</div>
-          </div>
-          <div className={styles.statItem}>
-            <div className={`${styles.statNum} ${stats.pending_leave_requests > 0 ? styles.statNumWarn : ''}`}>
-              {stats.pending_leave_requests}
-            </div>
-            <div className={styles.statLabel}>待审批</div>
-          </div>
+        <span className={styles.title}>人力智能</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <ZButton variant="ghost" size="sm" onClick={() => navigate('/sm/hr/team')}>团队成员</ZButton>
+          <ZButton variant="ghost" size="sm" onClick={load}>刷新</ZButton>
         </div>
-      )}
-
-      {/* 快捷入口 */}
-      <div className={styles.quickGrid}>
-        <button className={styles.quickBtn} onClick={() => navigate('/employee-roster')}>
-          <span className={styles.quickIcon}>👥</span>
-          <span className={styles.quickLabel}>花名册</span>
-        </button>
-        <button className={styles.quickBtn} onClick={() => navigate('/leave-management')}>
-          <span className={styles.quickIcon}>📋</span>
-          <span className={styles.quickLabel}>假勤</span>
-        </button>
-        <button className={styles.quickBtn} onClick={() => navigate('/attendance-report')}>
-          <span className={styles.quickIcon}>📊</span>
-          <span className={styles.quickLabel}>考勤</span>
-        </button>
-        <button className={styles.quickBtn} onClick={() => navigate('/employee-lifecycle')}>
-          <span className={styles.quickIcon}>🔄</span>
-          <span className={styles.quickLabel}>入离职</span>
-        </button>
       </div>
 
-      {/* 待审批假条 */}
-      <div className={styles.card}>
-        <div className={styles.cardTitle}>
-          待审批假条 ({pendingLeaves.length})
-        </div>
-        {pendingLeaves.length === 0 ? (
-          <div className={styles.empty}>暂无待审批假条</div>
-        ) : (
-          pendingLeaves.map(leave => (
-            <div key={leave.id} className={styles.approvalItem}>
-              <div className={styles.approvalInfo}>
-                <div className={styles.approvalName}>
-                  {leave.employee_name}
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginLeft: 6 }}>
-                    {LEAVE_LABELS[leave.leave_category] || leave.leave_category}
-                  </span>
-                </div>
-                <div className={styles.approvalMeta}>
-                  {leave.start_date} ~ {leave.end_date} · {leave.leave_days}天
-                </div>
-                <div className={styles.approvalMeta}>
-                  {leave.reason}
-                </div>
-              </div>
-              <div className={styles.approvalBtns}>
-                <button className={styles.btnApprove} onClick={() => handleApprove(leave.id)}>
-                  批准
-                </button>
-                <button className={styles.btnReject} onClick={() => handleReject(leave.id)}>
-                  驳回
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      {loading ? (
+        <div className={styles.body}><ZSkeleton rows={4} /></div>
+      ) : (
+        <div className={styles.body}>
+          {/* KPI 行 */}
+          <div className={styles.kpiRow}>
+            <ZCard>
+              <ZKpi value={highRiskCount} label="留任风险" unit="人" />
+            </ZCard>
+            <ZCard>
+              <ZKpi value={gapCount} label="技能缺口" unit="项" />
+            </ZCard>
+            <ZCard>
+              <ZKpi value={`¥${potentialYuan.toFixed(0)}`} label="提升潜力" unit="/月" />
+            </ZCard>
+          </div>
 
-      {/* 人力异常提醒 */}
-      {stats && (stats.contracts_expiring_30d > 0 || stats.month_resign > 0) && (
-        <div className={styles.card} style={{ borderColor: 'rgba(235, 87, 87, 0.15)' }}>
-          <div className={styles.cardTitle} style={{ color: '#EB5757' }}>人力提醒</div>
-          {stats.contracts_expiring_30d > 0 && (
-            <div className={styles.approvalItem}>
-              <div className={styles.approvalInfo}>
-                <div className={styles.approvalName}>合同即将到期</div>
-                <div className={styles.approvalMeta}>
-                  {stats.contracts_expiring_30d} 份合同将在30天内到期
-                </div>
+          {/* 留人预警卡 */}
+          <ZCard
+            title="留任风险预警"
+            extra={
+              highRiskCount > 0
+                ? <ZBadge type="critical" text={`${highRiskCount}人需关注`} />
+                : <ZBadge type="success" text="暂无高风险" />
+            }
+          >
+            {persons.length === 0 ? (
+              <ZEmpty title="暂无风险员工" description="本店员工留任状态良好" />
+            ) : (
+              <div className={styles.riskList}>
+                {persons.slice(0, 3).map((p) => (
+                  <div key={p.person_id} className={styles.riskItem}>
+                    <div className={styles.riskTop}>
+                      <span className={styles.personName}>
+                        {p.person_name || '员工'}
+                      </span>
+                      <ZBadge
+                        type={riskBadgeType(p.risk_score)}
+                        text={riskLabel(p.risk_score)}
+                      />
+                    </div>
+                    <div className={styles.scoreBar}>
+                      <div
+                        className={styles.scoreFill}
+                        data-level={riskBadgeType(p.risk_score)}
+                        style={{ width: `${Math.round(p.risk_score * 100)}%` }}
+                      />
+                    </div>
+                    {p.intervention && (
+                      <div className={styles.intervention}>
+                        建议：{p.intervention.action}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <button className={styles.btnApprove} onClick={() => navigate('/contract-management')}
-                style={{ background: 'rgba(242, 153, 74, 0.15)', color: '#F2994A' }}>
-                查看
-              </button>
-            </div>
-          )}
-          {stats.month_resign > 0 && (
-            <div className={styles.approvalItem}>
-              <div className={styles.approvalInfo}>
-                <div className={styles.approvalName}>本月离职</div>
-                <div className={styles.approvalMeta}>
-                  本月已有 {stats.month_resign} 人离职
-                </div>
+            )}
+          </ZCard>
+
+          {/* 技能提升建议卡 */}
+          <ZCard
+            title="技能提升建议"
+            extra={
+              potentialYuan > 0
+                ? <ZBadge type="info" text={`潜力¥${potentialYuan.toFixed(0)}/月`} />
+                : undefined
+            }
+          >
+            {recs.length === 0 ? (
+              <ZEmpty title="暂无技能建议" description="当前技能匹配情况良好" />
+            ) : (
+              <div className={styles.skillList}>
+                {recs.slice(0, 5).map((r, idx) => (
+                  <div key={idx} className={styles.skillItem}>
+                    <span className={styles.skillRank}>{idx + 1}</span>
+                    <span className={styles.skillName}>{r.skill_name}</span>
+                    {r.category && <ZBadge type="info" text={r.category} />}
+                    {r.expected_yuan != null && (
+                      <span className={styles.skillYuan}>
+                        +¥{r.expected_yuan.toFixed(0)}/月
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
-              <button className={styles.btnApprove} onClick={() => navigate('/employee-lifecycle')}
-                style={{ background: 'rgba(242, 153, 74, 0.15)', color: '#F2994A' }}>
-                查看
-              </button>
+            )}
+          </ZCard>
+
+          {/* 快捷操作 */}
+          <ZCard title="快捷操作">
+            <div className={styles.actionRow}>
+              <ZButton variant="primary" size="sm" onClick={() => navigate('/sm/hr/onboarding/new')}>
+                发起入职
+              </ZButton>
+              <ZButton variant="ghost" size="sm" onClick={() => navigate('/sm/hr/offboarding/new')}>
+                提交离职
+              </ZButton>
+              <ZButton variant="ghost" size="sm" onClick={() => navigate('/sm/hr/transfer/new')}>
+                申请调岗
+              </ZButton>
             </div>
-          )}
+          </ZCard>
         </div>
       )}
     </div>
   );
-};
-
-export default SmHRQuick;
+}

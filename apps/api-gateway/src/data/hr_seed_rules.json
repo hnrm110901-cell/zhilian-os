@@ -1,0 +1,46 @@
+[
+  {
+    "rule_type": "alert",
+    "category": "turnover",
+    "condition": {"consecutive_late_days": {"gte": 3}, "last_month_performance_pct": {"lte": 60}},
+    "action": {"type": "notify_manager", "message": "员工连续迟到3天且上月绩效低于60分，建议安排1对1谈话"},
+    "expected_impact": {"retention_lift_pct": 30, "action_cost_yuan": 0},
+    "confidence": 0.85,
+    "industry_source": "屯象16年餐饮管理经验"
+  },
+  {
+    "rule_type": "alert",
+    "category": "turnover",
+    "condition": {"days_since_last_training": {"gte": 90}, "tenure_months": {"lte": 6}},
+    "action": {"type": "assign_training", "message": "新员工入职6个月内90天未培训，离职风险上升"},
+    "expected_impact": {"retention_lift_pct": 20},
+    "confidence": 0.75,
+    "industry_source": "屯象16年餐饮管理经验"
+  },
+  {
+    "rule_type": "sop",
+    "category": "scheduling",
+    "condition": {"weekday": "friday", "meal_period": "dinner", "expected_covers": {"gte": 80}},
+    "action": {"type": "staffing_recommendation", "min_servers": 4, "min_kitchen": 3},
+    "expected_impact": {"service_quality_score_lift": 15},
+    "confidence": 0.80,
+    "industry_source": "连锁餐饮行业标准"
+  },
+  {
+    "rule_type": "kpi_baseline",
+    "category": "standards",
+    "condition": {"position": "waiter", "tenure_months": {"gte": 3}},
+    "action": {"kpi_targets": {"table_turn_rate": 2.5, "customer_satisfaction": 4.2, "upsell_rate_pct": 15}},
+    "confidence": 0.90,
+    "industry_source": "连锁餐饮行业标准"
+  },
+  {
+    "rule_type": "best_practice",
+    "category": "training",
+    "condition": {"new_employee": true, "days_since_hire": {"lte": 7}},
+    "action": {"type": "onboarding_checklist", "required_skills": ["food_safety_basics", "pos_system", "service_etiquette"]},
+    "expected_impact": {"90_day_retention_lift_pct": 25},
+    "confidence": 0.88,
+    "industry_source": "屯象种子客户最佳实践"
+  }
+]

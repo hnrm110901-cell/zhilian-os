@@ -1,0 +1,92 @@
+.page {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.actionBtns {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.detailMeta {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--border);
+}
+
+.step {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  position: relative;
+}
+
+.stepDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+  margin-left: -7px;
+}
+
+.stepApproved { background: var(--status-success, #52c41a); }
+.stepRejected { background: var(--status-error, #ff4d4f); }
+.stepPending { background: var(--status-warning, #faad14); }
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stepLabel {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.stepComment {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.stepTime {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

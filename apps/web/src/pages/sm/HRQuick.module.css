@@ -1,167 +1,131 @@
-/* ── SM HR Quick ──────────────────────────────────────── */
-
 .page {
-  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 100vh;
-  background: var(--bg);
+  min-height: 100%;
+  background: var(--bg-page, #f5f5f5);
 }
 
 .header {
-  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px;
+  background: var(--bg-surface, #fff);
 }
 
 .title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
 }
 
-.subtitle {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin: 4px 0 0;
+.body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-/* ── Stat Row ──────────────────────────────────────────── */
-
-.statRow {
+/* KPI 行 */
+.kpiRow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
-.statItem {
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  text-align: center;
-}
-
-.statNum {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.statNumMint { color: #0AAF9A; }
-.statNumWarn { color: #F2994A; }
-.statNumDanger { color: #EB5757; }
-
-.statLabel {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin-top: 4px;
-}
-
-/* ── Cards ─────────────────────────────────────────────── */
-
-.card {
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.cardTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
-/* ── Approval Item ─────────────────────────────────────── */
-
-.approvalItem {
+/* 留任风险列表 */
+.riskList {
   display: flex;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--surface-hover);
+  flex-direction: column;
   gap: 12px;
 }
 
-.approvalItem:last-child { border-bottom: none; }
-
-.approvalInfo { flex: 1; }
-
-.approvalName {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.approvalMeta {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin-top: 2px;
-}
-
-.approvalBtns {
+.riskItem {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.btnApprove {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(39, 174, 96, 0.15);
-  color: #27AE60;
+.riskTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.personName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+}
+
+/* 风险进度条 */
+.scoreBar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-muted, #f0f0f0);
+  overflow: hidden;
+}
+
+.scoreFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.scoreFill[data-level='critical'] { background: var(--color-critical, #f5222d); }
+.scoreFill[data-level='warning']  { background: var(--color-warning, #fa8c16); }
+.scoreFill[data-level='info']     { background: var(--color-success, #52c41a); }
+
+.intervention {
   font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  color: var(--text-secondary, #666);
+  background: var(--bg-muted, #f8f8f8);
+  border-radius: 4px;
+  padding: 4px 8px;
 }
 
-.btnReject {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(235, 87, 87, 0.12);
-  color: #EB5757;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* ── Quick Actions ─────────────────────────────────────── */
-
-.quickGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+/* 技能列表 */
+.skillList {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.quickBtn {
+.skillItem {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 14px 8px;
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.15s;
+  gap: 8px;
 }
 
-.quickBtn:active { background: var(--surface-hover); }
-
-.quickIcon { font-size: 20px; }
-
-.quickLabel {
+.skillRank {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent, #ff6b2c);
+  color: #fff;
   font-size: 11px;
-  color: var(--text-secondary);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-/* ── Empty ─────────────────────────────────────────────── */
+.skillName {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary, #1a1a1a);
+}
 
-.empty {
-  text-align: center;
-  padding: 24px;
-  color: var(--text-tertiary);
+.skillYuan {
   font-size: 13px;
+  font-weight: 600;
+  color: var(--color-success, #52c41a);
+  white-space: nowrap;
+}
+
+.actionRow {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }

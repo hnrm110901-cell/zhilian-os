@@ -22,6 +22,107 @@ from prometheus_client import (
     generate_latest,
 )
 
+from src.core.config import settings
+# 核心模块
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master, alerts_webhook
+from src.api import pos_sync
+from src.api import roles as roles_api
+from src.api import merchants
+from src.api import prep_suggestion, soldout, agent_configs
+from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
+# 逐步启用的模块
+from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue, meituan_reservation
+# 需要外部适配器的模块 (会在适配器不可用时返回错误)
+from src.api import members, blindbox
+from src.api import edge_node, decision_validator, recommendations, agent_collaboration
+# Phase 1: CRUD API
+from src.api import employees, inventory, schedules, reservations, kpis, orders
+# Phase 1 本体层 — BOM 版本化配方管理
+from src.api import bom
+# Phase 2 本体层 API — 推理层 / 企微 Action FSM / 自然语言查询
+from src.api import ontology, wechat_actions
+# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库 / 损耗事件
+from src.api import data_security, chain_expansion, knowledge_rules, waste_events
+# Phase 4 — L2 融合层（多源食材ID规范化）
+from src.api import fusion
+# Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
+from src.api import l3_knowledge
+# Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
+from src.api import l4_reasoning
+# Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
+from src.api import l5_action
+# Phase 8 — 多阶段工作流引擎（Day N 晚上 17:00-22:00 规划 Day N+1）
+from src.api import workflow
+from src.api import ai_evolution_dashboard
+from src.api import compliance
+from src.api import quality
+from src.api import scheduler
+from src.api import agent_memory
+from src.api import event_sourcing
+from src.api import voice_ws
+from src.api import vector_index
+from src.api import forecast
+from src.api import cross_store_insights
+from src.api import report_templates
+from src.api import competitive_analysis
+from src.api import federated
+from src.api import export_jobs
+from src.api import backups
+from src.api import private_domain
+from src.api import ops
+from src.api import daily_hub
+from src.api import banquet
+from src.api import banquet_lifecycle
+from src.api import banquet_agent
+from src.api import external_factors
+from src.api import pos_webhook
+from src.api import bulk_import
+from src.api import hq_dashboard
+from src.api import dish_rd_agent
+from src.api import supplier_agent
+from src.api import daily_ops
+from src.api import job_standard
+from src.api import org_hierarchy
+from src.api import ai_pillars
+from src.api import ai_accuracy
+from src.api import dashboard_preferences
+from src.api import governance
+from src.api import workforce
+# ARCH-004 可信执行层 / FEAT-004 动态菜单 / ARCH-003 门店记忆层 / 本体论 L2 API / FCT 公开接口
+from src.api import execution, menu, store_memory, ontology_api, fct_public
+# Phase 1 — 运营智能层：渠道毛利 API
+from src.api import channel_profit
+from src.api import performance_compute
+# Phase P1 — 预订Agent: 渠道中台 + 客户风控
+from src.api import channel_analytics, customer_risk
+# Phase P2 — 预订Agent: 宴会销控引擎
+from src.api import banquet_sales_api
+# Phase P3 — 预订Agent: EO执行引擎（宴小猪能力）
+from src.api import event_orders
+# Phase P4 — 预订Agent: AI智能整合（屯象独有）
+from src.api import reservation_ai
+# Onboarding Engine — 企业诊断与数据入库
+from src.api import onboarding
+# Month 1 (P0) — 外部集成：电子发票 / 饿了么 / 支付对账
+from src.api import e_invoice
+from src.api import eleme
+from src.api import payment_reconciliation
+# Month 2 (P0+P1) — 抖音 / 食品安全 / 健康证
+from src.api import douyin
+from src.api import food_safety
+from src.api import health_certificates
+# Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账
+from src.api import supplier_b2b
+from src.api import dianping
+from src.api import bank_reconciliation
+# Batch 1 — 数据融合层：集成中心 / 全渠道营收 / 三角对账
+from src.api import integration_hub
+from src.api import omni_channel
+from src.api import tri_reconciliation
+# Batch 2 — 智能决策层：供应商智能 / 评论行动 / 合规引擎
+from src.api import supplier_intelligence
+from src.api import review_action
+from src.api import compliance_engine
 # Batch 3 — 自动化闭环层：智能采购 / 日清日结 / 指挥中心
 # Batch 2 — 智能决策层：供应商智能 / 评论行动 / 合规引擎
 # Batch 1 — 数据融合层：集成中心 / 全渠道营收 / 三角对账
@@ -1012,78 +1113,69 @@ from src.api import waste_guard
 
 app.include_router(waste_guard.router, tags=["waste_guard"])
 
-# HR模块 — 薪酬/假勤/审批/招聘/绩效/合同/报表
-from src.api import hr_attendance
-from src.api import hr_dashboard as hr_dashboard_api
-from src.api import hr_employee, hr_leave, hr_performance, hr_recruitment
-from src.api import payroll as payroll_api
-
-app.include_router(payroll_api.router, prefix="/api/v1", tags=["payroll"])
-app.include_router(hr_leave.router, prefix="/api/v1", tags=["hr_leave"])
-app.include_router(hr_recruitment.router, prefix="/api/v1", tags=["hr_recruitment"])
-app.include_router(hr_performance.router, prefix="/api/v1", tags=["hr_performance"])
-app.include_router(hr_dashboard_api.router, prefix="/api/v1", tags=["hr_dashboard"])
-app.include_router(hr_employee.router, prefix="/api/v1", tags=["hr_employee"])
-app.include_router(hr_attendance.router, prefix="/api/v1", tags=["hr_attendance"])
-from src.api import hr_schedule
-
-app.include_router(hr_schedule.router, prefix="/api/v1", tags=["hr_schedule"])
-from src.api import hr_commission, hr_lifecycle, hr_reward_penalty, hr_social_insurance
-
-app.include_router(hr_lifecycle.router, prefix="/api/v1", tags=["hr_lifecycle"])
-app.include_router(hr_commission.router, prefix="/api/v1", tags=["hr_commission"])
-app.include_router(hr_reward_penalty.router, prefix="/api/v1", tags=["hr_reward_penalty"])
-app.include_router(hr_social_insurance.router, prefix="/api/v1", tags=["hr_social_insurance"])
-from src.api import hr_growth
-
-app.include_router(hr_growth.router, prefix="/api/v1", tags=["hr_growth"])
-from src.api import hr_import
-
-app.include_router(hr_import.router, prefix="/api/v1", tags=["hr_import"])
-from src.api import hr_exit_interview
-
-app.include_router(hr_exit_interview.router, prefix="/api/v1", tags=["hr_exit_interview"])
-from src.api import hr_settlement
-
-app.include_router(hr_settlement.router, prefix="/api/v1", tags=["hr_settlement"])
-from src.api import hr_training
-
-app.include_router(hr_training.router, prefix="/api/v1", tags=["hr_training"])
-from src.api import hr_report
-
-app.include_router(hr_report.router, prefix="/api/v1", tags=["hr_report"])
-from src.api import hr_sensitive
-
-app.include_router(hr_sensitive.router, prefix="/api/v1", tags=["hr_sensitive"])
-from src.api import hr_rules
-
-app.include_router(hr_rules.router, prefix="/api/v1", tags=["hr_rules"])
-from src.api import hr_payslip
-
-app.include_router(hr_payslip.router, prefix="/api/v1", tags=["hr_payslip"])
-from src.api import hr_employee_self_service
-
-app.include_router(hr_employee_self_service.router, prefix="/api/v1", tags=["hr_employee_self_service"])
-from src.api import hr_approval
-
-app.include_router(hr_approval.router, prefix="/api/v1", tags=["hr_approval"])
-from src.api import hr_audit as hr_audit_api
-
-app.include_router(hr_audit_api.router, prefix="/api/v1", tags=["hr_audit"])
-from src.api import im_callback, im_self_service, im_sync
-
-app.include_router(im_sync.router, prefix="/api/v1", tags=["im_sync"])
-app.include_router(im_callback.router, prefix="/api/v1", tags=["im_callback"])
-app.include_router(im_self_service.router, prefix="/api/v1", tags=["im_self_service"])
-from src.api import hr_batch
-
-app.include_router(hr_batch.router, prefix="/api/v1", tags=["hr_batch"])
-from src.api import hr_ai
-
-app.include_router(hr_ai.router, prefix="/api/v1", tags=["hr_ai"])
-from src.api import hr_decision_flywheel
-
-app.include_router(hr_decision_flywheel.router, prefix="/api/v1", tags=["decision_flywheel"])
+# HR模块 — 薪酬/假勤/审批/招聘/绩效/合同/报表（部分 API 文件尚未实现，跳过缺失项）
+try:
+    from src.api import payroll as payroll_api
+    from src.api import hr_leave
+    from src.api import hr_recruitment
+    from src.api import hr_performance
+    from src.api import hr_dashboard as hr_dashboard_api
+    from src.api import hr_employee
+    from src.api import hr_attendance
+    from src.api import hr_schedule
+    from src.api import hr_lifecycle
+    from src.api import hr_commission
+    from src.api import hr_reward_penalty
+    from src.api import hr_social_insurance
+    from src.api import hr_growth
+    from src.api import hr_import
+    from src.api import hr_exit_interview
+    from src.api import hr_settlement
+    from src.api import hr_training
+    from src.api import hr_report
+    from src.api import hr_sensitive
+    from src.api import hr_rules
+    from src.api import hr_payslip
+    from src.api import hr_employee_self_service
+    from src.api import hr_approval
+    from src.api import hr_audit as hr_audit_api
+    from src.api import im_sync, im_callback, im_self_service
+    from src.api import hr_batch
+    from src.api import hr_ai
+    from src.api import hr_decision_flywheel
+    app.include_router(payroll_api.router, prefix="/api/v1", tags=["payroll"])
+    app.include_router(hr_leave.router, prefix="/api/v1", tags=["hr_leave"])
+    app.include_router(hr_recruitment.router, prefix="/api/v1", tags=["hr_recruitment"])
+    app.include_router(hr_performance.router, prefix="/api/v1", tags=["hr_performance"])
+    app.include_router(hr_dashboard_api.router, prefix="/api/v1", tags=["hr_dashboard"])
+    app.include_router(hr_employee.router, prefix="/api/v1", tags=["hr_employee"])
+    app.include_router(hr_attendance.router, prefix="/api/v1", tags=["hr_attendance"])
+    app.include_router(hr_schedule.router, prefix="/api/v1", tags=["hr_schedule"])
+    app.include_router(hr_lifecycle.router, prefix="/api/v1", tags=["hr_lifecycle"])
+    app.include_router(hr_commission.router, prefix="/api/v1", tags=["hr_commission"])
+    app.include_router(hr_reward_penalty.router, prefix="/api/v1", tags=["hr_reward_penalty"])
+    app.include_router(hr_social_insurance.router, prefix="/api/v1", tags=["hr_social_insurance"])
+    app.include_router(hr_growth.router, prefix="/api/v1", tags=["hr_growth"])
+    app.include_router(hr_import.router, prefix="/api/v1", tags=["hr_import"])
+    app.include_router(hr_exit_interview.router, prefix="/api/v1", tags=["hr_exit_interview"])
+    app.include_router(hr_settlement.router, prefix="/api/v1", tags=["hr_settlement"])
+    app.include_router(hr_training.router, prefix="/api/v1", tags=["hr_training"])
+    app.include_router(hr_report.router, prefix="/api/v1", tags=["hr_report"])
+    app.include_router(hr_sensitive.router, prefix="/api/v1", tags=["hr_sensitive"])
+    app.include_router(hr_rules.router, prefix="/api/v1", tags=["hr_rules"])
+    app.include_router(hr_payslip.router, prefix="/api/v1", tags=["hr_payslip"])
+    app.include_router(hr_employee_self_service.router, prefix="/api/v1", tags=["hr_employee_self_service"])
+    app.include_router(hr_approval.router, prefix="/api/v1", tags=["hr_approval"])
+    app.include_router(hr_audit_api.router, prefix="/api/v1", tags=["hr_audit"])
+    app.include_router(im_sync.router, prefix="/api/v1", tags=["im_sync"])
+    app.include_router(im_callback.router, prefix="/api/v1", tags=["im_callback"])
+    app.include_router(im_self_service.router, prefix="/api/v1", tags=["im_self_service"])
+    app.include_router(hr_batch.router, prefix="/api/v1", tags=["hr_batch"])
+    app.include_router(hr_ai.router, prefix="/api/v1", tags=["hr_ai"])
+    app.include_router(hr_decision_flywheel.router, prefix="/api/v1", tags=["decision_flywheel"])
+except ImportError as _e:
+    import structlog as _sl
+    _sl.get_logger().warning("HR API 模块未实现，跳过注册", error=str(_e))
 
 # 知识OS层 — 技能图谱 / 知识采集 / 技能护照 / 行为模式 / 离职风险
 from src.api.knowledge import router as knowledge_router
@@ -1114,6 +1206,18 @@ app.include_router(compliance_engine.router, tags=["compliance-engine"])
 app.include_router(auto_procurement.router, prefix="/api/v1", tags=["auto-procurement"])
 app.include_router(financial_closing.router, tags=["financial-closing"])
 app.include_router(command_center.router, tags=["command-center"])
+# 日清日结 + 周复盘
+app.include_router(daily_ops.router)
+# 岗位标准化知识库 + 员工成长
+app.include_router(job_standard.router)
+# 组织层级 + 多层配置继承
+app.include_router(org_hierarchy.router)
+# M2 HR Foundation — HRAgent v1 + REST API
+from src.api import hr as hr_api
+app.include_router(hr_api.router, prefix="/api/v1/hr", tags=["HR"])
+# 企微考勤Webhook（无需认证，外部系统回调）
+from src.api.webhooks.wechat_attendance import router as wechat_attendance_router
+app.include_router(wechat_attendance_router, prefix="/api/v1", tags=["webhooks"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):

@@ -23,6 +23,7 @@ from ..models.task import Task, TaskPriority, TaskStatus
 from ..models.user import User, UserRole
 from ..repositories import EmployeeRepository
 from ..services.wechat_service import wechat_service
+from ..services.hr.double_write_service import DoubleWriteService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -138,6 +139,14 @@ async def create_employee(
     await session.commit()
     await session.refresh(emp)
     logger.info("employee_created", employee_id=emp.id, store_id=emp.store_id)
+    # --- HR double-write (shadow, non-blocking) ---
+    # DoubleWriteService.on_employee_created already catches internally;
+    # this outer try/except guards against DoubleWriteService constructor failures.
+    try:
+        dw = DoubleWriteService()
+        await dw.on_employee_created(emp)
+    except Exception as exc:
+        logger.warning("hr_double_write.create_hook_failed", employee_id=emp.id, error=str(exc))
     return EmployeeResponse(
         id=emp.id,
         store_id=emp.store_id,
@@ -168,6 +177,14 @@ async def update_employee(
         setattr(emp, field, value)
     await session.commit()
     await session.refresh(emp)
+    # --- HR double-write (shadow, non-blocking) ---
+    # DoubleWriteService.on_employee_updated already catches internally;
+    # this outer try/except guards against DoubleWriteService constructor failures.
+    try:
+        dw = DoubleWriteService()
+        await dw.on_employee_updated(emp)
+    except Exception as exc:
+        logger.warning("hr_double_write.update_hook_failed", employee_id=emp.id, error=str(exc))
     return EmployeeResponse(
         id=emp.id,
         store_id=emp.store_id,

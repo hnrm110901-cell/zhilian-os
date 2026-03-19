@@ -1,0 +1,31 @@
+.page { padding: 16px; background: var(--bg-primary, #f5f5f5); min-height: 100vh; font-family: 'Noto Sans SC', -apple-system, sans-serif; }
+.header { margin-bottom: 14px; }
+.title { font-size: 18px; font-weight: 700; color: var(--text-primary, #1a1a1a); }
+.filterRow { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.filterBtn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border-color, #e8e8e8); background: var(--bg-card, #fff); font-size: 13px; cursor: pointer; color: var(--text-secondary, #666); }
+.filterActive { background: var(--accent, #FF6B2C); color: #fff; border-color: var(--accent, #FF6B2C); font-weight: 600; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--bg-card, #fff); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.cardHeader { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; cursor: pointer; }
+.cardLeft { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.severity { font-size: 16px; flex-shrink: 0; }
+.cardTitle { font-size: 14px; font-weight: 600; color: var(--text-primary, #1a1a1a); }
+.cardMeta { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
+.cardRight { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.statusTag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 8px; }
+.repeatTag { font-size: 11px; background: #fff2f0; color: #cf1322; padding: 2px 6px; border-radius: 8px; }
+.expandIcon { font-size: 10px; color: var(--text-tertiary, #bbb); margin-left: 4px; }
+.cardBody { padding: 0 14px 14px; border-top: 1px solid var(--border-color, #f0f0f0); }
+.desc { font-size: 13px; color: var(--text-secondary, #666); margin: 10px 0 6px; line-height: 1.5; }
+.meta { font-size: 12px; color: var(--text-tertiary, #888); margin-bottom: 6px; }
+.comment { font-size: 12px; color: var(--text-secondary, #666); background: var(--bg-primary, #f9f9f9); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; line-height: 1.4; }
+.commentLabel { font-weight: 600; color: var(--text-primary, #333); }
+.submitArea { margin-top: 8px; }
+.textarea { width: 100%; border: 1px solid var(--border-color, #e8e8e8); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; resize: vertical; background: var(--bg-primary, #fafafa); box-sizing: border-box; }
+.textarea:focus { outline: none; border-color: var(--accent, #FF6B2C); }
+.submitBtn { margin-top: 8px; width: 100%; background: var(--accent, #FF6B2C); color: #fff; border: none; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.submitBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+.empty { text-align: center; padding: 48px 24px; color: var(--text-secondary, #888); font-size: 14px; }
+.emptyIcon { font-size: 40px; margin-bottom: 12px; }
+.skeletonCard { background: var(--bg-card, #fff); border-radius: 12px; height: 72px; margin-bottom: 10px; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }

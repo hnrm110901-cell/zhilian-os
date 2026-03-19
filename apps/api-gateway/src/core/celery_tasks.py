@@ -6132,6 +6132,282 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
         raise self.retry(exc=exc)
 
 
+# ── HR: 每周留任预测模型重训 ─────────────────────────────────────────────────────
+
+
+@celery_app.task(name="hr.retrain_retention_model_weekly")
+def retrain_retention_model_weekly():
+    """每周日 02:00 UTC — 遍历所有 active store，重训留任预测模型存入 Redis。"""
+    import sqlalchemy as sa
+
+    async def _run():
+        import redis as redis_lib
+        from src.core.config import settings
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.retention_ml_service import RetentionMLService
+
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=False)
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    sa.text("SELECT id FROM stores WHERE is_active = TRUE")
+                )
+                store_ids = [str(row[0]) for row in result.fetchall()]
+
+            for store_id in store_ids:
+                async with AsyncSessionLocal() as session:
+                    svc = RetentionMLService(session=session, redis_client=r)
+                    outcome = await svc.train_for_store(store_id)
+                    logger.info("celery.hr_ml_retrain", store_id=store_id, outcome=outcome)
+        finally:
+            r.close()
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.trigger_staffing_analysis_weekly")
+def trigger_staffing_analysis_weekly():
+    """每周一 06:00 UTC — 遍历所有 active store，生成排班诊断存入 Redis。"""
+    import sqlalchemy as sa
+
+    async def _run():
+        import redis as redis_lib
+        from src.core.config import settings
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.staffing_service import StaffingService
+        from datetime import date as date_cls
+
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=False)
+        today = date_cls.today()
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    sa.text("SELECT id FROM stores WHERE is_active = TRUE")
+                )
+                store_ids = [str(row[0]) for row in result.fetchall()]
+
+            for store_id in store_ids:
+                async with AsyncSessionLocal() as session:
+                    svc = StaffingService(session=session, redis_client=r)
+                    d = await svc.diagnose_staffing(store_id, today)
+                    logger.info(
+                        "celery.hr_staffing_weekly",
+                        store_id=store_id,
+                        peak_hours=d.get("peak_hours"),
+                        savings_yuan=d.get("estimated_savings_yuan"),
+                    )
+        finally:
+            r.close()
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.trigger_exit_knowledge_capture")
+def trigger_exit_knowledge_capture(person_id: str):
+    """WF-4: 当留任信号 risk_score > 0.85 时触发知识采集推送.
+
+    由 WF-1 扫描任务在高危员工时调用，也可手动触发（离职申请提交时）。
+    """
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.knowledge_capture_service import KnowledgeCaptureService
+
+        async with AsyncSessionLocal() as session:
+            svc = KnowledgeCaptureService(session=session)
+            result = await svc.trigger_capture(person_id, "exit")
+            logger.info(
+                "celery.hr_knowledge_capture_triggered",
+                person_id=person_id,
+                wechat_sent=result.get("wechat_sent"),
+            )
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.notify_pending_approvals")
+def notify_pending_approvals():
+    """每天09:00推送超过24h未处理的审批提醒"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.hr.approval_instance import ApprovalInstance
+        from src.models.hr.approval_step_record import ApprovalStepRecord
+        import sqlalchemy as sa
+        from datetime import datetime, timezone, timedelta
+
+        async with AsyncSessionLocal() as session:
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            result = await session.execute(
+                sa.select(ApprovalStepRecord)
+                .join(ApprovalInstance, ApprovalStepRecord.instance_id == ApprovalInstance.id)
+                .where(
+                    ApprovalStepRecord.action == "pending",
+                    ApprovalInstance.status == "pending",
+                    ApprovalStepRecord.created_at < cutoff,
+                )
+            )
+            overdue_records = list(result.scalars().all())
+            logger.info(
+                "celery.notify_pending_approvals",
+                overdue_count=len(overdue_records),
+            )
+            # 企微推送占位：遍历overdue_records发送提醒
+            for record in overdue_records:
+                record.notified_at = datetime.now(timezone.utc)
+            await session.commit()
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.check_approval_deadline")
+def check_approval_deadline(instance_id: str):
+    """48h超时自动升级到上级审批（占位实现）"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.hr.approval_instance import ApprovalInstance
+        import sqlalchemy as sa
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                sa.select(ApprovalInstance).where(
+                    ApprovalInstance.id == sa.text(f"'{instance_id}'::uuid")
+                )
+            )
+            instance = result.scalar_one_or_none()
+            if instance and instance.status == "pending":
+                logger.warning(
+                    "celery.approval_deadline_exceeded",
+                    instance_id=instance_id,
+                    current_step=instance.current_step,
+                )
+                # 超时升级占位：实际实现时查找上级审批人并创建新step record
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.calculate_yesterday_attendance")
+def calculate_yesterday_attendance():
+    """每日00:30计算全部门店前日考勤（DailyAttendance）"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.attendance_service import AttendanceService
+        from src.models.hr.clock_record import ClockRecord
+        import sqlalchemy as sa
+        from datetime import date, timedelta
+
+        yesterday = date.today() - timedelta(days=1)
+        async with AsyncSessionLocal() as session:
+            # 查找昨天有打卡记录的所有assignment_id
+            result = await session.execute(
+                sa.select(sa.distinct(ClockRecord.assignment_id)).where(
+                    sa.func.date(ClockRecord.clock_time) == yesterday
+                )
+            )
+            assignment_ids = [row[0] for row in result.fetchall()]
+
+            svc = AttendanceService()
+            count = 0
+            for aid in assignment_ids:
+                await svc.calculate_daily(aid, yesterday, session)
+                count += 1
+
+            await session.commit()
+            logger.info(
+                "celery.calculate_yesterday_attendance",
+                date=str(yesterday),
+                processed=count,
+            )
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.lock_previous_month_attendance")
+def lock_previous_month_attendance():
+    """每月5日锁定上月考勤（locked=True）"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.hr.daily_attendance import DailyAttendance
+        import sqlalchemy as sa
+        from datetime import date
+
+        today = date.today()
+        if today.month == 1:
+            prev_year, prev_month = today.year - 1, 12
+        else:
+            prev_year, prev_month = today.year, today.month - 1
+
+        first_day = date(prev_year, prev_month, 1)
+        if prev_month == 12:
+            last_day = date(prev_year + 1, 1, 1)
+        else:
+            last_day = date(prev_year, prev_month + 1, 1)
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                sa.update(DailyAttendance)
+                .where(
+                    DailyAttendance.date >= first_day,
+                    DailyAttendance.date < last_day,
+                    DailyAttendance.locked == False,
+                )
+                .values(locked=True)
+            )
+            await session.commit()
+            logger.info(
+                "celery.lock_previous_month",
+                year=prev_year,
+                month=prev_month,
+                locked_count=result.rowcount,
+            )
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.sync_pos_employees")
+def sync_pos_employees_task():
+    """每日01:00从POS同步全部门店员工数据"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.employee_sync_service import EmployeeSyncService
+
+        async with AsyncSessionLocal() as session:
+            # 占位：实际需从store配置表查找所有有POS配置的门店
+            svc = EmployeeSyncService()
+            logger.info("celery.sync_pos_employees.start")
+            # 占位：遍历门店调用 svc.sync_single_store(...)
+            logger.info("celery.sync_pos_employees.done")
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.accrue_monthly_leave")
+def accrue_monthly_leave():
+    """每月1日自动发放月度假期配额"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.leave_service import LeaveService
+        from src.models.hr.employment_assignment import EmploymentAssignment
+        import sqlalchemy as sa
+        from datetime import date
+
+        year = date.today().year
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                sa.select(EmploymentAssignment.id).where(
+                    EmploymentAssignment.status == "active"
+                )
+            )
+            assignment_ids = [row[0] for row in result.fetchall()]
+
+            svc = LeaveService()
+            count = 0
+            for aid in assignment_ids:
+                await svc.accrue_annual_leave(aid, year, session)
+                count += 1
+
+            await session.commit()
+            logger.info("celery.accrue_monthly_leave", year=year, processed=count)
+
+    asyncio.run(_run())
 # ── IM 通讯录定时同步 ─────────────────────────────────────────────────────
 
 

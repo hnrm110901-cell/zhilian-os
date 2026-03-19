@@ -59,6 +59,7 @@ class AuthService:
             "role": user.role.value,
             "store_id": user.store_id or "",
             "brand_id": user.brand_id or "",
+            "org_node_id": getattr(user, "org_node_id", None),
         }
 
         access_token = create_access_token(
@@ -111,6 +112,7 @@ class AuthService:
                 "role": user.role.value,
                 "store_id": user.store_id or "",
                 "brand_id": user.brand_id or "",
+                "org_node_id": getattr(user, "org_node_id", None),
             },
             expires_delta=access_token_expires,
         )

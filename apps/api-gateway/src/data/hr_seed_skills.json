@@ -1,0 +1,65 @@
+[
+  {
+    "skill_name": "餐饮服务礼仪",
+    "category": "service",
+    "description": "标准问候、引座、点餐、上菜、结账全流程礼仪规范",
+    "estimated_revenue_lift": 0.0
+  },
+  {
+    "skill_name": "POS系统操作",
+    "category": "service",
+    "description": "收银系统点餐、改单、退单、打印操作",
+    "estimated_revenue_lift": 0.0
+  },
+  {
+    "skill_name": "食品安全基础",
+    "category": "compliance",
+    "description": "食品卫生法规、个人卫生要求、储存温控规范",
+    "estimated_revenue_lift": 0.0
+  },
+  {
+    "skill_name": "酒水知识与推荐",
+    "category": "service",
+    "description": "酒单讲解、配餐推荐、开瓶服务、醒酒时机",
+    "kpi_impact": {"avg_check_per_table_yuan": 35},
+    "estimated_revenue_lift": 35.0
+  },
+  {
+    "skill_name": "客诉处理",
+    "category": "service",
+    "description": "投诉接收、道歉话术、补偿方案、升级判断、事后复盘",
+    "kpi_impact": {"customer_satisfaction_score_lift": 0.3},
+    "estimated_revenue_lift": 0.0
+  },
+  {
+    "skill_name": "排班基础",
+    "category": "management",
+    "description": "排班需求预测、轮休安排、假期协调、兼职调配",
+    "estimated_revenue_lift": 800.0
+  },
+  {
+    "skill_name": "新员工带教",
+    "category": "management",
+    "description": "一对一辅导、岗位示范、跟台评估、出师标准",
+    "estimated_revenue_lift": 0.0
+  },
+  {
+    "skill_name": "成本意识与控制",
+    "category": "management",
+    "description": "人力成本率计算、损耗识别、班次成本核算",
+    "kpi_impact": {"labor_cost_rate_reduction_pct": 1.5},
+    "estimated_revenue_lift": 1500.0
+  },
+  {
+    "skill_name": "数据分析基础",
+    "category": "management",
+    "description": "营业额趋势、客流分析、毛利率解读、异常识别",
+    "estimated_revenue_lift": 0.0
+  },
+  {
+    "skill_name": "供应商沟通",
+    "category": "management",
+    "description": "订货流程、验收标准、异常退货、价格谈判基础",
+    "estimated_revenue_lift": 500.0
+  }
+]

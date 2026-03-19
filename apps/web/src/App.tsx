@@ -318,6 +318,20 @@ const HQDecisions     = lazy(() => import('./pages/hq/Decisions'));
 const HQFinance       = lazy(() => import('./pages/hq/Finance'));
 const HQWorkforce     = lazy(() => import('./pages/hq/Workforce'));
 const HQBanquet       = lazy(() => import('./pages/hq/Banquet'));
+const HQHr                = lazy(() => import('./pages/hq/HR'));
+const HQHrKnowledge       = lazy(() => import('./pages/hq/HRKnowledge'));
+const HQHrTalentPipeline  = lazy(() => import('./pages/hq/HRTalentPipeline'));
+const HQHrLifecycle       = lazy(() => import('./pages/hq/HRLifecycle'));
+const HQHrApprovals       = lazy(() => import('./pages/hq/HRApprovals'));
+const HQHrAttendance      = lazy(() => import('./pages/hq/HRAttendance'));
+const HQHrPayroll         = lazy(() => import('./pages/hq/HRPayroll'));
+const HQHrImport          = lazy(() => import('./pages/hq/HRImport'));
+const SmHRTeam            = lazy(() => import('./pages/sm/HRTeam'));
+const SmHRPerson          = lazy(() => import('./pages/sm/HRPerson'));
+const SmHRSelf            = lazy(() => import('./pages/sm/HRSelf'));
+const SmHRMyAttendance    = lazy(() => import('./pages/sm/HRMyAttendance'));
+const SmHRLeave           = lazy(() => import('./pages/sm/HRLeave'));
+const SmHRGrowth          = lazy(() => import('./pages/sm/HRGrowth'));
 const SmBanquet       = lazy(() => import('./pages/sm/Banquet'));
 const SmBanquetLeads       = lazy(() => import('./pages/sm/BanquetLeads'));
 const SmBanquetLeadDetail  = lazy(() => import('./pages/sm/BanquetLeadDetail'));
@@ -328,6 +342,15 @@ const SmBanquetPush        = lazy(() => import('./pages/sm/BanquetPush'));
 const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
 const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 const SmPrivateDomainHealth = lazy(() => import('./pages/sm/PrivateDomainHealthPage'));
+const SmDailyDashboard  = lazy(() => import('./pages/sm/DailyDashboard'));
+const SmDailySettlement = lazy(() => import('./pages/sm/DailySettlement'));
+const SmAbnormalTasks   = lazy(() => import('./pages/sm/AbnormalTasks'));
+const SmWeeklyReview    = lazy(() => import('./pages/sm/WeeklyReview'));
+
+// 岗位标准化知识库 + 员工成长溯源 (Phase 2-3 HR知识OS)
+const JobStandardLibrary  = lazy(() => import('./pages/hr/JobStandardLibrary'));
+const EmployeeGrowthTrace = lazy(() => import('./pages/hr/EmployeeGrowthTrace'));
+const JobStandardDetail   = lazy(() => import('./pages/hr/JobStandardDetail'));
 const SmMemberProfile = lazy(() => import('./pages/sm/MemberProfile'));
 const HqMarketingTasks = lazy(() => import('./pages/hq/MarketingTasks'));
 const HqMarketingTaskCreate = lazy(() => import('./pages/hq/MarketingTaskCreate'));
@@ -958,6 +981,16 @@ const AppContent: React.FC = () => {
                   <Route path="attendance-rules" element={
                     <ProtectedRoute requiredRole="admin"><AttendanceRulePage /></ProtectedRoute>
                   } />
+                  {/* 岗位标准化知识库 + 员工成长溯源 */}
+                  <Route path="job-standard-library" element={
+                    <ProtectedRoute requiredRole="admin"><JobStandardLibrary /></ProtectedRoute>
+                  } />
+                  <Route path="employee-growth-trace" element={
+                    <ProtectedRoute requiredRole="store_manager"><EmployeeGrowthTrace /></ProtectedRoute>
+                  } />
+                  <Route path="job-standard/:jobCode" element={
+                    <ProtectedRoute><JobStandardDetail /></ProtectedRoute>
+                  } />
                   {/* 替换易订 — R3 桌台平面图 / R4 AI邀请函 */}
                   <Route path="floor-plan" element={
                     <ProtectedRoute><FloorPlanPage /></ProtectedRoute>
@@ -1067,10 +1100,21 @@ const AppContent: React.FC = () => {
                   <Route path="banquet-search"       element={<SmBanquetSearch />} />
                   <Route path="private-domain-health" element={<SmPrivateDomainHealth />} />
                   <Route path="prep" element={<SmPrepSuggestion />} />
-                  <Route path="hr"       element={<SmHRQuick />} />
+                  <Route path="hr"             element={<SmHRQuick />} />
+                  <Route path="hr/team"        element={<SmHRTeam />} />
+                  <Route path="hr/person/:id"  element={<SmHRPerson />} />
+                  <Route path="hr/self"          element={<SmHRSelf />} />
+                  <Route path="hr/my-attendance" element={<SmHRMyAttendance />} />
+                  <Route path="hr/leave"         element={<SmHRLeave />} />
+                  <Route path="hr/growth"        element={<SmHRGrowth />} />
                   <Route path="patrol"   element={<SmPatrol />} />
                   <Route path="members"  element={<SmMemberProfile />} />
                   <Route path="profile"  element={<SmProfile />} />
+                  {/* 日清日结 + 周复盘 */}
+                  <Route path="daily-dashboard"  element={<SmDailyDashboard />} />
+                  <Route path="daily-settlement" element={<SmDailySettlement />} />
+                  <Route path="tasks-abnormal"   element={<SmAbnormalTasks />} />
+                  <Route path="weekly-review"    element={<SmWeeklyReview />} />
                   <Route path="marketing-tasks" element={<SmMarketingTasks />} />
                   <Route path="health-index"          element={<SmStoreHealthIndex />} />
                 </Route>

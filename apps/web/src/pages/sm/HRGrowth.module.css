@@ -1,0 +1,16 @@
+.page { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.header { display: flex; align-items: center; justify-content: space-between; }
+.title { font-size: 1.25rem; font-weight: 600; }
+.skillList { display: flex; flex-direction: column; gap: var(--space-2); }
+.skillItem { display: flex; align-items: center; justify-content: space-between; }
+.skillLevel { font-size: 0.75rem; color: var(--text-muted); }
+.timeline { display: flex; flex-direction: column; gap: var(--space-3); padding-left: var(--space-2); border-left: 2px solid var(--border); }
+.timelineItem { display: flex; gap: var(--space-3); align-items: center; position: relative; }
+.timelineDot { width: 10px; height: 10px; border-radius: 50%; margin-left: -7px; flex-shrink: 0; }
+.dotDone { background: #52c41a; }
+.dotFuture { background: var(--accent); }
+.timelineContent { display: flex; gap: var(--space-2); align-items: center; }
+.timelineDate { font-size: 0.75rem; color: var(--text-muted); min-width: 80px; }
+.aiCard { display: flex; flex-direction: column; gap: var(--space-2); }
+.aiText { font-size: 0.875rem; color: var(--text-primary); margin: 0; }
+.contribution { text-align: center; }

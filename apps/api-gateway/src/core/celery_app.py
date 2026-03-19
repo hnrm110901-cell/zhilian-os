@@ -805,6 +805,19 @@ celery_app.conf.update(
                 "priority": 8,
             },
         },
+        # HR — 每周日 02:00 UTC 重训留任预测模型
+        "hr-retrain-retention-model-weekly": {
+            "task": "hr.retrain_retention_model_weekly",
+            "schedule": crontab(hour=2, minute=0, day_of_week=0),  # Sunday 02:00 UTC
+            "args": (),
+            "options": {"queue": "low_priority", "priority": 3},
+        },
+        # HR — 每周一 06:00 UTC 生成排班诊断
+        "hr-staffing-analysis-weekly": {
+            "task": "hr.trigger_staffing_analysis_weekly",
+            "schedule": crontab(hour=6, minute=0, day_of_week=1),  # Monday 06:00 UTC
+            "args": (),
+            "options": {"queue": "low_priority", "priority": 3},
         # 私域旅程 catch-up：每5分钟扫描 next_action_at 过期的 running 旅程并重新调度
         "dispatch-stale-journeys": {
             "task": "src.core.celery_tasks.dispatch_stale_journeys",
