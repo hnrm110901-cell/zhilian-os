@@ -818,6 +818,7 @@ celery_app.conf.update(
             "schedule": crontab(hour=6, minute=0, day_of_week=1),  # Monday 06:00 UTC
             "args": (),
             "options": {"queue": "low_priority", "priority": 3},
+        },
         # 私域旅程 catch-up：每5分钟扫描 next_action_at 过期的 running 旅程并重新调度
         "dispatch-stale-journeys": {
             "task": "src.core.celery_tasks.dispatch_stale_journeys",
