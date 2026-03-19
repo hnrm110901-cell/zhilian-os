@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.employee import Employee  # 影子写入（向后兼容，待M4删除）
 from src.models.hr.person import Person
 from src.models.organization import Organization
 
@@ -190,22 +189,9 @@ class HRRosterImportService:
                 emp_id = str(data["id"]).strip()
                 data["store_id"] = data.get("store_id") or store_id
 
-                # ── 主写入：Person 表 ──
+                # 写入 Person 表（三层模型主路径）
                 await self._upsert_person(db, emp_id, data)
-
-                # ── 影子写入：Employee 表（向后兼容，待 M4 删除） ──
-                existing = await db.execute(select(Employee).where(Employee.id == emp_id))
-                emp = existing.scalar_one_or_none()
-
-                if emp:
-                    for key, val in data.items():
-                        if key != "id" and val is not None:
-                            setattr(emp, key, val)
-                    stats["updated"] += 1
-                else:
-                    emp = Employee(**data)
-                    db.add(emp)
-                    stats["created"] += 1
+                stats["created"] += 1
 
                 # 自动创建组织节点（如果有部门/区域信息）
                 dept = None

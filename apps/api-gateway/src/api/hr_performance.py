@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.employee_contract import ContractStatus, ContractType, EmployeeContract
 from ..models.performance_review import PerformanceReview, PerformanceTemplate, ReviewLevel, ReviewStatus
 from ..models.user import User
@@ -80,8 +81,12 @@ async def list_reviews(
         conditions.append(PerformanceReview.status == status)
 
     result = await db.execute(
-        select(PerformanceReview, Employee.name, Employee.position)
-        .join(Employee, PerformanceReview.employee_id == Employee.id)
+        select(PerformanceReview, Person.name, EmploymentAssignment.position)
+        .join(Person, Person.legacy_employee_id == PerformanceReview.employee_id)
+        .outerjoin(EmploymentAssignment, and_(
+            EmploymentAssignment.person_id == Person.id,
+            EmploymentAssignment.status == "active",
+        ))
         .where(and_(*conditions))
         .order_by(PerformanceReview.created_at.desc())
     )

@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
 from ..models.user import User
 
@@ -160,11 +161,15 @@ async def list_employee_insurances(
     query = (
         select(
             EmployeeSocialInsurance,
-            Employee.name.label("employee_name"),
-            Employee.position.label("employee_position"),
+            Person.name.label("employee_name"),
+            EmploymentAssignment.position.label("employee_position"),
             SocialInsuranceConfig.region_name,
         )
-        .join(Employee, EmployeeSocialInsurance.employee_id == Employee.id)
+        .join(Person, Person.legacy_employee_id == EmployeeSocialInsurance.employee_id)
+        .outerjoin(EmploymentAssignment, and_(
+            EmploymentAssignment.person_id == Person.id,
+            EmploymentAssignment.status == "active",
+        ))
         .join(SocialInsuranceConfig, EmployeeSocialInsurance.config_id == SocialInsuranceConfig.id)
         .where(
             and_(
@@ -212,7 +217,7 @@ async def set_employee_insurance(
 ):
     """设置员工参保方案"""
     # 验证员工存在
-    emp = await db.execute(select(Employee.id).where(Employee.id == body.employee_id))
+    emp = await db.execute(select(Person.id).where(Person.legacy_employee_id == body.employee_id))
     if not emp.scalars().first():
         raise HTTPException(status_code=404, detail="员工不存在")
 

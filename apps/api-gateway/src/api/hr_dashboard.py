@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.attendance import AttendanceLog
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.employee_contract import ContractStatus, EmployeeContract
 from ..models.employee_lifecycle import ChangeType, EmployeeChange
 from ..models.leave import LeaveRequest, LeaveRequestStatus
@@ -42,7 +43,7 @@ async def get_hr_overview(
 
     # 1. 在职人数
     active_count = await db.execute(
-        select(func.count(Employee.id)).where(and_(Employee.store_id == store_id, Employee.is_active.is_(True)))
+        select(func.count(Person.id)).where(and_(Person.store_id == store_id, Person.is_active.is_(True)))
     )
     total_active = active_count.scalar() or 0
 
@@ -294,16 +295,20 @@ async def get_position_distribution(
     """岗位分布"""
     result = await db.execute(
         select(
-            Employee.position,
-            func.count(Employee.id).label("count"),
+            EmploymentAssignment.position,
+            func.count(Person.id).label("count"),
         )
+        .join(EmploymentAssignment, and_(
+            EmploymentAssignment.person_id == Person.id,
+            EmploymentAssignment.status == "active",
+        ))
         .where(
             and_(
-                Employee.store_id == store_id,
-                Employee.is_active.is_(True),
+                Person.store_id == store_id,
+                Person.is_active.is_(True),
             )
         )
-        .group_by(Employee.position)
+        .group_by(EmploymentAssignment.position)
     )
     rows = result.all()
     return {

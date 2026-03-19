@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.employee import Employee
 from ..models.mentorship import Mentorship
 from ..models.training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
 from ..models.user import User

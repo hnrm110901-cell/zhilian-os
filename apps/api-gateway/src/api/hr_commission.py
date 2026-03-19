@@ -148,11 +148,11 @@ async def list_commission_records(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取门店月度提成记录"""
-    from ..models.employee import Employee
+    from ..models.hr.person import Person
 
     query = (
-        select(CommissionRecord, Employee.name.label("employee_name"))
-        .join(Employee, CommissionRecord.employee_id == Employee.id)
+        select(CommissionRecord, Person.name.label("employee_name"))
+        .join(Person, Person.legacy_employee_id == CommissionRecord.employee_id)
         .where(
             and_(
                 CommissionRecord.store_id == store_id,

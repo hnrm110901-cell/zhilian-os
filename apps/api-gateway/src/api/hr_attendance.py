@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.attendance import AttendanceLog, AttendanceRule, ShiftTemplate
-from ..models.employee import Employee
 from ..models.user import User
 from ..services.attendance_engine import AttendanceEngine
 

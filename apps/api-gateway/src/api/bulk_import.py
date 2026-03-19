@@ -14,7 +14,6 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from src.core.database import get_db_session
 from src.core.dependencies import get_current_user
-from src.models.employee import Employee  # 影子写入（向后兼容，待M4删除）
 from src.models.hr.person import Person
 from src.models.inventory import InventoryItem, InventoryStatus
 from src.models.order import Order, OrderItem, OrderStatus
@@ -101,30 +100,6 @@ async def import_employees(
                         is_active=is_active,
                     )
                     session.add(person)
-
-                # ── 影子写入：Employee 表（向后兼容，待 M4 删除） ──
-                existing_emp = await session.execute(select(Employee).where(Employee.id == emp_id))
-                emp = existing_emp.scalar_one_or_none()
-                if emp:
-                    emp.name = name
-                    emp.phone = phone or emp.phone
-                    emp.email = email or emp.email
-                    emp.position = position
-                    emp.hire_date = hire_date or emp.hire_date
-                    emp.is_active = is_active
-                else:
-                    session.add(
-                        Employee(
-                            id=emp_id,
-                            store_id=store_id,
-                            name=name,
-                            phone=phone,
-                            email=email,
-                            position=position,
-                            hire_date=hire_date,
-                            is_active=is_active,
-                        )
-                    )
 
                 ok += 1
             except Exception as e:

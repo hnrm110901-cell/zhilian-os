@@ -14,7 +14,9 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from src.models import Dish, DishCategory, Employee, InventoryItem, Order, OrderItem, Store
+from src.models import Dish, DishCategory, InventoryItem, Order, OrderItem, Store
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.supply_chain import Supplier
 from src.models.bom import BOMTemplate, BOMItem
 from src.models.waste_event import WasteEvent
@@ -195,38 +197,47 @@ async def sync_staff_to_graph(
     tenant_id: str,
     store_id: Optional[str] = None,
 ) -> int:
-    """将员工（Employee）从 PG 同步到图谱（Staff 节点），并建立 Staff -[:BELONGS_TO]-> Store。"""
+    """将员工（Person）从 PG 同步到图谱（Staff 节点），并建立 Staff -[:BELONGS_TO]-> Store。"""
     repo = get_ontology_repository()
     if not repo:
         return 0
-    q = select(Employee).where(Employee.is_active == True)
+    from sqlalchemy import and_
+    q = (
+        select(Person, EmploymentAssignment.position)
+        .outerjoin(EmploymentAssignment, and_(
+            EmploymentAssignment.person_id == Person.id,
+            EmploymentAssignment.status == "active",
+        ))
+        .where(Person.is_active == True)
+    )
     if store_id:
-        q = q.where(Employee.store_id == store_id)
+        q = q.where(Person.store_id == store_id)
     result = await session.execute(q)
-    employees = result.scalars().all()
+    rows = result.all()
     count = 0
-    for e in employees:
+    for person, position in rows:
+        legacy_id = person.legacy_employee_id or str(person.id)
         repo.merge_node(
             NodeLabel.Staff.value,
             "staff_id",
-            e.id,
+            legacy_id,
             {
-                "name": e.name or "",
-                "role": (e.position or ""),
-                "store_id": e.store_id or "",
+                "name": person.name or "",
+                "role": (position or ""),
+                "store_id": person.store_id or "",
                 "tenant_id": tenant_id,
             },
             tenant_id=tenant_id,
         )
-        if e.store_id:
+        if person.store_id:
             repo.merge_relation(
                 NodeLabel.Staff.value,
                 "staff_id",
-                e.id,
+                legacy_id,
                 RelType.BELONGS_TO.value,
                 NodeLabel.Store.value,
                 "store_id",
-                e.store_id,
+                person.store_id,
             )
         count += 1
     return count

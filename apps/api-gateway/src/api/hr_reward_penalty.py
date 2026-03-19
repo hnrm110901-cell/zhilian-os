@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.employee import Employee
+from ..models.hr.person import Person
 from ..models.reward_penalty import RewardPenaltyRecord, RewardPenaltyStatus, RewardPenaltyType
 from ..models.user import User
 
@@ -49,8 +49,8 @@ async def list_reward_penalties(
 ):
     """奖惩记录列表"""
     query = (
-        select(RewardPenaltyRecord, Employee.name.label("employee_name"))
-        .join(Employee, RewardPenaltyRecord.employee_id == Employee.id)
+        select(RewardPenaltyRecord, Person.name.label("employee_name"))
+        .join(Person, Person.legacy_employee_id == RewardPenaltyRecord.employee_id)
         .where(RewardPenaltyRecord.store_id == store_id)
     )
     if pay_month:

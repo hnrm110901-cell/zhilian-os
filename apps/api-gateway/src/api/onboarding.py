@@ -645,7 +645,7 @@ async def _bulk_import_employees(store_id: str, df: pd.DataFrame) -> tuple[int, 
     from sqlalchemy import select
 
     from ..core.database import get_db_session
-    from ..models.employee import Employee
+    from ..models.hr.person import Person
 
     ok, fail, errors = 0, 0, []
     async with get_db_session() as session:
@@ -658,16 +658,13 @@ async def _bulk_import_employees(store_id: str, df: pd.DataFrame) -> tuple[int, 
                     raise ValueError("姓名和岗位为必填项")
                 emp_id = f"EMP_{uuid.uuid4().hex[:8].upper()}"
                 hire_str = str(row.get("入职日期", "")).strip()
-                hire_date = date.fromisoformat(hire_str) if hire_str else None
                 is_active = str(row.get("是否在职", "1")).strip() not in ("0", "false", "否", "离职")
                 session.add(
-                    Employee(
-                        id=emp_id,
+                    Person(
+                        legacy_employee_id=emp_id,
                         store_id=store_id,
                         name=name,
                         phone=str(row.get("手机", "")).strip() or None,
-                        position=position,
-                        hire_date=hire_date,
                         is_active=is_active,
                     )
                 )

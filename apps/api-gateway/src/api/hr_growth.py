@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.employee import Employee
+from ..models.hr.person import Person
 from ..models.employee_growth import (
     CareerPath,
     EmployeeGrowthPlan,
@@ -274,8 +274,8 @@ async def list_growth_plans(
 ):
     """获取成长计划列表"""
     query = (
-        select(EmployeeGrowthPlan, Employee.name.label("employee_name"))
-        .join(Employee, EmployeeGrowthPlan.employee_id == Employee.id)
+        select(EmployeeGrowthPlan, Person.name.label("employee_name"))
+        .join(Person, Person.legacy_employee_id == EmployeeGrowthPlan.employee_id)
         .where(EmployeeGrowthPlan.store_id == store_id)
     )
     if employee_id:
@@ -334,8 +334,8 @@ async def list_milestones(
 ):
     """获取里程碑列表"""
     query = (
-        select(EmployeeMilestone, Employee.name.label("employee_name"))
-        .join(Employee, EmployeeMilestone.employee_id == Employee.id)
+        select(EmployeeMilestone, Person.name.label("employee_name"))
+        .join(Person, Person.legacy_employee_id == EmployeeMilestone.employee_id)
         .where(EmployeeMilestone.store_id == store_id)
     )
     if employee_id:
