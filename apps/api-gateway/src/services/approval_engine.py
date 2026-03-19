@@ -16,7 +16,8 @@ import structlog
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.approval import ApprovalDelegation, ApprovalInstance, ApprovalRecord, ApprovalStatus, ApprovalTemplate
-from src.models.employee import Employee
+from src.models.hr.employment_assignment import EmploymentAssignment
+from src.models.hr.person import Person
 
 logger = structlog.get_logger()
 
@@ -407,8 +408,13 @@ class ApprovalEngine:
         delegator_ids = [row[0] for row in delegation_result.all()]
 
         # 获取我负责角色对应的待审批
-        # 先找出该审批人在组织中的角色
-        emp_result = await db.execute(select(Employee.position, Employee.store_id).where(Employee.id == approver_id))
+        # 先找出该审批人在组织中的角色（通过 Person.legacy_employee_id 桥接）
+        emp_result = await db.execute(
+            select(EmploymentAssignment.position, Person.store_id)
+            .join(EmploymentAssignment, EmploymentAssignment.person_id == Person.id)
+            .where(Person.legacy_employee_id == str(approver_id))
+            .limit(1)
+        )
         emp_row = emp_result.first()
         approver_role = emp_row[0] if emp_row else None
 
@@ -446,9 +452,14 @@ class ApprovalEngine:
             if normalized_role == step_role:
                 matched.append(inst)
                 continue
-            # 检查委托人的角色是否匹配
+            # 检查委托人的角色是否匹配（通过 Person.legacy_employee_id 桥接）
             for did in delegator_ids:
-                d_result = await db.execute(select(Employee.position).where(Employee.id == did))
+                d_result = await db.execute(
+                    select(EmploymentAssignment.position)
+                    .join(Person, Person.id == EmploymentAssignment.person_id)
+                    .where(Person.legacy_employee_id == str(did))
+                    .limit(1)
+                )
                 d_row = d_result.first()
                 if d_row:
                     d_role = role_map.get(d_row[0], d_row[0])
@@ -554,38 +565,42 @@ class ApprovalEngine:
         role_map = self._role_to_position_map()
         positions = role_map.get(role, [role])
 
-        # 先在门店内查找
+        # 先在门店内查找（Person + EmploymentAssignment JOIN）
         for pos in positions:
             result = await db.execute(
-                select(Employee.id, Employee.name)
+                select(Person.legacy_employee_id, Person.name)
+                .join(EmploymentAssignment, EmploymentAssignment.person_id == Person.id)
                 .where(
                     and_(
-                        Employee.store_id == store_id,
-                        Employee.position == pos,
-                        Employee.is_active.is_(True),
+                        Person.store_id == store_id,
+                        EmploymentAssignment.position == pos,
+                        Person.is_active.is_(True),
+                        EmploymentAssignment.status == "active",
                     )
                 )
                 .limit(1)
             )
             row = result.first()
             if row:
-                return {"id": row[0], "name": row[1]}
+                return {"id": row[0] or str(row[1]), "name": row[1]}
 
-        # 跨门店查找（如 area_manager / hr_director / ceo 可能不在同一门店）
+        # 跨门店查找（area_manager / hr_director / ceo 可能不在同一门店）
         for pos in positions:
             result = await db.execute(
-                select(Employee.id, Employee.name)
+                select(Person.legacy_employee_id, Person.name)
+                .join(EmploymentAssignment, EmploymentAssignment.person_id == Person.id)
                 .where(
                     and_(
-                        Employee.position == pos,
-                        Employee.is_active.is_(True),
+                        EmploymentAssignment.position == pos,
+                        Person.is_active.is_(True),
+                        EmploymentAssignment.status == "active",
                     )
                 )
                 .limit(1)
             )
             row = result.first()
             if row:
-                return {"id": row[0], "name": row[1]}
+                return {"id": row[0] or str(row[1]), "name": row[1]}
 
         logger.warning(
             "approval.approver_not_found",
@@ -732,7 +747,7 @@ class ApprovalEngine:
 
     @staticmethod
     def _role_to_position_map() -> Dict[str, List[str]]:
-        """审批角色 → Employee.position 映射（一个角色可能对应多种职位名称）"""
+        """审批角色 → EmploymentAssignment.position 映射（一个角色可能对应多种职位名称）"""
         return {
             "store_manager": ["manager", "store_manager", "店长"],
             "area_manager": ["area_manager", "区域经理", "督导"],
@@ -744,7 +759,7 @@ class ApprovalEngine:
 
     @staticmethod
     def _position_to_role_map() -> Dict[str, str]:
-        """Employee.position → 审批角色（反向映射）"""
+        """EmploymentAssignment.position → 审批角色（反向映射）"""
         mapping: Dict[str, str] = {}
         for role, positions in ApprovalEngine._role_to_position_map().items():
             for pos in positions:
