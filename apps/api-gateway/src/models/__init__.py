@@ -727,3 +727,39 @@ from .marketing_task import (
 # P0-P2 智能提升（屯象OS）
 from .weight_learning import DecisionWeightConfig
 from .signal_routing_rule import SignalRoutingRule
+
+# ── 餐饮行业知识库 — 三库 + 菜品知识库 + 行业字典 ──
+from .knowledge_base import (
+    # BOM 配方与工艺库
+    BOMRecipe,
+    BOMRecipeItem,
+    BOMRecipeProcessStep,
+    BOMRecipeServingStandard,
+    BOMRecipeStorageRule,
+    BOMRecipeVersion,
+    BOMRecipeCostCalc,
+    # 成本结构基准库
+    CostBenchmark,
+    CostBenchmarkItem,
+    CostBenchmarkVersion,
+    CostStoreDailyFact,
+    CostDishDailyFact,
+    CostWarningRecord,
+    # 定价策略与折扣规则库
+    PricingStrategy,
+    PricingDishRule,
+    PricingStrategyVersion,
+    PromotionRule,
+    CouponTemplate,
+    PricingExecutionSnapshot,
+    # 菜品知识库
+    DishKnowledge,
+    DishRecipeVersion,
+    DishRecipeIngredient,
+    IndustryIngredientMaster,
+    DishKnowledgeNutrition,
+    DishKnowledgeOperationProfile,
+    DishKnowledgeTaxonomyTag,
+    # 行业字典
+    IndustryDictionary,
+)
