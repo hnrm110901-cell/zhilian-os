@@ -7,6 +7,7 @@ from ..base import Base
 
 class RetentionSignal(Base):
     __tablename__ = "retention_signals"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     assignment_id = Column(UUID(as_uuid=True),
