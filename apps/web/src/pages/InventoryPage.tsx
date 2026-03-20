@@ -462,7 +462,7 @@ const InventoryPage: React.FC = () => {
             <Select placeholder="选择操作类型">
               {Object.entries(TXN_CONFIG).map(([k, v]) => (
                 <Option key={k} value={k}><Tag color={v.color}>{v.text}</Tag></Option>
-              )) : null}
+              ))}
             </Select>
           </Form.Item>
           <Form.Item label="数量" name="quantity" rules={[{ required: true }, { type: 'number', min: 0.01 }]}>

@@ -159,7 +159,7 @@ const CompliancePage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }} placeholder="全部门店" allowClear>
           {stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : null}
+          ))}
         </Select>
         <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
         <Button icon={<ScanOutlined />} loading={scanning} onClick={scanStore}>扫描到期证照</Button>

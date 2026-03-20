@@ -313,7 +313,7 @@ const FinancialAnomalyPage: React.FC = () => {
           >
             {periodOptions.map((p) => (
               <Option key={p} value={p}>{p}</Option>
-            )) : null}
+            ))}
           </Select>
           <Button
             type="primary"

@@ -434,7 +434,7 @@ const DishLifecyclePage: React.FC = () => {
                       <Option key={p} value={p}>
                         {PHASE_CONFIG[p]?.icon} {PHASE_CONFIG[p]?.label}
                       </Option>
-                    )) : null}
+                    ))}
                   </Select>
                 </Space>
                 {records.length === 0 ? (

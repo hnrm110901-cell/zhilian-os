@@ -405,7 +405,7 @@ const OrderPage: React.FC = () => {
                     <Option value="all">全部状态</Option>
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                       <Option key={k} value={k}>{v.text}</Option>
-                    )) : null}
+                    ))}
                   </Select>
                   <span style={{ color: '#999' }}>共 {filteredOrders.length} 条</span>
                 </Space>

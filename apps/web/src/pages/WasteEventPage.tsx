@@ -442,7 +442,7 @@ const WasteEventPage: React.FC = () => {
                   >
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                       <Option key={k} value={k}>{v.label}</Option>
-                    )) : null}
+                    ))}
                   </Select>
                   <Select
                     placeholder="事件类型"
@@ -453,7 +453,7 @@ const WasteEventPage: React.FC = () => {
                   >
                     {Object.entries(TYPE_CONFIG).map(([k, v]) => (
                       <Option key={k} value={k}>{v.label}</Option>
-                    )) : null}
+                    ))}
                   </Select>
                   <Select
                     value={days}
@@ -462,7 +462,7 @@ const WasteEventPage: React.FC = () => {
                   >
                     {[7, 14, 30, 60, 90].map(d => (
                       <Option key={d} value={d}>最近{d}天</Option>
-                    )) : null}
+                    ))}
                   </Select>
                 </Space>
 
@@ -743,7 +743,7 @@ const WasteEventPage: React.FC = () => {
             <Select placeholder="选择根因" showSearch allowClear>
               {Object.entries(ROOT_CAUSE_LABELS).map(([k, v]) => (
                 <Option key={k} value={k}>{v}</Option>
-              )) : null}
+              ))}
             </Select>
           </Form.Item>
           <Form.Item name="action_taken" label="实际处置措施">

@@ -552,7 +552,7 @@ const SchedulePage: React.FC = () => {
                           <Select placeholder="选择员工">
                             {employees.filter(e => e.is_active).map(e => (
                               <Option key={e.id} value={e.id}>{e.name}</Option>
-                            )) : null}
+                            ))}
                           </Select>
                         </Form.Item>
                       </Col>

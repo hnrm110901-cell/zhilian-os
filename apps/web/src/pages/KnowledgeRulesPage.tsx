@@ -410,7 +410,7 @@ const KnowledgeRulesPage: React.FC = () => {
             >
               {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
                 <Option key={k} value={k}>{v.label}</Option>
-              )) : null}
+              ))}
             </Select>
             <Select
               style={{ width: 100 }}
@@ -421,7 +421,7 @@ const KnowledgeRulesPage: React.FC = () => {
             >
               {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                 <Option key={k} value={k}>{v.label}</Option>
-              )) : null}
+              ))}
             </Select>
           </Space>
 
@@ -502,7 +502,7 @@ const KnowledgeRulesPage: React.FC = () => {
                 >
                   {Object.entries(INDUSTRY_LABELS).map(([k, v]) => (
                     <Option key={k} value={k}>{v}</Option>
-                  )) : null}
+                  ))}
                 </Select>
               </Col>
               <Col span={16}>

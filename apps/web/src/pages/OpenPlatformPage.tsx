@@ -165,7 +165,7 @@ const OpenPlatformPage: React.FC = () => {
                               <Option key={t} value={t}>
                                 <Tag color={tierColor[t]}>{t.toUpperCase()}</Tag>
                               </Option>
-                            )) : null}
+                            ))}
                           </Select>
                         </Form.Item>
                         <Button type="primary" htmlType="submit" icon={<UserAddOutlined />}>注册开发者</Button>

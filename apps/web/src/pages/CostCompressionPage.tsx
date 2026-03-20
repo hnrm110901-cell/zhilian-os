@@ -149,13 +149,13 @@ function CompressionBoard({ storeId, period }: { storeId: string; period: string
           value={action} onChange={v => { setAction(v); setPriority(undefined); }}>
           {Object.entries(ACTION_CONFIG).map(([k, v]) => (
             <Option key={k} value={k}><Tag color={v.color}>{v.label}</Tag></Option>
-          )) : null}
+          ))}
         </Select>
         <Select allowClear placeholder="筛选优先级" style={{ width: 120 }}
           value={priority} onChange={v => { setPriority(v); setAction(undefined); }}>
           {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
             <Option key={k} value={k}><span className={v.cls}>{v.label}</span></Option>
-          )) : null}
+          ))}
         </Select>
         <Button type="primary" icon={<SearchOutlined />} onClick={load} loading={loading}>查询</Button>
       </div>
@@ -609,7 +609,7 @@ const CostCompressionPage: React.FC = () => {
                 <Select value={reduction} onChange={setReduction} style={{ width: 100 }}>
                   {[1.0, 1.5, 2.0, 2.5, 3.0].map(n => (
                     <Option key={n} value={n}>目标降 {n}pp</Option>
-                  )) : null}
+                  ))}
                 </Select>
               </Tooltip>
               <Button type="primary" icon={<WarningOutlined />} loading={computing} onClick={handleCompute}>

@@ -78,7 +78,7 @@ const IndustrySolutionsPage: React.FC = () => {
             <Select value={industryType} onChange={setIndustryType} style={{ width: 160 }}>
               {Object.entries(industryLabel).map(([k, v]) => (
                 <Option key={k} value={k}>{v}</Option>
-              )) : null}
+              ))}
             </Select>
             <Button type="primary" icon={<GlobalOutlined />} onClick={handleGetSolution}>查询方案</Button>
           </Space>
