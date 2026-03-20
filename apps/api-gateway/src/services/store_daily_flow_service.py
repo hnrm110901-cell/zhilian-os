@@ -334,3 +334,18 @@ STANDARD_TASKS = {
         {"code": "next_day_todo", "name": "明日待办", "order": 5, "required": True, "role": "store_manager", "proof": "text"},
     ],
 }
+
+# 11个标准节点定义（纯数据，不依赖 SQLAlchemy，供 API 层直接引用）
+STANDARD_NODES = [
+    {"code": "opening_prep",    "name": "开店准备",  "order": 1,  "start": "07:00", "end": "08:30", "role": "store_manager"},
+    {"code": "ready_check",     "name": "营业就绪",  "order": 2,  "start": "08:30", "end": "10:00", "role": "store_manager"},
+    {"code": "lunch_warmup",    "name": "午市预热",  "order": 3,  "start": "10:00", "end": "11:30", "role": "store_manager"},
+    {"code": "lunch_peak",      "name": "午市高峰",  "order": 4,  "start": "11:30", "end": "14:00", "role": "store_manager"},
+    {"code": "lunch_wrapup",    "name": "午市收尾",  "order": 5,  "start": "14:00", "end": "16:30", "role": "store_manager"},
+    {"code": "dinner_prep",     "name": "晚市准备",  "order": 6,  "start": "16:30", "end": "17:30", "role": "store_manager"},
+    {"code": "dinner_peak",     "name": "晚市高峰",  "order": 7,  "start": "17:30", "end": "21:30", "role": "store_manager"},
+    {"code": "late_night_prep", "name": "夜宵准备",  "order": 8,  "start": "21:00", "end": "22:00", "role": "store_manager", "optional": True},
+    {"code": "late_night_ops",  "name": "夜宵经营",  "order": 9,  "start": "22:00", "end": "02:00", "role": "store_manager", "optional": True},
+    {"code": "closing",         "name": "闭店收尾",  "order": 10, "start": "21:30", "end": "23:00", "role": "store_manager"},
+    {"code": "settlement",      "name": "日清日结",  "order": 11, "start": "22:00", "end": "24:00", "role": "store_manager"},
+]
