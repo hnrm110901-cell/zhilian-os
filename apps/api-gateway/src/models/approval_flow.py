@@ -91,60 +91,8 @@ class ApprovalFlowTemplate(Base, TimestampMixin):
 # ── 2. 审批实例 ────────────────────────────────────────────
 
 
-class ApprovalInstance(Base, TimestampMixin):
-    """
-    审批实例：每次发起审批创建一条。
-    关联到具体的业务数据（请假单、加班单等）。
-    """
-
-    __tablename__ = "approval_instances"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    store_id = Column(String(50), nullable=False, index=True)
-    template_id = Column(UUID(as_uuid=True), ForeignKey("approval_flow_templates.id"), nullable=True)
-
-    approval_type = Column(
-        SAEnum(ApprovalType, name="approval_type_enum"),
-        nullable=False,
-        index=True,
-    )
-    status = Column(
-        SAEnum(ApprovalStatus, name="approval_status_enum"),
-        nullable=False,
-        default=ApprovalStatus.PENDING,
-        index=True,
-    )
-
-    # 发起人
-    applicant_id = Column(String(50), nullable=False, index=True)
-    applicant_name = Column(String(100), nullable=True)
-
-    # 关联业务
-    business_type = Column(String(50), nullable=False)  # "leave_request", "overtime_request", etc.
-    business_id = Column(String(50), nullable=False)  # 业务记录ID
-
-    # 审批标题和摘要
-    title = Column(String(200), nullable=False)
-    summary = Column(Text, nullable=True)
-
-    # 业务数据快照（审计用）
-    business_data = Column(JSON, nullable=True)
-
-    # 当前审批步骤
-    current_step = Column(Integer, default=1)
-    total_steps = Column(Integer, default=1)
-
-    # 审批结果
-    final_approver_id = Column(String(50), nullable=True)
-    final_approver_name = Column(String(100), nullable=True)
-    rejection_reason = Column(Text, nullable=True)
-
-    approved_at = Column(DateTime, nullable=True)
-    rejected_at = Column(DateTime, nullable=True)
-    expired_at = Column(DateTime, nullable=True)
-
-    def __repr__(self):
-        return f"<ApprovalInstance(type='{self.approval_type}', " f"status='{self.status}', applicant='{self.applicant_id}')>"
+# ApprovalInstance 已迁移到 models/hr/approval_instance.py，此处 re-export 保持向后兼容
+from .hr.approval_instance import ApprovalInstance  # noqa: F401
 
 
 # ── 3. 审批节点记录 ────────────────────────────────────────

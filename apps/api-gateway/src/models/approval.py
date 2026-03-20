@@ -21,31 +21,8 @@ class ApprovalStatus(str, enum.Enum):
     ESCALATED = "escalated"  # 超期自动升级
 
 
-class ApprovalTemplate(Base, TimestampMixin):
-    """审批模板 — 定义审批路由规则"""
-
-    __tablename__ = "approval_templates"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    brand_id = Column(String(50), nullable=False, index=True)
-
-    template_code = Column(String(50), nullable=False, unique=True)
-    template_name = Column(String(100), nullable=False)
-
-    # 审批链路 JSON:
-    # [{"level": 1, "role": "store_manager", "timeout_hours": 24},
-    #  {"level": 2, "role": "area_manager", "timeout_hours": 48,
-    #   "condition": "amount_fen > 500000"},
-    #  {"level": 3, "role": "hr_director", "timeout_hours": 72}]
-    approval_chain = Column(JSON, nullable=False)
-
-    # 金额阈梯触发:
-    # [{"threshold_fen": 500000, "extra_approver_role": "area_manager"},
-    #  {"threshold_fen": 2000000, "extra_approver_role": "ceo"}]
-    amount_thresholds = Column(JSON, default=list)
-
-    is_active = Column(Boolean, default=True)
-    description = Column(Text, nullable=True)
+# ApprovalTemplate 已迁移到 models/hr/approval_template.py，此处 re-export 保持向后兼容
+from .hr.approval_template import ApprovalTemplate  # noqa: F401
 
 
 class ApprovalInstance(Base, TimestampMixin):

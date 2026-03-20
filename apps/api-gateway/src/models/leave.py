@@ -92,90 +92,15 @@ class LeaveTypeConfig(Base, TimestampMixin):
 # ── 2. 假期余额 ────────────────────────────────────────────
 
 
-class LeaveBalance(Base, TimestampMixin):
-    """
-    员工假期余额：每年每种假期一条。
-    """
-
-    __tablename__ = "leave_balances"
-    __table_args__ = (UniqueConstraint("employee_id", "year", "leave_category", name="uq_leave_balance"),)
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    store_id = Column(String(50), nullable=False, index=True)
-    employee_id = Column(String(50), ForeignKey("employees.id"), nullable=False, index=True)
-    year = Column(Integer, nullable=False)
-
-    leave_category = Column(
-        SAEnum(LeaveCategory, name="leave_category_enum"),
-        nullable=False,
-    )
-
-    total_days = Column(Numeric(5, 1), nullable=False, default=0)  # 总额度
-    used_days = Column(Numeric(5, 1), nullable=False, default=0)  # 已使用
-    pending_days = Column(Numeric(5, 1), nullable=False, default=0)  # 审批中
-
-    @property
-    def remaining_days(self):
-        return float(self.total_days) - float(self.used_days) - float(self.pending_days)
-
-    def __repr__(self):
-        return (
-            f"<LeaveBalance(employee='{self.employee_id}', "
-            f"year={self.year}, {self.leave_category}: "
-            f"used={self.used_days}/{self.total_days})>"
-        )
+# LeaveBalance 已迁移到 models/hr/leave_balance.py，此处 re-export 保持向后兼容
+from .hr.leave_balance import LeaveBalance  # noqa: F401
 
 
 # ── 3. 请假单 ──────────────────────────────────────────────
 
 
-class LeaveRequest(Base, TimestampMixin):
-    """请假申请单"""
-
-    __tablename__ = "leave_requests"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    store_id = Column(String(50), nullable=False, index=True)
-    employee_id = Column(String(50), ForeignKey("employees.id"), nullable=False, index=True)
-
-    leave_category = Column(
-        SAEnum(LeaveCategory, name="leave_category_enum"),
-        nullable=False,
-    )
-    status = Column(
-        SAEnum(LeaveRequestStatus, name="leave_request_status_enum"),
-        nullable=False,
-        default=LeaveRequestStatus.DRAFT,
-        index=True,
-    )
-
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    start_half = Column(String(10), default="am")  # am/pm（半天假）
-    end_half = Column(String(10), default="pm")
-
-    leave_days = Column(Numeric(5, 1), nullable=False)  # 请假天数
-    leave_hours = Column(Numeric(6, 1), nullable=True)  # 请假小时数
-
-    reason = Column(Text, nullable=False)
-    attachment_urls = Column(JSON, nullable=True)  # 附件（病假证明等）
-
-    # 审批关联
-    approval_instance_id = Column(UUID(as_uuid=True), nullable=True)
-
-    # 代班信息
-    substitute_employee_id = Column(String(50), nullable=True)
-
-    approved_by = Column(String(100), nullable=True)
-    approved_at = Column(DateTime, nullable=True)
-    rejection_reason = Column(Text, nullable=True)
-
-    def __repr__(self):
-        return (
-            f"<LeaveRequest(employee='{self.employee_id}', "
-            f"{self.leave_category}: {self.start_date}~{self.end_date}, "
-            f"status='{self.status}')>"
-        )
+# LeaveRequest 已迁移到 models/hr/leave_request.py，此处 re-export 保持向后兼容
+from .hr.leave_request import LeaveRequest  # noqa: F401
 
 
 # ── 4. 加班单 ──────────────────────────────────────────────

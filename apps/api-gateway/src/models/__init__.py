@@ -573,7 +573,7 @@ from .action_task import ActionTask
 from .weekly_review import WeeklyReview, WeeklyReviewItem
 from .data_quality_check import DataQualityCheckRecord
 
-# HR domain models (z54)
+# HR domain models (z54) — 完整导入 hr/ 子目录所有模型
 from .hr import (
     Person,
     EmploymentAssignment,
@@ -581,6 +581,16 @@ from .hr import (
     EmployeeIdMap,
     AttendanceRule,
     KpiTemplate,
+    OnboardingProcess,
+    OnboardingChecklistItem,
+    OffboardingProcess,
+    TransferProcess,
+    ApprovalStepRecord,
+    ClockRecord,
+    DailyAttendance,
+    PayrollBatch,
+    PayrollItem,
+    CostAllocation,
 )
 
 # HR Knowledge OS models (z55)
@@ -698,12 +708,9 @@ from .social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
 # HR Phase 4 — 培训认证/师徒制
 from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
 
-# HR架构重构 — 旧 M1 models 已移入 hr/ 目录（上方 z54 区块导入）
-from .skill_node import SkillNode
+# HR架构重构 — skill_node/behavior_pattern/retention_signal/knowledge_capture
+# 已迁移到 hr_knowledge/ 子目录（上方 z55 区块已导入），此处仅补充 Achievement
 from .achievement import Achievement
-from .behavior_pattern import BehaviorPattern
-from .retention_signal import RetentionSignal
-from .knowledge_capture import KnowledgeCapture
 
 # P2 — 服务券 + 发券ROI
 from .service_voucher import ServiceVoucherTemplate, ServiceVoucher
