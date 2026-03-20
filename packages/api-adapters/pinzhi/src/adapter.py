@@ -194,39 +194,62 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询菜品信息", updatetime=updatetime)
 
-        try:
-            response = await self._request("POST", "/pinzhi/querydishes.do", data=params)
-            return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询菜品失败", error=str(e))
-            return []
+        # 品智菜品接口有多个路径和请求方式组合，不同网关部署可能不同
+        # queryDishesInfo.do 的 POST multipart 签名规则与 GET 不同，
+        # 需和品智确认具体签名方式；当前已知 querydishes.do POST 可用
+        for method, path in [
+            ("POST", "/pinzhi/querydishes.do"),
+            ("POST", "/pinzhi/queryDishesInfo.do"),
+            ("GET", "/pinzhi/queryDishesInfo.do"),
+        ]:
+            try:
+                if method == "GET":
+                    response = await self._request("GET", path, params=params)
+                else:
+                    response = await self._request("POST", path, data=params)
+                return response.get("data", [])
+            except Exception as e:
+                logger.warning("查询菜品失败", method=method, path=path, error=str(e))
+        return []
 
-    async def get_practice(self) -> List[Dict[str, Any]]:
+    async def get_practice(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         查询做法和配料信息
+
+        Args:
+            ognid: 门店omsID，实测需传 ognid 才能正确签名
 
         Returns:
             做法和配料列表
         """
-        params = self._add_sign({})
-        logger.info("查询做法配料")
+        params = {}
+        if ognid:
+            params["ognid"] = ognid
+        params = self._add_sign(params)
+        logger.info("查询做法配料", ognid=ognid)
 
         try:
-            response = await self._request("POST", "/pinzhi/queryPractice.do", data=params)
+            response = await self._request("GET", "/pinzhi/queryPractice.do", params=params)
             return response.get("data", [])
         except Exception as e:
             logger.warning("查询做法配料失败", error=str(e))
             return []
 
-    async def get_tables(self) -> List[Dict[str, Any]]:
+    async def get_tables(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         查询收银桌台信息
+
+        Args:
+            ognid: 门店omsID，部分网关要求传门店参数
 
         Returns:
             桌台信息列表
         """
-        params = self._add_sign({})
-        logger.info("查询桌台信息")
+        params = {}
+        if ognid:
+            params["ognid"] = ognid
+        params = self._add_sign(params)
+        logger.info("查询桌台信息", ognid=ognid)
 
         try:
             response = await self._request("GET", "/pinzhi/queryTable.do", params=params)
@@ -235,22 +258,30 @@ class PinzhiAdapter:
             logger.warning("查询桌台失败", error=str(e))
             return []
 
-    async def get_employees(self) -> List[Dict[str, Any]]:
+    async def get_employees(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         查询门店用户（员工）信息
+
+        Args:
+            ognid: 门店omsID，部分网关要求传门店参数
 
         Returns:
             员工信息列表
         """
-        params = self._add_sign({})
-        logger.info("查询员工信息")
+        params = {}
+        if ognid:
+            params["ognid"] = ognid
+        params = self._add_sign(params)
+        logger.info("查询员工信息", ognid=ognid)
 
-        try:
-            response = await self._request("GET", "/pinzhi/employe.do", params=params)
-            return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询员工失败", error=str(e))
-            return []
+        # 尝试两个可能的接口路径
+        for path in ["/pinzhi/employe.do", "/pinzhi/queryUserInfo.do"]:
+            try:
+                response = await self._request("GET", path, params=params)
+                return response.get("data", [])
+            except Exception as e:
+                logger.warning("查询员工失败", path=path, error=str(e))
+        return []
 
     # ==================== 业务数据接口 ====================
 
@@ -516,17 +547,14 @@ class PinzhiAdapter:
         checks = [
             ("门店信息", "GET", "/pinzhi/organizations.do", lambda: {"ognid": ognid} if ognid else {}, True),
             ("门店每日经营数据(报表)", "GET", "/pinzhi/queryOgnDailyBizData.do", lambda: {"businessDate": business_date, **({"ognid": ognid} if ognid else {})}, True),
-            ("按门店收入数据", "GET", "/pinzhi/queryOrderSummary.do", lambda: {"ognid": ognid or "", "businessDate": business_date}, True),  # 无 ognid 时可能报错，仍尝试
-            ("订单列表V2", "GET", "/pinzhi/orderNew.do", lambda: {"beginDate": business_date, "endDate": business_date, "pageIndex": 1, "pageSize": 5}, True),
+            ("按门店收入数据", "GET", "/pinzhi/queryOrderSummary.do", lambda: {"ognid": ognid or "", "businessDate": business_date}, True),
+            ("订单列表V2", "POST", "/pinzhi/orderNew.do", lambda: {"ognid": ognid or "", "businessDate": business_date, "pageIndex": 1, "pageSize": 5}, True),
             ("菜品类别", "GET", "/pinzhi/reportcategory.do", lambda: {}, True),
-            ("支付方式", "GET", "/pinzhi/payType.do", lambda: {}, True),
-            ("支付方式(payment)", "GET", "/pinzhi/payment.do", lambda: {}, False),  # 部分环境用 payment.do
-            ("组织/机构", "GET", "/pinzhi/organizations.do", lambda: {}, False),
-            ("所有门店营业额", "GET", "/pinzhi/queryStoreSummaryList.do", lambda: {"businessDate": business_date}, False),
-            ("出品过程明细", "GET", "/pinzhi/queryCookingDetail.do", lambda: {"businessDate": business_date}, False),
+            ("菜品列表", "POST", "/pinzhi/querydishes.do", lambda: {"updatetime": 0}, False),  # 签名机制待品智确认
+            ("支付方式", "GET", "/pinzhi/payment.do", lambda: {}, True),
             ("挂账客户", "GET", "/pinzhi/paymentCustomer.do", lambda: {}, False),
-            ("桌台信息", "GET", "/pinzhi/queryTable.do", lambda: {}, False),
-            ("门店用户(employe)", "GET", "/pinzhi/employe.do", lambda: {}, False),
+            ("桌台信息", "GET", "/pinzhi/queryTable.do", lambda: {**({"ognid": ognid} if ognid else {})}, False),
+            ("门店用户", "GET", "/pinzhi/queryUserInfo.do", lambda: {**({"ognid": ognid} if ognid else {})}, False),
         ]
 
         core_names = {
