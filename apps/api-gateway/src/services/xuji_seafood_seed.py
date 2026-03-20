@@ -328,6 +328,7 @@ class XujiSeafoodSeedService:
             store = Store(
                 id=s["id"],
                 name=s["name"],
+                code=s["id"].replace("_", ""),  # xuji_wuyi → xujiwuyi
                 brand_id=BRAND_ID,
                 address=s.get("address"),
                 city=s.get("city"),
