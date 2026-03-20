@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.employee_contract import ContractStatus, ContractType, EmployeeContract
 from ..models.employee_lifecycle import ChangeType, EmployeeChange
 from ..models.payroll import PayrollRecord, PayrollStatus, SalaryStructure
@@ -158,27 +159,37 @@ async def batch_hire(
         savepoint = await db.begin_nested()
         try:
             # 检查员工ID是否已存在
-            exists = await db.execute(select(Employee.id).where(Employee.id == emp_data.employee_id))
+            exists = await db.execute(
+                select(Person.id).where(Person.legacy_employee_id == emp_data.employee_id)
+            )
             if exists.scalars().first():
                 raise ValueError(f"员工ID {emp_data.employee_id} 已存在")
 
             hire_date_parsed = date.fromisoformat(emp_data.hire_date)
 
-            # 创建员工记录
-            employee = Employee(
-                id=emp_data.employee_id,
+            # 创建 Person
+            person = Person(
+                legacy_employee_id=emp_data.employee_id,
                 store_id=emp_data.store_id,
                 name=emp_data.name,
                 phone=emp_data.phone,
                 email=emp_data.email,
-                position=emp_data.position,
-                hire_date=hire_date_parsed,
                 is_active=True,
-                employment_status="regular",
-                employment_type=emp_data.employment_type,
                 wechat_userid=emp_data.wechat_userid,
             )
-            db.add(employee)
+            db.add(person)
+            await db.flush()  # 获取 person.id
+
+            # 创建在岗关系
+            ea = EmploymentAssignment(
+                person_id=person.id,
+                org_node_id=emp_data.store_id,
+                position=emp_data.position,
+                employment_type=emp_data.employment_type or "full_time",
+                start_date=hire_date_parsed,
+                status="active",
+            )
+            db.add(ea)
 
             # 创建入职变动记录
             change = EmployeeChange(
@@ -268,27 +279,48 @@ async def batch_transfer(
     for idx, t in enumerate(transfers):
         savepoint = await db.begin_nested()
         try:
-            # 查找员工
-            emp_result = await db.execute(
-                select(Employee).where(
+            # 查找人员 + 在岗关系
+            row = await db.execute(
+                select(Person, EmploymentAssignment)
+                .outerjoin(
+                    EmploymentAssignment,
                     and_(
-                        Employee.id == t.employee_id,
-                        Employee.is_active.is_(True),
+                        EmploymentAssignment.person_id == Person.id,
+                        EmploymentAssignment.status == "active",
+                    ),
+                )
+                .where(
+                    and_(
+                        Person.legacy_employee_id == t.employee_id,
+                        Person.is_active.is_(True),
                     )
                 )
             )
-            employee = emp_result.scalar_one_or_none()
-            if not employee:
+            result_row = row.first()
+            if not result_row:
                 raise ValueError(f"员工 {t.employee_id} 不存在或已离职")
+            person, ea = result_row
 
             effective = date.fromisoformat(t.effective_date)
-            old_position = employee.position
-            old_store = employee.store_id
+            old_position = ea.position if ea else None
+            old_store = person.store_id
 
-            # 更新员工信息
-            employee.store_id = t.to_store_id
-            if t.new_position:
-                employee.position = t.new_position
+            # 更新 Person 门店
+            person.store_id = t.to_store_id
+
+            # 结束旧在岗关系 + 创建新在岗关系
+            if ea:
+                ea.status = "ended"
+                ea.end_date = effective
+            new_ea = EmploymentAssignment(
+                person_id=person.id,
+                org_node_id=t.to_store_id,
+                position=t.new_position or old_position,
+                employment_type=ea.employment_type if ea else "full_time",
+                start_date=effective,
+                status="active",
+            )
+            db.add(new_ea)
 
             # 创建调动记录
             change = EmployeeChange(
@@ -367,17 +399,17 @@ async def batch_salary_adjust(
     for idx, adj in enumerate(adjustments):
         savepoint = await db.begin_nested()
         try:
-            # 查找员工
-            emp_result = await db.execute(
-                select(Employee).where(
+            # 查找人员
+            person_result = await db.execute(
+                select(Person).where(
                     and_(
-                        Employee.id == adj.employee_id,
-                        Employee.is_active.is_(True),
+                        Person.legacy_employee_id == adj.employee_id,
+                        Person.is_active.is_(True),
                     )
                 )
             )
-            employee = emp_result.scalar_one_or_none()
-            if not employee:
+            person = person_result.scalar_one_or_none()
+            if not person:
                 raise ValueError(f"员工 {adj.employee_id} 不存在或已离职")
 
             # 获取当前薪资方案

@@ -32,7 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.config import settings
 from ..core.security import get_password_hash
 from ..models.brand_im_config import BrandIMConfig, IMPlatform, IMSyncLog
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.user import User, UserRole
 
 logger = structlog.get_logger()
@@ -359,14 +360,16 @@ class IMSyncService:
             if not default_store:
                 raise ValueError("品牌下无门店，无法同步员工")
 
-            # 获取本地该品牌所有员工（按 im_userid 索引）
+            # 获取本地该品牌所有人员（按 im_userid 索引）
             local_employees = {}
             for store_id in brand_store_ids:
-                emp_result = await self.db.execute(select(Employee).where(Employee.store_id == store_id))
-                for emp in emp_result.scalars().all():
-                    im_uid = getattr(emp, userid_field, None)
+                emp_result = await self.db.execute(
+                    select(Person).where(Person.store_id == store_id)
+                )
+                for person in emp_result.scalars().all():
+                    im_uid = getattr(person, userid_field, None)
                     if im_uid:
-                        local_employees[im_uid] = emp
+                        local_employees[im_uid] = person
 
             # 平台上有的 userid 集合
             platform_uids = set()
@@ -377,27 +380,27 @@ class IMSyncService:
                 if not member.is_active:
                     # 平台上已离职
                     if member.userid in local_employees:
-                        emp = local_employees[member.userid]
-                        if emp.is_active:
-                            await self._disable_employee(emp, config, stats)
+                        person = local_employees[member.userid]
+                        if person.is_active:
+                            await self._disable_person(person, config, stats)
                     continue
 
                 if member.userid in local_employees:
-                    # 更新现有员工
-                    emp = local_employees[member.userid]
-                    changed = self._update_employee_fields(emp, member)
+                    # 更新现有人员
+                    person = local_employees[member.userid]
+                    changed = self._update_person_fields(person, member)
                     if changed:
                         stats["updated"] += 1
                     # 确保在职状态
-                    if not emp.is_active:
-                        emp.is_active = True
-                        emp.employment_status = "regular"
+                    if not person.is_active:
+                        person.is_active = True
+                        person.career_stage = "regular"
                         stats["updated"] += 1
                 else:
-                    # 新增员工 — 按部门映射门店
+                    # 新增人员 — 按部门映射门店
                     resolved_store = self._resolve_store_by_dept(member.department, config, default_store)
                     try:
-                        await self._create_employee(member, resolved_store, userid_field, config, stats)
+                        await self._create_person(member, resolved_store, userid_field, config, stats)
                     except Exception as e:
                         stats["errors"].append(
                             {
@@ -408,9 +411,9 @@ class IMSyncService:
                         )
 
             # 本地有但平台无 → 标记离职
-            for im_uid, emp in local_employees.items():
-                if im_uid not in platform_uids and emp.is_active:
-                    await self._disable_employee(emp, config, stats)
+            for im_uid, person in local_employees.items():
+                if im_uid not in platform_uids and person.is_active:
+                    await self._disable_person(person, config, stats)
 
             # 更新配置的同步状态
             config.last_sync_at = datetime.utcnow()
@@ -505,9 +508,11 @@ class IMSyncService:
         brand_store_ids = [r[0] for r in store_result.all()]
         default_store = config.default_store_id or (brand_store_ids[0] if brand_store_ids else None)
 
-        # 查现有员工
-        emp_result = await self.db.execute(select(Employee).where(getattr(Employee, userid_field) == userid))
-        existing_emp = emp_result.scalar_one_or_none()
+        # 查现有人员
+        emp_result = await self.db.execute(
+            select(Person).where(getattr(Person, userid_field) == userid)
+        )
+        existing_person = emp_result.scalar_one_or_none()
 
         stats = {
             "added": 0,
@@ -519,10 +524,10 @@ class IMSyncService:
         }
 
         if event_type in ("create_user", "user_add_org"):
-            if existing_emp:
+            if existing_person:
                 # 已存在，激活
-                existing_emp.is_active = True
-                existing_emp.employment_status = "regular"
+                existing_person.is_active = True
+                existing_person.career_stage = "regular"
                 stats["updated"] += 1
             else:
                 # 拉取详情
@@ -530,24 +535,24 @@ class IMSyncService:
                     adapter = await self._get_adapter(config)
                     member = await self._fetch_member_detail(adapter, userid, is_wechat)
                     if member and default_store:
-                        await self._create_employee(member, default_store, userid_field, config, stats)
+                        await self._create_person(member, default_store, userid_field, config, stats)
                 except Exception as e:
                     stats["errors"].append({"userid": userid, "error": str(e)})
 
         elif event_type in ("update_user", "user_modify_org"):
-            if existing_emp:
+            if existing_person:
                 try:
                     adapter = await self._get_adapter(config)
                     member = await self._fetch_member_detail(adapter, userid, is_wechat)
                     if member:
-                        self._update_employee_fields(existing_emp, member)
+                        self._update_person_fields(existing_person, member)
                         stats["updated"] += 1
                 except Exception as e:
                     stats["errors"].append({"userid": userid, "error": str(e)})
 
         elif event_type in ("delete_user", "user_leave_org"):
-            if existing_emp and existing_emp.is_active:
-                await self._disable_employee(existing_emp, config, stats)
+            if existing_person and existing_person.is_active:
+                await self._disable_person(existing_person, config, stats)
 
         # 记录日志
         sync_log = IMSyncLog(
@@ -626,7 +631,7 @@ class IMSyncService:
                     raw=u,
                 )
 
-    async def _create_employee(
+    async def _create_person(
         self,
         member: PlatformMember,
         store_id: str,
@@ -634,46 +639,61 @@ class IMSyncService:
         config: BrandIMConfig,
         stats: Dict,
     ):
-        """创建新员工 + 可选创建系统账号"""
+        """创建新 Person + EmploymentAssignment + 可选创建系统账号"""
         emp_id = f"EMP_{uuid.uuid4().hex[:8].upper()}"
-        emp = Employee(
-            id=emp_id,
+        person = Person(
+            legacy_employee_id=emp_id,
             store_id=store_id,
             name=member.name,
             phone=member.mobile,
             email=member.email,
-            position=self._map_position(member.position),
-            hire_date=date.today(),
             is_active=True,
-            employment_status="regular",
+            career_stage="regular",
         )
-        setattr(emp, userid_field, member.userid)
-        self.db.add(emp)
+        setattr(person, userid_field, member.userid)
+        self.db.add(person)
+        await self.db.flush()  # 获取 person.id
+
+        # 创建在岗关系
+        mapped_position = self._map_position(member.position)
+        ea = EmploymentAssignment(
+            person_id=person.id,
+            org_node_id=store_id,
+            position=mapped_position,
+            employment_type="full_time",
+            start_date=date.today(),
+            status="active",
+        )
+        self.db.add(ea)
         stats["added"] += 1
 
         # 自动创建系统账号
         if config.auto_create_user:
-            await self._create_user_for_employee(emp, member, config, userid_field, stats)
+            await self._create_user_for_person(person, member, config, userid_field, stats)
 
         # 触发入职引导机器人（Phase 4 #10）
         try:
             from ..services.im_onboarding_robot import IMOnboardingRobot
 
             robot = IMOnboardingRobot(self.db)
-            await robot.trigger_onboarding(emp.id, brand_id=config.brand_id)
+            await robot.trigger_onboarding(
+                person.legacy_employee_id, brand_id=config.brand_id,
+            )
         except Exception as e:
-            logger.warning("im_sync.onboarding_trigger_failed", employee_id=emp.id, error=str(e))
+            logger.warning(
+                "im_sync.onboarding_trigger_failed",
+                person_id=str(person.id), error=str(e),
+            )
 
-    async def _create_user_for_employee(
+    async def _create_user_for_person(
         self,
-        emp: Employee,
+        person: Person,
         member: PlatformMember,
         config: BrandIMConfig,
         userid_field: str,
         stats: Dict,
     ):
-        """为员工创建系统账号"""
-        # 检查是否已有账号（按 username 或 phone 查重）
+        """为人员创建系统账号"""
         username = member.userid
         existing = await self.db.execute(select(User).where(User.username == username))
         if existing.scalar_one_or_none():
@@ -691,7 +711,7 @@ class IMSyncService:
             role=role,
             is_active=True,
             brand_id=config.brand_id,
-            store_id=emp.store_id,
+            store_id=person.store_id,
             phone=member.mobile,
         )
         if is_wechat:
@@ -702,24 +722,40 @@ class IMSyncService:
         self.db.add(user)
         stats["user_created"] += 1
 
-    async def _disable_employee(
+    async def _disable_person(
         self,
-        emp: Employee,
+        person: Person,
         config: BrandIMConfig,
         stats: Dict,
     ):
-        """标记员工离职 + 禁用系统账号"""
-        emp.is_active = False
-        emp.employment_status = "resigned"
+        """标记人员离职 + 结束在岗关系 + 禁用系统账号"""
+        person.is_active = False
+        person.career_stage = "resigned"
         stats["disabled"] += 1
 
+        # 结束所有在岗关系
+        ea_result = await self.db.execute(
+            select(EmploymentAssignment).where(
+                and_(
+                    EmploymentAssignment.person_id == person.id,
+                    EmploymentAssignment.status == "active",
+                )
+            )
+        )
+        for ea in ea_result.scalars().all():
+            ea.status = "ended"
+            ea.end_date = date.today()
+
         if config.auto_disable_user:
-            # 按 wechat_userid / dingtalk_userid 查 User
             is_wechat = config.im_platform == IMPlatform.WECHAT_WORK
-            if is_wechat and emp.wechat_userid:
-                user_result = await self.db.execute(select(User).where(User.wechat_user_id == emp.wechat_userid))
-            elif not is_wechat and emp.dingtalk_userid:
-                user_result = await self.db.execute(select(User).where(User.dingtalk_user_id == emp.dingtalk_userid))
+            if is_wechat and person.wechat_userid:
+                user_result = await self.db.execute(
+                    select(User).where(User.wechat_user_id == person.wechat_userid)
+                )
+            elif not is_wechat and person.dingtalk_userid:
+                user_result = await self.db.execute(
+                    select(User).where(User.dingtalk_user_id == person.dingtalk_userid)
+                )
             else:
                 return
 
@@ -728,23 +764,20 @@ class IMSyncService:
                 user.is_active = False
                 stats["user_disabled"] += 1
 
-    def _update_employee_fields(self, emp: Employee, member: PlatformMember) -> bool:
-        """更新员工字段，返回是否有变更"""
+    def _update_person_fields(self, person: Person, member: PlatformMember) -> bool:
+        """更新人员字段，返回是否有变更"""
         changed = False
-        if member.name and member.name != emp.name:
-            emp.name = member.name
+        if member.name and member.name != person.name:
+            person.name = member.name
             changed = True
-        if member.mobile and member.mobile != emp.phone:
-            emp.phone = member.mobile
+        if member.mobile and member.mobile != person.phone:
+            person.phone = member.mobile
             changed = True
-        if member.email and member.email != emp.email:
-            emp.email = member.email
+        if member.email and member.email != person.email:
+            person.email = member.email
             changed = True
-        if member.position:
-            mapped = self._map_position(member.position)
-            if mapped and mapped != emp.position:
-                emp.position = mapped
-                changed = True
+        # position 更新需要通过 EmploymentAssignment，此处仅做标记
+        # 全量同步中 position 变更需要单独处理（暂不自动更新 EA）
         return changed
 
     def _resolve_store_by_dept(

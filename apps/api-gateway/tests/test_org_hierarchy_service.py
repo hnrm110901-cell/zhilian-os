@@ -76,12 +76,13 @@ def test_store_has_org_node_id():
     assert "operation_mode" in cols
 
 
-from src.models.employee import Employee
+from src.models.hr.employment_assignment import EmploymentAssignment
 
 
-def test_employee_has_dept_node_id():
-    cols = {c.key for c in Employee.__table__.columns}
-    assert "dept_node_id" in cols
+def test_employment_assignment_has_org_node_id():
+    """EmploymentAssignment 通过 org_node_id 关联组织架构节点（替代旧 employees.dept_node_id）"""
+    cols = {c.key for c in EmploymentAssignment.__table__.columns}
+    assert "org_node_id" in cols
 
 
 import pytest
