@@ -458,3 +458,171 @@ class TestCurrencyInvariant:
 
         table = EmploymentAssignment.__table__
         assert "daily_wage_standard_fen" in table.columns
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Golden Path 8: 决策自动化分级 — 置信度×风险×信任阶段联动
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestDecisionAutoExecutionTiers:
+    """验证决策自动化分级的核心不变式"""
+
+    def _make_service(self):
+        from unittest.mock import MagicMock
+        from src.services.human_in_the_loop_service import HumanInTheLoopService
+        return HumanInTheLoopService(db=MagicMock())
+
+    def test_critical_never_downgraded(self):
+        """CRITICAL 操作无论置信度多高都不降级"""
+        from src.services.human_in_the_loop_service import (
+            OperationType, RiskLevel, TrustPhase,
+        )
+        svc = self._make_service()
+        for op in [OperationType.FUND_TRANSFER, OperationType.DATA_DELETION,
+                    OperationType.PERMISSION_CHANGE, OperationType.CONTRACT_SIGNING]:
+            level = svc.classify_risk_level(op, {}, TrustPhase.AUTONOMOUS, confidence_score=0.99)
+            assert level == RiskLevel.CRITICAL, f"{op.value} 应始终为 CRITICAL"
+
+    def test_high_not_downgraded_by_confidence(self):
+        """HIGH 操作（人事/供应商）不受高置信度降级"""
+        from src.services.human_in_the_loop_service import (
+            OperationType, RiskLevel, TrustPhase,
+        )
+        svc = self._make_service()
+        level = svc.classify_risk_level(
+            OperationType.STAFF_TRANSFER, {}, TrustPhase.AUTONOMOUS, confidence_score=0.99,
+        )
+        assert level == RiskLevel.HIGH
+
+    def test_medium_escalated_on_low_confidence(self):
+        """MEDIUM 操作 + 低置信度 → 升级为 HIGH（强制审批）"""
+        from src.services.human_in_the_loop_service import (
+            OperationType, RiskLevel, TrustPhase,
+        )
+        svc = self._make_service()
+        level = svc.classify_risk_level(
+            OperationType.AUTO_PURCHASE, {}, TrustPhase.ASSISTANCE, confidence_score=0.70,
+        )
+        assert level == RiskLevel.HIGH, "低置信度应升级为 HIGH"
+
+    def test_medium_stays_medium_normal_confidence(self):
+        """MEDIUM 操作 + 正常置信度 → 保持 MEDIUM"""
+        from src.services.human_in_the_loop_service import (
+            OperationType, RiskLevel, TrustPhase,
+        )
+        svc = self._make_service()
+        level = svc.classify_risk_level(
+            OperationType.AUTO_SCHEDULING, {}, TrustPhase.ASSISTANCE, confidence_score=0.90,
+        )
+        assert level == RiskLevel.MEDIUM
+
+    def test_medium_downgraded_on_high_confidence_autonomous(self):
+        """MEDIUM 操作 + 高置信度 + 自主期 → 降级为 LOW"""
+        from src.services.human_in_the_loop_service import (
+            OperationType, RiskLevel, TrustPhase,
+        )
+        svc = self._make_service()
+        level = svc.classify_risk_level(
+            OperationType.AUTO_PURCHASE, {}, TrustPhase.AUTONOMOUS, confidence_score=0.96,
+        )
+        assert level == RiskLevel.LOW, "自主期+高置信度应降级为 LOW"
+
+    def test_medium_not_downgraded_in_assistance_phase(self):
+        """MEDIUM 操作 + 高置信度但非自主期 → 保持 MEDIUM（不降级）"""
+        from src.services.human_in_the_loop_service import (
+            OperationType, RiskLevel, TrustPhase,
+        )
+        svc = self._make_service()
+        level = svc.classify_risk_level(
+            OperationType.AUTO_PURCHASE, {}, TrustPhase.ASSISTANCE, confidence_score=0.96,
+        )
+        assert level == RiskLevel.MEDIUM, "辅助期不应降级"
+
+    def test_observation_phase_escalates_medium_to_high(self):
+        """观察期 → MEDIUM 操作强制升级为 HIGH（原有逻辑保留）"""
+        from src.services.human_in_the_loop_service import (
+            OperationType, RiskLevel, TrustPhase,
+        )
+        svc = self._make_service()
+        level = svc.classify_risk_level(
+            OperationType.COUPON_DISTRIBUTION, {}, TrustPhase.OBSERVATION, confidence_score=0.99,
+        )
+        assert level == RiskLevel.HIGH, "观察期即使高置信度也应为 HIGH"
+
+    def test_confidence_thresholds_configurable(self):
+        """置信度阈值可通过类属性配置"""
+        from src.services.human_in_the_loop_service import HumanInTheLoopService
+        assert "low_confidence" in HumanInTheLoopService.CONFIDENCE_THRESHOLDS
+        assert "high_confidence" in HumanInTheLoopService.CONFIDENCE_THRESHOLDS
+        low = HumanInTheLoopService.CONFIDENCE_THRESHOLDS["low_confidence"]
+        high = HumanInTheLoopService.CONFIDENCE_THRESHOLDS["high_confidence"]
+        assert 0.0 < low < high <= 1.0, f"阈值不合理: low={low}, high={high}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Golden Path 9: 技能图谱前置依赖验证（PostgreSQL 替代 Neo4j）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestSkillGraphTraversal:
+    """验证技能图谱拓扑排序和依赖验证的正确性"""
+
+    def test_valid_skill_order(self):
+        """合法学习顺序：前置技能在后续技能之前"""
+        from src.services.hr.knowledge_service import HrKnowledgeService
+
+        graph = {
+            "wok_basic": [],
+            "wok_advanced": ["wok_basic"],
+            "fire_control": ["wok_basic"],
+            "stir_fry_master": ["wok_advanced", "fire_control"],
+        }
+        order = ["wok_basic", "wok_advanced", "fire_control", "stir_fry_master"]
+        is_valid, violations = HrKnowledgeService.validate_skill_order(graph, order)
+        assert is_valid
+        assert violations == []
+
+    def test_invalid_skill_order_missing_prereq(self):
+        """非法学习顺序：跳过前置技能"""
+        from src.services.hr.knowledge_service import HrKnowledgeService
+
+        graph = {
+            "wok_basic": [],
+            "wok_advanced": ["wok_basic"],
+            "stir_fry_master": ["wok_advanced"],
+        }
+        # 跳过了 wok_basic 直接学 wok_advanced
+        order = ["wok_advanced", "stir_fry_master"]
+        is_valid, violations = HrKnowledgeService.validate_skill_order(graph, order)
+        assert not is_valid
+        assert len(violations) == 1
+        assert "wok_basic" in violations[0]
+
+    def test_empty_graph_always_valid(self):
+        """空图：任何顺序都合法"""
+        from src.services.hr.knowledge_service import HrKnowledgeService
+
+        is_valid, violations = HrKnowledgeService.validate_skill_order({}, ["a", "b"])
+        assert is_valid
+
+    def test_no_prereqs_always_valid(self):
+        """无前置技能的节点：任何顺序都合法"""
+        from src.services.hr.knowledge_service import HrKnowledgeService
+
+        graph = {"a": [], "b": [], "c": []}
+        is_valid, violations = HrKnowledgeService.validate_skill_order(graph, ["c", "a", "b"])
+        assert is_valid
+
+    def test_multiple_violations_detected(self):
+        """多个违规同时检测"""
+        from src.services.hr.knowledge_service import HrKnowledgeService
+
+        graph = {
+            "a": [],
+            "b": ["a"],
+            "c": ["a", "b"],
+        }
+        # c 在 a 和 b 之前，两个前置都缺失
+        order = ["c", "a", "b"]
+        is_valid, violations = HrKnowledgeService.validate_skill_order(graph, order)
+        assert not is_valid
+        assert len(violations) == 2
