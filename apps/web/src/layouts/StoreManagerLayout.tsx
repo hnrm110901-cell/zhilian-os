@@ -5,6 +5,7 @@ import styles from './StoreManagerLayout.module.css';
 
 const NAV_ITEMS = [
   { to: '/sm',                    label: '简报',   icon: '📋' },
+  { to: '/sm/daily-flow',          label: '流程',   icon: '⏱️' },
   { to: '/sm/daily-dashboard',    label: '日清',   icon: '📊' },
   { to: '/sm/patrol',             label: '巡店',   icon: '🔍' },
   { to: '/sm/hr',                 label: '人力',   icon: '👥' },

@@ -1208,6 +1208,13 @@ app.include_router(financial_closing.router, tags=["financial-closing"])
 app.include_router(command_center.router, tags=["command-center"])
 # 日清日结 + 周复盘
 app.include_router(daily_ops.router)
+
+# ── 门店全天流程 + 帕累托分析（v3.0 日清日结系统交付）──
+from src.api.store_daily_flow import router as daily_flow_router
+app.include_router(daily_flow_router, tags=["门店全天流程"])
+
+from src.api.pareto_analysis import router as pareto_router
+app.include_router(pareto_router, tags=["帕累托分析"])
 # 岗位标准化知识库 + 员工成长
 app.include_router(job_standard.router)
 # 组织层级 + 多层配置继承
