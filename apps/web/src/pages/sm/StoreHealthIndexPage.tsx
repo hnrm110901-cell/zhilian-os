@@ -191,7 +191,7 @@ const StoreHealthIndexPage: React.FC = () => {
               <HealthRing score={data.score} size={120} strokeWidth={10} />
               <div className={styles.scoreInfo}>
                 <ZBadge
-                  type={levelBadgeType(data.level_color) as any}
+                  type={levelBadgeType(data.level_color)}
                   className={styles.levelBadge}
                 >
                   {data.level_label}

@@ -16,12 +16,14 @@ export interface ZBadgeProps {
   text?: string;
   label?: string;
   icon?: React.ReactNode;
+  className?: string;
+  children?: React.ReactNode;
 }
 
-export default function ZBadge({ type = 'default', text, label, icon }: ZBadgeProps) {
-  const shown = text ?? label ?? '';
+export default function ZBadge({ type = 'default', text, label, icon, className, children }: ZBadgeProps) {
+  const shown = children ?? text ?? label ?? '';
   return (
-    <span className={`${styles.badge} ${styles[type]}`}>
+    <span className={`${styles.badge} ${styles[type]}${className ? ` ${className}` : ''}`}>
       {icon && icon}
       {shown}
     </span>
