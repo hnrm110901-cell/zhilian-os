@@ -150,7 +150,7 @@ const ServicePage: React.FC = () => {
                   <Option key={s.id || s.store_id} value={s.id || s.store_id}>
                     {s.name || s.id || s.store_id}
                   </Option>
-                ))
+                )) : null}
           </Select>
           <RangePicker
             value={range}

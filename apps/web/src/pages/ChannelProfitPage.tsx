@@ -177,7 +177,7 @@ const ChannelProfitPage: React.FC = () => {
             {stores.length > 0
               ? stores.map((s: any) => (
                   <Option key={s.id || s.store_id} value={s.id || s.store_id}>{s.name}</Option>
-                ))
+                )) : null}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
         </Space>
