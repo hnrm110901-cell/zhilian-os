@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import get_current_user, require_role
 from src.models.user import User, UserRole
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.repositories import EmployeeRepository
 from src.services.labor_cost_service import LaborCostService
 from src.services.labor_demand_service import LaborDemandService
@@ -438,7 +439,23 @@ async def get_employee_health(
     fairness_service = ShiftFairnessService()
     turnover_service = TurnoverPredictionService()
 
-    employees = await EmployeeRepository.get_by_store(db, store_id)
+    persons = await EmployeeRepository.get_by_store(db, store_id)
+    # 批量获取在岗关系（获取 position）
+    from sqlalchemy import and_, select
+    person_ids = [p.id for p in persons]
+    ea_map: dict = {}
+    if person_ids:
+        ea_result = await db.execute(
+            select(EmploymentAssignment).where(
+                and_(
+                    EmploymentAssignment.person_id.in_(person_ids),
+                    EmploymentAssignment.status == "active",
+                )
+            )
+        )
+        for ea in ea_result.scalars().all():
+            ea_map[ea.person_id] = ea
+
     fairness_data = await fairness_service.get_monthly_shift_fairness(
         store_id=store_id,
         year=y,
@@ -448,19 +465,21 @@ async def get_employee_health(
     fairness_map = {item["employee_id"]: item for item in fairness_data.get("employee_stats", [])}
 
     items = []
-    for employee in employees:
+    for person in persons:
+        emp_id = person.legacy_employee_id or str(person.id)
         pred = await turnover_service.predict_employee_turnover(
-            employee_id=employee.id,
+            employee_id=emp_id,
             db=db,
             send_alert=False,
         )
-        stat = fairness_map.get(employee.id, {})
+        stat = fairness_map.get(emp_id, {})
         risk_score = float(pred["risk_score_90d"])
+        ea = ea_map.get(person.id)
         items.append(
             {
-                "employee_id": employee.id,
-                "name": employee.name,
-                "position": employee.position,
+                "employee_id": emp_id,
+                "name": person.name,
+                "position": ea.position if ea else None,
                 "risk_score_90d": risk_score,
                 "risk_level": _risk_level(risk_score),
                 "replacement_cost_yuan": float(pred["replacement_cost_yuan"]),

@@ -1136,8 +1136,32 @@ async def _fetch_hr_overview(store_id: str, db: AsyncSession):
         "contracts_expiring_30d": contracts_expiring,
         "pending_leave_requests": pending_leaves,
         "active_job_postings": active_jobs,
-        "attendance_rate_pct": 96.5,
+        "attendance_rate_pct": await _calc_attendance_rate(store_id, db),
     }
+
+
+async def _calc_attendance_rate(store_id: str, db: AsyncSession) -> float:
+    """计算本月出勤率（降级返回 None，前端显示 '--'）"""
+    from sqlalchemy import text
+
+    try:
+        result = await db.execute(
+            text("""
+                SELECT
+                    ROUND(
+                        COUNT(CASE WHEN status = 'present' THEN 1 END) * 100.0
+                        / NULLIF(COUNT(*), 0), 1
+                    ) AS rate
+                FROM daily_attendances
+                WHERE store_id = :store_id
+                  AND attendance_date >= date_trunc('month', CURRENT_DATE)
+            """),
+            {"store_id": store_id},
+        )
+        rate = result.scalar()
+        return float(rate) if rate is not None else None
+    except Exception:
+        return None  # 降级：表不存在或查询失败
 
 
 async def _fetch_hr_efficiency(store_id: str, db: AsyncSession):
@@ -1149,7 +1173,7 @@ async def _fetch_hr_efficiency(store_id: str, db: AsyncSession):
 
     emp_result = await db.execute(
         text("""
-        SELECT COUNT(*) AS cnt FROM employees
+        SELECT COUNT(*) AS cnt FROM persons
         WHERE store_id = :store_id AND is_active = true
     """),
         {"store_id": store_id},
@@ -1167,15 +1191,22 @@ async def _fetch_hr_efficiency(store_id: str, db: AsyncSession):
     total_salary_fen = payroll_result.scalar() or 0
     total_salary_yuan = total_salary_fen / 100.0
 
+    month_start = today.replace(day=1)
+    # 月末日期：下月1日
+    if today.month == 12:
+        month_end = today.replace(year=today.year + 1, month=1, day=1)
+    else:
+        month_end = today.replace(month=today.month + 1, day=1)
     rev_result = await db.execute(
         text("""
         SELECT COALESCE(SUM(final_amount), 0) AS total
         FROM orders
         WHERE store_id = :store_id
           AND created_at >= :month_start
+          AND created_at < :month_end
           AND status NOT IN ('cancelled', 'refunded')
     """),
-        {"store_id": store_id, "month_start": today.replace(day=1)},
+        {"store_id": store_id, "month_start": month_start, "month_end": month_end},
     )
     revenue_fen = rev_result.scalar() or 0
     revenue_yuan = revenue_fen / 100.0

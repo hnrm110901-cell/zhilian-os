@@ -11,19 +11,19 @@ from typing import Any, Dict, List, Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user, require_role
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.schedule import Schedule, Shift
 from ..models.store import Store
 from ..models.task import Task, TaskPriority, TaskStatus
 from ..models.user import User, UserRole
 from ..repositories import EmployeeRepository
 from ..services.wechat_service import wechat_service
-from ..services.hr.double_write_service import DoubleWriteService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -73,22 +73,38 @@ async def list_employees(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取门店员工列表"""
-    employees = await EmployeeRepository.get_by_store(session, store_id)
+    # EmployeeRepository.get_by_store 已迁移，返回 Person 列表
+    persons = await EmployeeRepository.get_by_store(session, store_id)
+    # 批量获取在岗关系
+    person_ids = [p.id for p in persons]
+    ea_map: dict = {}
+    if person_ids:
+        ea_result = await session.execute(
+            select(EmploymentAssignment).where(
+                and_(
+                    EmploymentAssignment.person_id.in_(person_ids),
+                    EmploymentAssignment.status == "active",
+                )
+            )
+        )
+        for ea in ea_result.scalars().all():
+            ea_map[ea.person_id] = ea
+
     return [
         EmployeeResponse(
-            id=e.id,
-            store_id=e.store_id,
-            name=e.name,
-            phone=e.phone,
-            email=e.email,
-            position=e.position,
-            skills=e.skills or [],
-            hire_date=e.hire_date,
-            is_active=e.is_active,
-            performance_score=e.performance_score,
-            preferences=e.preferences or {},
+            id=p.legacy_employee_id or str(p.id),
+            store_id=p.store_id or "",
+            name=p.name,
+            phone=p.phone,
+            email=p.email,
+            position=ea_map[p.id].position if p.id in ea_map else None,
+            skills=(p.preferences or {}).get("skills", []),
+            hire_date=ea_map[p.id].start_date if p.id in ea_map else None,
+            is_active=p.is_active,
+            performance_score=(p.profile_ext or {}).get("performance_score"),
+            preferences=p.preferences or {},
         )
-        for e in employees
+        for p in persons
     ]
 
 
@@ -99,21 +115,22 @@ async def get_employee(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取员工详情"""
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    row = await EmployeeRepository.get_with_assignment(session, employee_id)
+    if not row:
         raise HTTPException(status_code=404, detail="员工不存在")
+    person, ea = row
     return EmployeeResponse(
-        id=emp.id,
-        store_id=emp.store_id,
-        name=emp.name,
-        phone=emp.phone,
-        email=emp.email,
-        position=emp.position,
-        skills=emp.skills or [],
-        hire_date=emp.hire_date,
-        is_active=emp.is_active,
-        performance_score=emp.performance_score,
-        preferences=emp.preferences or {},
+        id=person.legacy_employee_id or str(person.id),
+        store_id=person.store_id or "",
+        name=person.name,
+        phone=person.phone,
+        email=person.email,
+        position=ea.position if ea else None,
+        skills=(person.preferences or {}).get("skills", []),
+        hire_date=ea.start_date if ea else None,
+        is_active=person.is_active,
+        performance_score=(person.profile_ext or {}).get("performance_score"),
+        preferences=person.preferences or {},
     )
 
 
@@ -123,42 +140,43 @@ async def create_employee(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
-    """创建员工"""
-    emp = Employee(
-        id=req.id,
+    """创建员工 — 写入 Person + EmploymentAssignment"""
+    person = Person(
+        legacy_employee_id=req.id,
         store_id=req.store_id,
         name=req.name,
         phone=req.phone,
         email=req.email,
-        position=req.position,
-        skills=req.skills or [],
-        hire_date=req.hire_date,
-        preferences=req.preferences or {},
+        preferences={"skills": req.skills or [], **(req.preferences or {})},
+        is_active=True,
     )
-    session.add(emp)
+    session.add(person)
+    await session.flush()  # 获取 person.id
+
+    ea = EmploymentAssignment(
+        person_id=person.id,
+        org_node_id=req.store_id,
+        position=req.position,
+        employment_type="full_time",
+        start_date=req.hire_date or date.today(),
+        status="active",
+    )
+    session.add(ea)
     await session.commit()
-    await session.refresh(emp)
-    logger.info("employee_created", employee_id=emp.id, store_id=emp.store_id)
-    # --- HR double-write (shadow, non-blocking) ---
-    # DoubleWriteService.on_employee_created already catches internally;
-    # this outer try/except guards against DoubleWriteService constructor failures.
-    try:
-        dw = DoubleWriteService()
-        await dw.on_employee_created(emp)
-    except Exception as exc:
-        logger.warning("hr_double_write.create_hook_failed", employee_id=emp.id, error=str(exc))
+    await session.refresh(person)
+    logger.info("employee_created", employee_id=req.id, store_id=req.store_id)
     return EmployeeResponse(
-        id=emp.id,
-        store_id=emp.store_id,
-        name=emp.name,
-        phone=emp.phone,
-        email=emp.email,
-        position=emp.position,
-        skills=emp.skills or [],
-        hire_date=emp.hire_date,
-        is_active=emp.is_active,
-        performance_score=emp.performance_score,
-        preferences=emp.preferences or {},
+        id=person.legacy_employee_id or str(person.id),
+        store_id=person.store_id or "",
+        name=person.name,
+        phone=person.phone,
+        email=person.email,
+        position=ea.position,
+        skills=(person.preferences or {}).get("skills", []),
+        hire_date=ea.start_date,
+        is_active=person.is_active,
+        performance_score=None,
+        preferences=person.preferences or {},
     )
 
 
@@ -169,34 +187,50 @@ async def update_employee(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
-    """更新员工信息"""
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    """更新员工信息 — 更新 Person + EmploymentAssignment"""
+    row = await EmployeeRepository.get_with_assignment(session, employee_id)
+    if not row:
         raise HTTPException(status_code=404, detail="员工不存在")
-    for field, value in req.model_dump(exclude_none=True).items():
-        setattr(emp, field, value)
+    person, ea = row
+
+    # Person 直接字段
+    person_fields = {"name", "phone", "email", "is_active"}
+    # EA 字段
+    ea_fields = {"position"}
+    # 特殊处理字段
+    updates = req.model_dump(exclude_none=True)
+    for field, value in updates.items():
+        if field in person_fields:
+            setattr(person, field, value)
+        elif field == "position" and ea:
+            ea.position = value
+        elif field == "skills":
+            prefs = dict(person.preferences or {})
+            prefs["skills"] = value
+            person.preferences = prefs
+        elif field == "performance_score":
+            ext = dict(person.profile_ext or {})
+            ext["performance_score"] = value
+            person.profile_ext = ext
+        elif field == "preferences":
+            prefs = dict(person.preferences or {})
+            prefs.update(value)
+            person.preferences = prefs
+
     await session.commit()
-    await session.refresh(emp)
-    # --- HR double-write (shadow, non-blocking) ---
-    # DoubleWriteService.on_employee_updated already catches internally;
-    # this outer try/except guards against DoubleWriteService constructor failures.
-    try:
-        dw = DoubleWriteService()
-        await dw.on_employee_updated(emp)
-    except Exception as exc:
-        logger.warning("hr_double_write.update_hook_failed", employee_id=emp.id, error=str(exc))
+    await session.refresh(person)
     return EmployeeResponse(
-        id=emp.id,
-        store_id=emp.store_id,
-        name=emp.name,
-        phone=emp.phone,
-        email=emp.email,
-        position=emp.position,
-        skills=emp.skills or [],
-        hire_date=emp.hire_date,
-        is_active=emp.is_active,
-        performance_score=emp.performance_score,
-        preferences=emp.preferences or {},
+        id=person.legacy_employee_id or str(person.id),
+        store_id=person.store_id or "",
+        name=person.name,
+        phone=person.phone,
+        email=person.email,
+        position=ea.position if ea else None,
+        skills=(person.preferences or {}).get("skills", []),
+        hire_date=ea.start_date if ea else None,
+        is_active=person.is_active,
+        performance_score=(person.profile_ext or {}).get("performance_score"),
+        preferences=person.preferences or {},
     )
 
 
@@ -242,8 +276,8 @@ async def record_performance(
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
     """录入员工绩效数据，并更新 performance_score 综合评分"""
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    person = await EmployeeRepository.get_by_id(session, employee_id)
+    if not person:
         raise HTTPException(status_code=404, detail="员工不存在")
 
     # 综合评分：各维度加权平均
@@ -257,7 +291,9 @@ async def record_performance(
     composite = round(sum(scores) / len(scores), 1) if scores else None
 
     if composite is not None:
-        emp.performance_score = str(composite)
+        ext = dict(person.profile_ext or {})
+        ext["performance_score"] = str(composite)
+        person.profile_ext = ext
     await session.commit()
 
     logger.info("performance_recorded", employee_id=employee_id, period=req.period, score=composite)
@@ -306,7 +342,8 @@ async def create_shift_swap_request(
     if not schedule or schedule.store_id != requester.store_id:
         raise HTTPException(status_code=400, detail="班次与门店不匹配")
 
-    if shift.position and shift.position not in (target.skills or []):
+    target_skills = (target.preferences or {}).get("skills", [])
+    if shift.position and shift.position not in target_skills:
         raise HTTPException(
             status_code=400,
             detail=f"目标员工技能不匹配，缺少岗位技能: {shift.position}",
@@ -475,24 +512,42 @@ async def get_performance_leaderboard(
     current_user: User = Depends(get_current_active_user),
 ):
     """员工绩效排行榜（按 performance_score 降序）"""
-    employees = await EmployeeRepository.get_by_store(session, store_id)
-    ranked = sorted(
-        [e for e in employees if e.is_active and e.performance_score],
-        key=lambda e: float(e.performance_score or 0),
-        reverse=True,
+    # 查询门店所有在职人员 + 在岗关系
+    result = await session.execute(
+        select(Person, EmploymentAssignment)
+        .outerjoin(
+            EmploymentAssignment,
+            and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ),
+        )
+        .where(
+            and_(Person.store_id == store_id, Person.is_active.is_(True))
+        )
     )
+    rows = result.all()
+
+    scored = []
+    for person, ea in rows:
+        score_str = (person.profile_ext or {}).get("performance_score")
+        if score_str:
+            scored.append((person, ea, float(score_str)))
+
+    scored.sort(key=lambda x: x[2], reverse=True)
+
     return {
         "store_id": store_id,
-        "total": len(ranked),
+        "total": len(scored),
         "leaderboard": [
             {
                 "rank": idx + 1,
-                "employee_id": e.id,
-                "name": e.name,
-                "position": e.position,
-                "performance_score": float(e.performance_score),
+                "employee_id": person.legacy_employee_id or str(person.id),
+                "name": person.name,
+                "position": ea.position if ea else None,
+                "performance_score": score,
             }
-            for idx, e in enumerate(ranked)
+            for idx, (person, ea, score) in enumerate(scored)
         ],
     }
 
@@ -504,13 +559,13 @@ async def get_employee_preferences(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取员工排班偏好。"""
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    person = await EmployeeRepository.get_by_id(session, employee_id)
+    if not person:
         raise HTTPException(status_code=404, detail="员工不存在")
     return EmployeePreferenceResponse(
-        employee_id=emp.id,
-        store_id=emp.store_id,
-        preferences=emp.preferences or {},
+        employee_id=person.legacy_employee_id or str(person.id),
+        store_id=person.store_id or "",
+        preferences=person.preferences or {},
     )
 
 
@@ -522,16 +577,16 @@ async def put_employee_preferences(
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
     """全量覆盖员工排班偏好。"""
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    person = await EmployeeRepository.get_by_id(session, employee_id)
+    if not person:
         raise HTTPException(status_code=404, detail="员工不存在")
-    emp.preferences = req.preferences
+    person.preferences = req.preferences
     await session.commit()
-    await session.refresh(emp)
+    await session.refresh(person)
     return EmployeePreferenceResponse(
-        employee_id=emp.id,
-        store_id=emp.store_id,
-        preferences=emp.preferences or {},
+        employee_id=person.legacy_employee_id or str(person.id),
+        store_id=person.store_id or "",
+        preferences=person.preferences or {},
     )
 
 
@@ -543,18 +598,18 @@ async def patch_employee_preferences(
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
     """局部更新员工排班偏好（merge）。"""
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    person = await EmployeeRepository.get_by_id(session, employee_id)
+    if not person:
         raise HTTPException(status_code=404, detail="员工不存在")
-    merged = dict(emp.preferences or {})
+    merged = dict(person.preferences or {})
     merged.update(req.preferences)
-    emp.preferences = merged
+    person.preferences = merged
     await session.commit()
-    await session.refresh(emp)
+    await session.refresh(person)
     return EmployeePreferenceResponse(
-        employee_id=emp.id,
-        store_id=emp.store_id,
-        preferences=emp.preferences or {},
+        employee_id=person.legacy_employee_id or str(person.id),
+        store_id=person.store_id or "",
+        preferences=person.preferences or {},
     )
 
 
@@ -570,23 +625,23 @@ async def delete_employee_preferences(
     - 未提供 key：清空全部偏好
     - 提供 key：仅删除指定字段
     """
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    person = await EmployeeRepository.get_by_id(session, employee_id)
+    if not person:
         raise HTTPException(status_code=404, detail="员工不存在")
 
-    current = dict(emp.preferences or {})
+    current = dict(person.preferences or {})
     if key:
         current.pop(key, None)
-        emp.preferences = current
+        person.preferences = current
     else:
-        emp.preferences = {}
+        person.preferences = {}
 
     await session.commit()
-    await session.refresh(emp)
+    await session.refresh(person)
     return {
         "ok": True,
-        "employee_id": emp.id,
-        "preferences": emp.preferences or {},
+        "employee_id": person.legacy_employee_id or str(person.id),
+        "preferences": person.preferences or {},
     }
 
 
@@ -596,9 +651,9 @@ async def deactivate_employee(
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
     """停用员工（软删除）"""
-    emp = await EmployeeRepository.get_by_id(session, employee_id)
-    if not emp:
+    person = await EmployeeRepository.get_by_id(session, employee_id)
+    if not person:
         raise HTTPException(status_code=404, detail="员工不存在")
-    emp.is_active = False
+    person.is_active = False
     await session.commit()
     logger.info("employee_deactivated", employee_id=employee_id)

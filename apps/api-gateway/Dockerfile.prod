@@ -48,6 +48,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
   CMD curl -sf http://localhost:8000/api/v1/ready || exit 1
 
 # 启动应用：先初始化 DB，再启动 gunicorn
+# workers=2 适配 7.4GB 服务器（每 worker ~1.5GB），4 workers 会 OOM SIGKILL
 CMD ["bash", "docker-entrypoint.sh", \
-     "/root/.local/bin/gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", \
-     "src.main:app", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-"]
+     "/root/.local/bin/gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", \
+     "src.main:app", "--bind", "0.0.0.0:8000", \
+     "--access-logfile", "-", "--error-logfile", "-", "--timeout", "120"]

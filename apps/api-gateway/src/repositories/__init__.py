@@ -11,7 +11,6 @@ from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models import (
     KPI,
-    Employee,
     InventoryItem,
     InventoryTransaction,
     KPIRecord,
@@ -23,6 +22,8 @@ from src.models import (
     Store,
     User,
 )
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.reservation import ReservationStatus
 
 
@@ -59,19 +60,47 @@ class StoreRepository:
 
 
 class EmployeeRepository:
-    """Employee repository"""
+    """Employee repository — 已迁移到 Person + EmploymentAssignment
+
+    get_by_store / get_by_id 现在查询 Person 表（通过 legacy_employee_id 桥接）。
+    返回 Person 对象；需要 position 等字段时，调用方应 outerjoin EmploymentAssignment。
+    """
 
     @staticmethod
-    async def get_by_store(session: AsyncSession, store_id: str) -> List[Employee]:
-        """Get all employees for a store"""
-        result = await session.execute(select(Employee).where(and_(Employee.store_id == store_id, Employee.is_active == True)))
+    async def get_by_store(session: AsyncSession, store_id: str) -> List[Person]:
+        """获取门店在职人员（返回 Person 列表）"""
+        result = await session.execute(
+            select(Person).where(
+                and_(Person.store_id == store_id, Person.is_active.is_(True))
+            )
+        )
         return list(result.scalars().all())
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, employee_id: str) -> Optional[Employee]:
-        """Get employee by ID"""
-        result = await session.execute(select(Employee).where(Employee.id == employee_id))
+    async def get_by_id(session: AsyncSession, employee_id: str) -> Optional[Person]:
+        """按 legacy_employee_id 查找人员（返回 Person 或 None）"""
+        result = await session.execute(
+            select(Person).where(Person.legacy_employee_id == employee_id)
+        )
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_with_assignment(
+        session: AsyncSession, employee_id: str,
+    ) -> Optional[tuple]:
+        """按 legacy_employee_id 查找人员及在岗关系，返回 (Person, EmploymentAssignment|None)"""
+        result = await session.execute(
+            select(Person, EmploymentAssignment)
+            .outerjoin(
+                EmploymentAssignment,
+                and_(
+                    EmploymentAssignment.person_id == Person.id,
+                    EmploymentAssignment.status == "active",
+                ),
+            )
+            .where(Person.legacy_employee_id == employee_id)
+        )
+        return result.first()  # Row(Person, EA|None) or None
 
 
 class InventoryRepository:

@@ -124,6 +124,14 @@ class HumanInTheLoopService:
         "coupon_amount_threshold": float(os.getenv("HITL_COUPON_THRESHOLD", "1000.0")),
     }
 
+    # ── 置信度阈值：控制风险等级升降级 ──
+    # confidence < LOW_CONFIDENCE → MEDIUM 升级为 HIGH（低置信度强制审批）
+    # confidence >= HIGH_CONFIDENCE + AUTONOMOUS → MEDIUM 降级为 LOW（高置信度免审计）
+    CONFIDENCE_THRESHOLDS = {
+        "low_confidence": float(os.getenv("HITL_LOW_CONFIDENCE", "0.85")),
+        "high_confidence": float(os.getenv("HITL_HIGH_CONFIDENCE", "0.95")),
+    }
+
     # 审批超时时间（小时，支持环境变量覆盖）
     APPROVAL_TIMEOUT_HOURS = {
         RiskLevel.HIGH: int(os.getenv("HITL_HIGH_RISK_TIMEOUT_HOURS", "24")),
@@ -133,13 +141,29 @@ class HumanInTheLoopService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def classify_risk_level(self, operation_type: OperationType, operation_params: Dict, trust_phase: TrustPhase) -> RiskLevel:
+    def classify_risk_level(
+        self,
+        operation_type: OperationType,
+        operation_params: Dict,
+        trust_phase: TrustPhase,
+        confidence_score: float = 1.0,
+    ) -> RiskLevel:
         """
         分类风险等级
 
-        根据操作类型、参数和信任阶段，判断风险等级
+        根据操作类型、参数、信任阶段和置信度，判断风险等级。
+
+        置信度联动规则（v2.0）：
+        - CRITICAL 不受置信度影响（绝对红线）
+        - HIGH 不受置信度降级（人事/供应商变更等始终需审批）
+        - MEDIUM + confidence < low_confidence → 升级为 HIGH（低置信度强制审批）
+        - MEDIUM + confidence >= high_confidence + AUTONOMOUS → 降级为 LOW（免审计）
+        - LOW 不受置信度影响
         """
-        # Level 4: 极高风险操作（永远禁止AI自动执行）
+        low_conf = self.CONFIDENCE_THRESHOLDS["low_confidence"]
+        high_conf = self.CONFIDENCE_THRESHOLDS["high_confidence"]
+
+        # Level 4: 极高风险操作（永远禁止AI自动执行，置信度无效）
         if operation_type in [
             OperationType.FUND_TRANSFER,
             OperationType.DATA_DELETION,
@@ -148,7 +172,7 @@ class HumanInTheLoopService:
         ]:
             return RiskLevel.CRITICAL
 
-        # Level 3: 高风险操作
+        # Level 3: 高风险操作（不受置信度降级）
         if operation_type == OperationType.LARGE_PURCHASE:
             amount = operation_params.get("amount", 0)
             if amount > self.RISK_THRESHOLDS["purchase_amount_threshold"]:
@@ -162,11 +186,32 @@ class HumanInTheLoopService:
         if operation_type in [OperationType.STAFF_TRANSFER, OperationType.SUPPLIER_CHANGE]:
             return RiskLevel.HIGH
 
-        # Level 2: 中风险操作
+        # Level 2: 中风险操作（置信度可升/降级）
         if operation_type in [OperationType.AUTO_SCHEDULING, OperationType.AUTO_PURCHASE, OperationType.COUPON_DISTRIBUTION]:
-            # 在观察期，中风险操作也需要审批
+            # 观察期 → 强制审批
             if trust_phase == TrustPhase.OBSERVATION:
                 return RiskLevel.HIGH
+
+            # 低置信度 → 升级为 HIGH（即使已过观察期）
+            if confidence_score < low_conf:
+                logger.info(
+                    "低置信度升级风险等级",
+                    operation_type=operation_type.value,
+                    confidence=confidence_score,
+                    threshold=low_conf,
+                )
+                return RiskLevel.HIGH
+
+            # 自主期 + 高置信度 → 降级为 LOW（免审计，系统已充分验证）
+            if trust_phase == TrustPhase.AUTONOMOUS and confidence_score >= high_conf:
+                logger.info(
+                    "高置信度降级风险等级",
+                    operation_type=operation_type.value,
+                    confidence=confidence_score,
+                    trust_phase=trust_phase.value,
+                )
+                return RiskLevel.LOW
+
             return RiskLevel.MEDIUM
 
         # Level 1: 低风险操作
@@ -192,8 +237,10 @@ class HumanInTheLoopService:
         # 获取门店的信任阶段
         trust_phase = await self.get_store_trust_phase(store_id)
 
-        # 分类风险等级
-        risk_level = self.classify_risk_level(operation_type, operation_params, trust_phase)
+        # 分类风险等级（置信度参与联动）
+        risk_level = self.classify_risk_level(
+            operation_type, operation_params, trust_phase, confidence_score,
+        )
 
         # 创建AI决策记录
         decision = AIDecision(

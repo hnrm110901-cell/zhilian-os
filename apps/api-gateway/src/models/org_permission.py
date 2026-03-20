@@ -32,7 +32,7 @@ class OrgPermission(Base, TimestampMixin):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id    = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"),
+    user_id    = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
                         nullable=False, index=True)
     org_node_id = Column(String(64), ForeignKey("org_nodes.id", ondelete="CASCADE"),
                          nullable=False, index=True)
@@ -42,7 +42,7 @@ class OrgPermission(Base, TimestampMixin):
         default=OrgPermissionLevel.READ_ONLY.value,
     )
     is_active = Column(Boolean, default=True, nullable=False)
-    granted_by = Column(String(64), nullable=True)  # 授权人 user_id
+    granted_by = Column(UUID(as_uuid=True), nullable=True)  # 授权人 user_id
 
     def __repr__(self):
         return (f"<OrgPermission(user='{self.user_id}', "

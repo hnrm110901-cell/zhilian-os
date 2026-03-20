@@ -2,6 +2,7 @@
 import uuid
 from sqlalchemy import Column, String, Date, ForeignKey, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import relationship
 from ..base import Base
 
 
@@ -28,6 +29,9 @@ class EmploymentContract(Base):
     file_url = Column(String(500), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
+
+    # ── ORM relationships ──────────────────────────────────────
+    assignment = relationship("EmploymentAssignment", back_populates="contracts")
 
     def __repr__(self) -> str:
         return (f"<EmploymentContract(id={self.id}, "

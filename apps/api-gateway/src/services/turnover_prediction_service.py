@@ -69,11 +69,11 @@ class TurnoverPredictionService:
         send_alert: bool = True,
     ) -> Dict[str, Any]:
         """预测 90 天内流失风险，并在高风险时通知店长。"""
-        employee = await EmployeeRepository.get_by_id(db, employee_id)
-        if not employee:
+        person = await EmployeeRepository.get_by_id(db, employee_id)
+        if not person:
             raise ValueError("employee_not_found")
 
-        preferences = employee.preferences or {}
+        preferences = person.preferences or {}
         attendance_anomaly_count = int(preferences.get("attendance_anomaly_count", 0) or 0)
         fairness_score = float(preferences.get("shift_fairness_score", 100.0) or 100.0)
         consecutive_work_days = int(preferences.get("consecutive_work_days", 0) or 0)
@@ -92,14 +92,15 @@ class TurnoverPredictionService:
         salary = float(monthly_salary if monthly_salary is not None else preferences.get("monthly_salary", 0.0) or 0.0)
         replacement_cost = estimate_replacement_cost(salary)
 
+        legacy_id = person.legacy_employee_id or str(person.id)
         alert_sent = False
         if send_alert and risk_score > 0.7:
-            store = await db.get(Store, employee.store_id)
+            store = await db.get(Store, person.store_id)
             if store and store.manager_id:
                 message = (
                     f"【员工流失预警】\n"
-                    f"门店: {employee.store_id}\n"
-                    f"员工: {employee.name}({employee.id})\n"
+                    f"门店: {person.store_id}\n"
+                    f"员工: {person.name}({legacy_id})\n"
                     f"90天离职风险: {risk_score:.2f}\n"
                     f"主要因子: {major_factors[0][0]}={major_factors[0][1]:.2f}, {major_factors[1][0]}={major_factors[1][1]:.2f}\n"
                     f"估算替换成本: ¥{replacement_cost:.2f}"
@@ -111,8 +112,8 @@ class TurnoverPredictionService:
                     alert_sent = False
 
         return {
-            "employee_id": employee.id,
-            "store_id": employee.store_id,
+            "employee_id": legacy_id,
+            "store_id": person.store_id,
             "risk_score_90d": risk_score,
             "major_risk_factors": [{"name": name, "score": score} for name, score in major_factors],
             "replacement_cost_yuan": replacement_cost,

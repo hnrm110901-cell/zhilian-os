@@ -573,7 +573,7 @@ from .action_task import ActionTask
 from .weekly_review import WeeklyReview, WeeklyReviewItem
 from .data_quality_check import DataQualityCheckRecord
 
-# HR domain models (z54)
+# HR domain models (z54) — 完整导入 hr/ 子目录所有模型
 from .hr import (
     Person,
     EmploymentAssignment,
@@ -581,6 +581,16 @@ from .hr import (
     EmployeeIdMap,
     AttendanceRule,
     KpiTemplate,
+    OnboardingProcess,
+    OnboardingChecklistItem,
+    OffboardingProcess,
+    TransferProcess,
+    ApprovalStepRecord,
+    ClockRecord,
+    DailyAttendance,
+    PayrollBatch,
+    PayrollItem,
+    CostAllocation,
 )
 
 # HR Knowledge OS models (z55)
@@ -698,12 +708,9 @@ from .social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
 # HR Phase 4 — 培训认证/师徒制
 from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
 
-# HR架构重构 — 旧 M1 models 已移入 hr/ 目录（上方 z54 区块导入）
-from .skill_node import SkillNode
+# HR架构重构 — skill_node/behavior_pattern/retention_signal/knowledge_capture
+# 已迁移到 hr_knowledge/ 子目录（上方 z55 区块已导入），此处仅补充 Achievement
 from .achievement import Achievement
-from .behavior_pattern import BehaviorPattern
-from .retention_signal import RetentionSignal
-from .knowledge_capture import KnowledgeCapture
 
 # P2 — 服务券 + 发券ROI
 from .service_voucher import ServiceVoucherTemplate, ServiceVoucher
@@ -720,3 +727,50 @@ from .marketing_task import (
 # P0-P2 智能提升（屯象OS）
 from .weight_learning import DecisionWeightConfig
 from .signal_routing_rule import SignalRoutingRule
+
+# ── 餐饮行业知识库 — 三库 + 菜品知识库 + 行业字典 ──
+from .knowledge_base import (
+    # BOM 配方与工艺库
+    BOMRecipe,
+    BOMRecipeItem,
+    BOMRecipeProcessStep,
+    BOMRecipeServingStandard,
+    BOMRecipeStorageRule,
+    BOMRecipeVersion,
+    BOMRecipeCostCalc,
+    # 成本结构基准库
+    CostBenchmark,
+    CostBenchmarkItem,
+    CostBenchmarkVersion,
+    CostStoreDailyFact,
+    CostDishDailyFact,
+    CostWarningRecord,
+    # 定价策略与折扣规则库
+    PricingStrategy,
+    PricingDishRule,
+    PricingStrategyVersion,
+    PromotionRule,
+    CouponTemplate,
+    PricingExecutionSnapshot,
+    # 菜品知识库
+    DishKnowledge,
+    DishRecipeVersion,
+    DishRecipeIngredient,
+    IndustryIngredientMaster,
+    DishKnowledgeNutrition,
+    DishKnowledgeOperationProfile,
+    DishKnowledgeTaxonomyTag,
+    # 行业字典
+    IndustryDictionary,
+)
+
+# ── 使命旅程引擎 — 业人成长旅程管理 ──
+from .mission_journey import (
+    JourneyTemplate,
+    JourneyStageDefinition,
+    EmployeeJourney,
+    EmployeeStageProgress,
+    GrowthNarrative,
+    JourneyMilestone,
+    JourneyStats,
+)

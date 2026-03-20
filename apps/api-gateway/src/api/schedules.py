@@ -254,8 +254,8 @@ async def auto_generate_schedule(
     if existing:
         raise HTTPException(status_code=409, detail="该日期排班已存在，请先删除再重新生成")
 
-    employees = await EmployeeRepository.get_by_store(session, req.store_id)
-    active_emps = [e for e in employees if e.is_active]
+    persons = await EmployeeRepository.get_by_store(session, req.store_id)
+    active_emps = [p for p in persons if p.is_active]
     if not active_emps:
         raise HTTPException(status_code=400, detail="该门店暂无在职员工")
 
@@ -273,15 +273,15 @@ async def auto_generate_schedule(
         start_h, start_m = map(int, rule["start"].split(":"))
         end_h, end_m = map(int, rule["end"].split(":"))
         for needed_skill in rule["needs"]:
-            # 找有该技能的员工
-            candidates = [e for e in active_emps if needed_skill in (e.skills or [])]
+            # 找有该技能的员工（skills 存储在 Person.preferences["skills"]）
+            candidates = [e for e in active_emps if needed_skill in ((e.preferences or {}).get("skills", []))]
             if not candidates:
                 candidates = active_emps  # fallback
             emp = candidates[emp_idx % len(candidates)]
             emp_idx += 1
             shifts_data.append(
                 CreateShiftRequest(
-                    employee_id=emp.id,
+                    employee_id=emp.legacy_employee_id or str(emp.id),
                     shift_type=shift_type,
                     start_time=dtime(start_h, start_m),
                     end_time=dtime(end_h, end_m),
@@ -516,8 +516,8 @@ async def get_week_view(
         .order_by(Schedule.schedule_date)
     )
     schedules = result.scalars().all()
-    employees = await EmployeeRepository.get_by_store(session, store_id)
-    emp_map = {e.id: e.name for e in employees}
+    persons = await EmployeeRepository.get_by_store(session, store_id)
+    emp_map = {(p.legacy_employee_id or str(p.id)): p.name for p in persons}
 
     days = []
     for i in range(7):
@@ -572,8 +572,8 @@ async def get_schedule_stats(
         )
     )
     schedules = result.scalars().all()
-    employees = await EmployeeRepository.get_by_store(session, store_id)
-    emp_map = {e.id: e.name for e in employees}
+    persons = await EmployeeRepository.get_by_store(session, store_id)
+    emp_map = {(p.legacy_employee_id or str(p.id)): p.name for p in persons}
 
     stats: dict = {}
     for sched in schedules:

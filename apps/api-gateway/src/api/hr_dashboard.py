@@ -190,12 +190,12 @@ async def get_turnover_trend(
         else:
             month_end = date(y, m + 1, 1) - timedelta(days=1)
 
-        # 月初在职人数
+        # 月初在职人数（使用 Person 表）
         active_start = await db.execute(
-            select(func.count(Employee.id)).where(
+            select(func.count(Person.id)).where(
                 and_(
-                    Employee.store_id == store_id,
-                    Employee.is_active.is_(True),
+                    Person.store_id == store_id,
+                    Person.is_active.is_(True),
                 )
             )
         )

@@ -18,7 +18,11 @@ services:
       - api-gateway
 
   # API Gateway服务
+  # 支持两种模式：
+  # 1) CI/CD: 设置 API_IMAGE=ghcr.io/xxx → pull 远程镜像
+  # 2) 本地:  不设置 API_IMAGE → 本地 build
   api-gateway:
+    image: ${API_IMAGE:-}
     build:
       context: .
       dockerfile: ./apps/api-gateway/Dockerfile.prod

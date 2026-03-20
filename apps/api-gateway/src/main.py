@@ -221,7 +221,10 @@ from src.api import (
     integration_hub,
     integrations,
     inventory,
+    knowledge_base,
     knowledge_rules,
+    mission_journey,
+    employee_portal,
     kpis,
     l3_knowledge,
     l4_reasoning,
@@ -713,6 +716,12 @@ app.include_router(wechat_actions.router, tags=["wechat_actions"])
 app.include_router(data_security.router, tags=["data_security"])
 app.include_router(chain_expansion.router, tags=["chain_expansion"])
 app.include_router(knowledge_rules.router)
+# 餐饮行业知识库 — 三库 + 菜品知识库 + 行业字典
+app.include_router(knowledge_base.router, tags=["knowledge-base"])
+# 使命旅程引擎 — 业人成长旅程管理
+app.include_router(mission_journey.router, tags=["mission-journey"])
+# 员工自助门户 — 乐才平替
+app.include_router(employee_portal.router, tags=["employee-portal"])
 # Phase 3 — 损耗事件 CRUD（PostgreSQL + Neo4j 双写）
 app.include_router(waste_events.router, tags=["waste_events"])
 # Phase 4 — L2 融合层（多源食材 ID 规范化 + 置信度加权）

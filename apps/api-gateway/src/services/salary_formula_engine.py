@@ -581,7 +581,7 @@ class SalaryFormulaEngine:
     async def _build_context(
         self,
         db: AsyncSession,
-        employee: Employee,
+        employee: Person,
         salary_structure: Optional[SalaryStructure],
         pay_month: str,
         store_id: str,
@@ -646,7 +646,7 @@ class SalaryFormulaEngine:
     def _evaluate_item(
         self,
         item_def: SalaryItemDefinition,
-        employee: Employee,
+        employee: Person,
         salary_structure: Optional[SalaryStructure],
         ctx: SalaryFormulaContext,
     ) -> int:
@@ -1005,7 +1005,7 @@ class SalaryFormulaEngine:
     def _evaluate_expression(
         self,
         formula: str,
-        employee: Employee,
+        employee: Person,
         salary_structure: Optional[SalaryStructure],
         ctx: SalaryFormulaContext,
     ) -> int:
@@ -1019,7 +1019,7 @@ class SalaryFormulaEngine:
     def _evaluate_condition(
         self,
         formula: str,
-        employee: Employee,
+        employee: Person,
         salary_structure: Optional[SalaryStructure],
         ctx: SalaryFormulaContext,
     ) -> int:
@@ -1033,7 +1033,7 @@ class SalaryFormulaEngine:
     def _check_condition(
         self,
         condition: str,
-        employee: Employee,
+        employee: Person,
         salary_structure: Optional[SalaryStructure],
         ctx: SalaryFormulaContext,
     ) -> bool:
@@ -1047,7 +1047,7 @@ class SalaryFormulaEngine:
     def _resolve_variable(
         self,
         var_name: str,
-        employee: Employee,
+        employee: Person,
         salary_structure: Optional[SalaryStructure],
         ctx: SalaryFormulaContext,
     ) -> float:

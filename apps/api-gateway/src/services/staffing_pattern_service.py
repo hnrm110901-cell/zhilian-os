@@ -239,8 +239,8 @@ class StaffingPatternService:
         if not pattern:
             return []
 
-        employees = await EmployeeRepository.get_by_store(db, store_id)
-        active = [e for e in employees if getattr(e, "is_active", True)]
+        persons = await EmployeeRepository.get_by_store(db, store_id)
+        active = [p for p in persons if getattr(p, "is_active", True)]
         if not active:
             return []
 
@@ -249,7 +249,7 @@ class StaffingPatternService:
         for item in pattern.get("shifts_template", []):
             required = int(item.get("required_count", 1))
             position = str(item.get("position", "waiter"))
-            candidates = [e for e in active if position in (getattr(e, "skills", None) or [])]
+            candidates = [p for p in active if position in ((getattr(p, "preferences", None) or {}).get("skills", []))]
             if not candidates:
                 candidates = active
             for _ in range(required):
@@ -257,7 +257,7 @@ class StaffingPatternService:
                 idx += 1
                 shifts.append(
                     {
-                        "employee_id": str(emp.id),
+                        "employee_id": emp.legacy_employee_id or str(emp.id),
                         "shift_type": str(item.get("shift_type", "morning")),
                         "start_time": _parse_hhmm(str(item.get("start", "09:00"))),
                         "end_time": _parse_hhmm(str(item.get("end", "17:00"))),

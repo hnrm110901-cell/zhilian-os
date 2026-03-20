@@ -67,41 +67,5 @@ class ShiftTemplate(Base, TimestampMixin):
         return f"<ShiftTemplate(name='{self.name}', code='{self.code}')>"
 
 
-class AttendanceRule(Base, TimestampMixin):
-    """考勤规则 — 按品牌/门店/用工类型差异化配置"""
-
-    __tablename__ = "attendance_rules"
-    __table_args__ = {"extend_existing": True}
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    brand_id = Column(String(50), nullable=False, index=True)
-    store_id = Column(String(50), nullable=True)  # NULL=品牌通用
-    employment_type = Column(String(30), nullable=True)  # NULL=所有用工类型
-
-    # 打卡方式
-    clock_methods = Column(JSON, default=["wechat"])  # wechat/dingtalk/face/fingerprint/gps/manual
-
-    # GPS围栏
-    gps_fence_enabled = Column(Boolean, default=False)
-    gps_latitude = Column(Numeric(10, 7), nullable=True)
-    gps_longitude = Column(Numeric(10, 7), nullable=True)
-    gps_radius_meters = Column(Integer, default=200)
-
-    # 扣款规则（金额单位：分）
-    late_deduction_fen = Column(Integer, default=0)  # 迟到每次扣款
-    absent_deduction_fen = Column(Integer, default=0)  # 旷工每天扣款
-    early_leave_deduction_fen = Column(Integer, default=0)  # 早退每次扣款
-
-    # 加班倍数
-    weekday_overtime_rate = Column(Numeric(3, 1), default=1.5)
-    weekend_overtime_rate = Column(Numeric(3, 1), default=2.0)
-    holiday_overtime_rate = Column(Numeric(3, 1), default=3.0)
-
-    # 综合工时
-    work_hour_type = Column(String(30), default="standard")  # standard/comprehensive/flexible
-    monthly_standard_hours = Column(Numeric(5, 1), default=174)
-
-    is_active = Column(Boolean, default=True)
-
-    def __repr__(self):
-        return f"<AttendanceRule(brand='{self.brand_id}', store='{self.store_id}')>"
+# AttendanceRule 已迁移到 models/hr/attendance_rule.py，此处 re-export 保持向后兼容
+from .hr.attendance_rule import AttendanceRule  # noqa: F401

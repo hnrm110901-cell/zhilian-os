@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.employee import Employee
+from ..models.hr.person import Person
+from ..models.hr.employment_assignment import EmploymentAssignment
 from ..models.employee_contract import EmployeeContract
 from ..models.employee_lifecycle import ChangeType, EmployeeChange
 from ..models.user import User
@@ -40,29 +41,41 @@ async def list_employees(
     current_user: User = Depends(get_current_active_user),
 ):
     """员工花名册：分页、筛选、搜索（敏感字段按角色自动脱敏）"""
-    query = select(Employee).where(Employee.store_id == store_id)
+    query = (
+        select(Person, EmploymentAssignment)
+        .outerjoin(
+            EmploymentAssignment,
+            and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ),
+        )
+        .where(Person.store_id == store_id)
+    )
 
     if status == "active":
-        query = query.where(Employee.is_active.is_(True))
+        query = query.where(Person.is_active.is_(True))
     elif status == "inactive":
-        query = query.where(Employee.is_active.is_(False))
+        query = query.where(Person.is_active.is_(False))
 
     if position:
-        query = query.where(Employee.position == position)
+        query = query.where(EmploymentAssignment.position == position)
 
     if keyword:
         like = f"%{keyword}%"
-        query = query.where(or_(Employee.name.ilike(like), Employee.phone.ilike(like)))
+        query = query.where(or_(Person.name.ilike(like), Person.phone.ilike(like)))
 
     # 总数
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
 
-    # 分页
+    # 分页 — 按 EA.start_date 降序（相当于原 hire_date）
     result = await db.execute(
-        query.order_by(Employee.hire_date.desc().nullslast()).offset((page - 1) * page_size).limit(page_size)
+        query.order_by(EmploymentAssignment.start_date.desc().nullslast())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
-    employees = result.scalars().all()
+    rows = result.all()
 
     # 确定脱敏级别：优先使用 mask_level 参数，其次从 X-User-Role 头获取
     if mask_level is not None:
@@ -73,17 +86,17 @@ async def list_employees(
 
     items = [
         {
-            "id": e.id,
-            "name": e.name,
-            "phone": e.phone,
-            "email": e.email,
-            "position": e.position,
-            "hire_date": str(e.hire_date) if e.hire_date else None,
-            "is_active": e.is_active,
-            "performance_score": e.performance_score,
-            "skills": e.skills or [],
+            "id": person.legacy_employee_id or str(person.id),
+            "name": person.name,
+            "phone": person.phone,
+            "email": person.email,
+            "position": ea.position if ea else None,
+            "hire_date": str(ea.start_date) if ea and ea.start_date else None,
+            "is_active": person.is_active,
+            "performance_score": (person.profile_ext or {}).get("performance_score"),
+            "skills": (person.preferences or {}).get("skills", []),
         }
-        for e in employees
+        for person, ea in rows
     ]
 
     # 按角色级别脱敏敏感字段
@@ -106,10 +119,21 @@ async def get_employee_detail(
     current_user: User = Depends(get_current_active_user),
 ):
     """员工详情：基本信息 + 合同 + 变动记录（敏感字段按角色自动脱敏）"""
-    emp = await db.execute(select(Employee).where(Employee.id == employee_id))
-    employee = emp.scalars().first()
-    if not employee:
+    row = await db.execute(
+        select(Person, EmploymentAssignment)
+        .outerjoin(
+            EmploymentAssignment,
+            and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ),
+        )
+        .where(Person.legacy_employee_id == employee_id)
+    )
+    result_row = row.first()
+    if not result_row:
         raise HTTPException(status_code=404, detail="员工不存在")
+    person, ea = result_row
 
     # 合同
     contract_result = await db.execute(
@@ -138,22 +162,22 @@ async def get_employee_detail(
 
     # 员工详情包含更多敏感字段
     employee_data = {
-        "id": employee.id,
-        "name": employee.name,
-        "phone": employee.phone,
-        "email": employee.email,
-        "position": employee.position,
-        "hire_date": str(employee.hire_date) if employee.hire_date else None,
-        "is_active": employee.is_active,
-        "performance_score": employee.performance_score,
-        "skills": employee.skills or [],
-        "store_id": employee.store_id,
-        "id_card_no": employee.id_card_no,
-        "bank_account": employee.bank_account,
-        "bank_name": employee.bank_name,
-        "emergency_contact": employee.emergency_contact,
-        "emergency_phone": employee.emergency_phone,
-        "emergency_relation": employee.emergency_relation,
+        "id": person.legacy_employee_id or str(person.id),
+        "name": person.name,
+        "phone": person.phone,
+        "email": person.email,
+        "position": ea.position if ea else None,
+        "hire_date": str(ea.start_date) if ea and ea.start_date else None,
+        "is_active": person.is_active,
+        "performance_score": (person.profile_ext or {}).get("performance_score"),
+        "skills": (person.preferences or {}).get("skills", []),
+        "store_id": person.store_id,
+        "id_card_no": person.id_number,
+        "bank_account": person.bank_account,
+        "bank_name": person.bank_name,
+        "emergency_contact": person.emergency_contact_name,
+        "emergency_phone": person.emergency_phone,
+        "emergency_relation": person.emergency_relation,
     }
 
     # 按角色级别脱敏敏感字段
@@ -209,28 +233,40 @@ async def onboard_employee(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """入职登记：创建员工 + 入职变动记录"""
+    """入职登记：创建 Person + EmploymentAssignment + 入职变动记录"""
     import uuid
 
     # 检查ID是否已存在
-    exists = await db.execute(select(Employee.id).where(Employee.id == body.employee_id))
+    exists = await db.execute(
+        select(Person.id).where(Person.legacy_employee_id == body.employee_id)
+    )
     if exists.scalars().first():
         raise HTTPException(status_code=409, detail="员工ID已存在")
 
     hire_date = date.fromisoformat(body.hire_date)
 
-    # 创建员工
-    employee = Employee(
-        id=body.employee_id,
+    # 创建 Person
+    person = Person(
+        legacy_employee_id=body.employee_id,
         store_id=body.store_id,
         name=body.name,
         phone=body.phone,
         email=body.email,
-        position=body.position,
-        hire_date=hire_date,
         is_active=True,
     )
-    db.add(employee)
+    db.add(person)
+    await db.flush()  # 获取 person.id 用于 EA FK
+
+    # 创建在岗关系
+    ea = EmploymentAssignment(
+        person_id=person.id,
+        org_node_id=body.store_id,
+        position=body.position,
+        employment_type="full_time",
+        start_date=hire_date,
+        status="active",
+    )
+    db.add(ea)
 
     # 创建入职变动记录
     change = EmployeeChange(
@@ -269,21 +305,37 @@ async def resign_employee(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """离职登记：更新员工状态 + 离职变动记录"""
+    """离职登记：更新 Person.is_active + 结束 EmploymentAssignment + 离职变动记录"""
     import uuid
 
-    emp = await db.execute(select(Employee).where(Employee.id == body.employee_id))
-    employee = emp.scalars().first()
-    if not employee:
+    row = await db.execute(
+        select(Person, EmploymentAssignment)
+        .outerjoin(
+            EmploymentAssignment,
+            and_(
+                EmploymentAssignment.person_id == Person.id,
+                EmploymentAssignment.status == "active",
+            ),
+        )
+        .where(Person.legacy_employee_id == body.employee_id)
+    )
+    result_row = row.first()
+    if not result_row:
         raise HTTPException(status_code=404, detail="员工不存在")
-    if not employee.is_active:
+    person, ea = result_row
+    if not person.is_active:
         raise HTTPException(status_code=400, detail="该员工已离职")
 
     last_date = date.fromisoformat(body.last_work_date)
     ct = ChangeType.RESIGN if body.change_type == "resign" else ChangeType.DISMISS
 
-    # 更新员工状态
-    employee.is_active = False
+    # 更新 Person 状态
+    person.is_active = False
+
+    # 结束在岗关系
+    if ea:
+        ea.status = "ended"
+        ea.end_date = last_date
 
     # 创建离职变动记录
     change = EmployeeChange(
@@ -292,8 +344,8 @@ async def resign_employee(
         employee_id=body.employee_id,
         change_type=ct,
         effective_date=last_date,
-        from_position=employee.position,
-        from_store_id=employee.store_id,
+        from_position=ea.position if ea else None,
+        from_store_id=person.store_id,
         resign_reason=body.resign_reason,
         last_work_date=last_date,
         handover_to=body.handover_to,
@@ -320,8 +372,8 @@ async def list_employee_changes(
 ):
     """员工变动记录列表"""
     query = (
-        select(EmployeeChange, Employee.name.label("employee_name"))
-        .join(Employee, Employee.id == EmployeeChange.employee_id)
+        select(EmployeeChange, Person.name.label("employee_name"))
+        .join(Person, Person.legacy_employee_id == EmployeeChange.employee_id)
         .where(EmployeeChange.store_id == store_id)
     )
 
