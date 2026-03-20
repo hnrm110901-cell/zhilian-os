@@ -2,6 +2,7 @@
 import uuid
 from sqlalchemy import Boolean, Column, Date, Integer, String, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import relationship
 from ..base import Base
 
 
@@ -32,6 +33,12 @@ class Person(Base):
                       comment="主门店ID，过渡期兼容，最终由 EmploymentAssignment.org_node_id 替代")
     is_active = Column(Boolean, nullable=False, default=True,
                        comment="是否在职，过渡期兼容，最终由 EmploymentAssignment.status 替代")
+
+    # ── ORM relationships ──────────────────────────────────────
+    assignments = relationship(
+        "EmploymentAssignment", back_populates="person",
+        lazy="select", order_by="EmploymentAssignment.start_date.desc()",
+    )
 
     # ── z65 档案字段 ──────────────────────────────────────────
     gender = Column(String(10), nullable=True, comment="性别")

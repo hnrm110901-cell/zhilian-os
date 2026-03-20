@@ -227,8 +227,8 @@ async def list_contracts(
         conditions.append(EmployeeContract.status == status)
 
     result = await db.execute(
-        select(EmployeeContract, Employee.name)
-        .join(Employee, EmployeeContract.employee_id == Employee.id)
+        select(EmployeeContract, Person.name)
+        .join(Person, EmployeeContract.employee_id == Person.legacy_employee_id)
         .where(and_(*conditions))
         .order_by(EmployeeContract.end_date.asc().nullslast())
     )
@@ -290,8 +290,8 @@ async def get_expiring_contracts(
     deadline = date.today() + timedelta(days=days)
 
     result = await db.execute(
-        select(EmployeeContract, Employee.name)
-        .join(Employee, EmployeeContract.employee_id == Employee.id)
+        select(EmployeeContract, Person.name)
+        .join(Person, EmployeeContract.employee_id == Person.legacy_employee_id)
         .where(
             and_(
                 EmployeeContract.store_id == store_id,

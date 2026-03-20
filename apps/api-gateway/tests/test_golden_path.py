@@ -675,3 +675,52 @@ class TestWorkerProcessSeparation:
             assert "hostname" in profile, f"{name} 缺少 hostname"
             hostnames.add(profile["hostname"])
         assert len(hostnames) == len(WORKER_PROFILES), "hostname 不唯一"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Golden Path 11: HR三层模型关系完整性
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestHRThreeLayerRelationships:
+    """验证 Person ↔ EmploymentAssignment ↔ EmploymentContract 的 ORM 关系"""
+
+    def test_person_has_assignments_relationship(self):
+        """Person 必须有 .assignments 关系"""
+        from src.models.hr.person import Person
+        assert hasattr(Person, "assignments"), "Person 缺少 assignments relationship"
+
+    def test_assignment_has_person_relationship(self):
+        """EmploymentAssignment 必须有 .person 关系"""
+        from src.models.hr.employment_assignment import EmploymentAssignment
+        assert hasattr(EmploymentAssignment, "person"), "EA 缺少 person relationship"
+
+    def test_assignment_has_contracts_relationship(self):
+        """EmploymentAssignment 必须有 .contracts 关系"""
+        from src.models.hr.employment_assignment import EmploymentAssignment
+        assert hasattr(EmploymentAssignment, "contracts"), "EA 缺少 contracts relationship"
+
+    def test_contract_has_assignment_relationship(self):
+        """EmploymentContract 必须有 .assignment 关系"""
+        from src.models.hr.employment_contract import EmploymentContract
+        assert hasattr(EmploymentContract, "assignment"), "Contract 缺少 assignment relationship"
+
+    def test_hr_performance_uses_person_not_employee(self):
+        """hr_performance.py 合同查询必须通过 Person 而非 Employee"""
+        import inspect
+        from src.api import hr_performance
+
+        source = inspect.getsource(hr_performance)
+        # 不应有 Employee.name 或 Employee.id 引用
+        assert "Employee.name" not in source, "hr_performance 仍引用 Employee.name"
+        assert "Employee.id)" not in source, "hr_performance 仍引用 Employee.id"
+        # 应通过 Person.legacy_employee_id 桥接
+        assert "Person.legacy_employee_id" in source, "hr_performance 应使用 Person.legacy_employee_id"
+
+    def test_hr_dashboard_uses_person_not_employee(self):
+        """hr_dashboard.py 流失率查询必须通过 Person 而非 Employee"""
+        import inspect
+        from src.api import hr_dashboard
+
+        source = inspect.getsource(hr_dashboard)
+        assert "Employee.id)" not in source, "hr_dashboard 仍引用 Employee.id"
+        assert "Employee.store_id" not in source, "hr_dashboard 仍引用 Employee.store_id"

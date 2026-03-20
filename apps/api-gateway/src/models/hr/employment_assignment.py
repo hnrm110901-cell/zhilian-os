@@ -2,6 +2,7 @@
 import uuid
 from sqlalchemy import Column, Integer, String, Date, ForeignKey, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from ..base import Base
 
 
@@ -39,6 +40,13 @@ class EmploymentAssignment(Base):
     offboarding_process_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
+
+    # ── ORM relationships ──────────────────────────────────────
+    person = relationship("Person", back_populates="assignments")
+    contracts = relationship(
+        "EmploymentContract", back_populates="assignment",
+        lazy="select", order_by="EmploymentContract.created_at.desc()",
+    )
 
     def __repr__(self) -> str:
         return (f"<EmploymentAssignment(id={self.id}, "
