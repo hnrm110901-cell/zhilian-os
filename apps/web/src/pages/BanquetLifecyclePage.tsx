@@ -651,7 +651,7 @@ const BanquetLifecyclePage: React.FC = () => {
                   onChange={setTargetStage}
                   style={{ width: '100%' }}
                 >
-                  {nextOptions.map(s => (
+                  {nextOptions.length > 0 ? nextOptions.map(s => (
                     <Option key={s} value={s}>
                       <Tag color={s === 'cancelled' ? 'red' : STAGE_MAP[s]?.color}>
                         {STAGE_MAP[s]?.label ?? s}
