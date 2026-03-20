@@ -626,3 +626,52 @@ class TestSkillGraphTraversal:
         is_valid, violations = HrKnowledgeService.validate_skill_order(graph, order)
         assert not is_valid
         assert len(violations) == 2
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Golden Path 10: Worker 进程分离配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestWorkerProcessSeparation:
+    """验证 Celery Worker 多角色分离配置正确性"""
+
+    def test_worker_profiles_exist(self):
+        """4种 Worker 角色配置必须存在"""
+        from start_celery_worker import WORKER_PROFILES
+
+        assert "realtime" in WORKER_PROFILES
+        assert "default" in WORKER_PROFILES
+        assert "batch" in WORKER_PROFILES
+        assert "all" in WORKER_PROFILES
+
+    def test_realtime_only_high_priority(self):
+        """realtime Worker 只监听 high_priority 队列"""
+        from start_celery_worker import WORKER_PROFILES
+
+        assert WORKER_PROFILES["realtime"]["queues"] == "high_priority"
+
+    def test_batch_has_long_timeout(self):
+        """batch Worker 的时间限制 >= 1小时"""
+        from start_celery_worker import WORKER_PROFILES
+
+        time_limit = int(WORKER_PROFILES["batch"]["time_limit"])
+        assert time_limit >= 3600, f"batch 时限 {time_limit}s 太短，批处理需≥1小时"
+
+    def test_all_profile_backward_compatible(self):
+        """all 配置必须监听全部3个队列（向后兼容）"""
+        from start_celery_worker import WORKER_PROFILES
+
+        queues = WORKER_PROFILES["all"]["queues"]
+        assert "high_priority" in queues
+        assert "default" in queues
+        assert "low_priority" in queues
+
+    def test_each_profile_has_hostname(self):
+        """每个 Worker 角色有独立 hostname（多Worker共存时区分身份）"""
+        from start_celery_worker import WORKER_PROFILES
+
+        hostnames = set()
+        for name, profile in WORKER_PROFILES.items():
+            assert "hostname" in profile, f"{name} 缺少 hostname"
+            hostnames.add(profile["hostname"])
+        assert len(hostnames) == len(WORKER_PROFILES), "hostname 不唯一"
