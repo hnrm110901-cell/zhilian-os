@@ -16,7 +16,7 @@ import {
   ShopOutlined, WarningOutlined, CheckCircleOutlined,
   EyeOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
-import apiClient from '../../services/apiClient';
+import apiClient from '../../services/api';
 
 const { Title, Text } = Typography;
 

@@ -19,7 +19,7 @@ import {
   UserOutlined, ExperimentOutlined, WarningOutlined,
   RocketOutlined, BulbOutlined, ExportOutlined
 } from '@ant-design/icons';
-import apiClient from '../../services/apiClient';
+import apiClient from '../../services/api';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;

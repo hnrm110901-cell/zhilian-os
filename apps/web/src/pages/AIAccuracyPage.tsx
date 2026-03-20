@@ -170,7 +170,6 @@ const AIAccuracyPage: React.FC = () => {
             onChange={setStoreId}
           >
             {stores.map((s) => <Option key={s.id} value={s.id}>{s.name}</Option>)}
-            : null}
           </Select>
           <Segmented
             options={[

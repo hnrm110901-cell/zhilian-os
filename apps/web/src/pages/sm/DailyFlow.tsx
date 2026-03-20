@@ -15,7 +15,7 @@ import {
   PlayCircleOutlined, StopOutlined, WarningOutlined,
   RightOutlined, CameraOutlined, FormOutlined
 } from '@ant-design/icons';
-import apiClient from '../../services/apiClient';
+import apiClient from '../../services/api';
 
 const { TextArea } = Input;
 

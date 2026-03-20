@@ -140,7 +140,6 @@ const DecisionValidatorPage: React.FC = () => {
                         <Form.Item name="store_id" label="门店ID" initialValue={defaultStoreId} rules={[{ required: true }]}>
                           <Select placeholder="选择门店">
                             {stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)}
-                            : null}
                           </Select>
                         </Form.Item>
                         <Form.Item name="decision_type" label="决策类型" rules={[{ required: true }]}>
@@ -228,7 +227,6 @@ const DecisionValidatorPage: React.FC = () => {
                         <Form.Item name="store_id" label="门店ID" initialValue={defaultStoreId} rules={[{ required: true }]}>
                           <Select placeholder="选择门店">
                             {stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)}
-                            : null}
                           </Select>
                         </Form.Item>
                         <Form.Item name="metric_name" label="指标名称" rules={[{ required: true }]}>
