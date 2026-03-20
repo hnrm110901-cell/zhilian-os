@@ -763,3 +763,14 @@ from .knowledge_base import (
     # 行业字典
     IndustryDictionary,
 )
+
+# ── 使命旅程引擎 — 业人成长旅程管理 ──
+from .mission_journey import (
+    JourneyTemplate,
+    JourneyStageDefinition,
+    EmployeeJourney,
+    EmployeeStageProgress,
+    GrowthNarrative,
+    JourneyMilestone,
+    JourneyStats,
+)
