@@ -11,13 +11,18 @@
 8. 安全求值：除零保护、溢出上限、负值兜底
 """
 
+from __future__ import annotations
+
 import calendar
 import re
 from datetime import date
 from decimal import Decimal
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import structlog
+
+if TYPE_CHECKING:
+    from src.models.employee import Employee
 from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import AttendanceLog
