@@ -839,9 +839,12 @@ from src.api import platform_analytics
 app.include_router(platform_analytics.router, tags=["platform_analytics"])
 
 # aPaaS Webhook 事件订阅 — Phase 4 Month 10
-from src.api import webhooks
-
-app.include_router(webhooks.router, tags=["webhooks"])
+try:
+    from src.api import webhooks
+    if hasattr(webhooks, 'router'):
+        app.include_router(webhooks.router, tags=["webhooks"])
+except Exception:
+    pass  # webhooks模块可选
 
 # aPaaS API 计量计费 — Phase 4 Month 11
 from src.api import api_billing
@@ -1217,6 +1220,13 @@ app.include_router(financial_closing.router, tags=["financial-closing"])
 app.include_router(command_center.router, tags=["command-center"])
 # 日清日结 + 周复盘
 app.include_router(daily_ops.router)
+
+# ── 门店全天流程 + 帕累托分析（v3.0 日清日结系统交付）──
+from src.api.store_daily_flow import router as daily_flow_router
+app.include_router(daily_flow_router, tags=["门店全天流程"])
+
+from src.api.pareto_analysis import router as pareto_router
+app.include_router(pareto_router, tags=["帕累托分析"])
 # 岗位标准化知识库 + 员工成长
 app.include_router(job_standard.router)
 # 组织层级 + 多层配置继承

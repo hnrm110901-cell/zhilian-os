@@ -94,7 +94,7 @@ const BulkImportPage: React.FC = () => {
                   <Option key={s.store_id || s.id} value={s.store_id || s.id}>
                     {s.name || s.store_id || s.id}
                   </Option>
-                ))
+                )) : null}
           </Select>
           <Tabs
             activeKey={entity}

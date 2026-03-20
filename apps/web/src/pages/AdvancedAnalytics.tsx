@@ -296,7 +296,7 @@ const AdvancedAnalytics: React.FC = () => {
         >
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          ))}
+          )) : null}
         </Select>
       </Card>
 

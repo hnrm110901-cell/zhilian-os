@@ -89,7 +89,7 @@ const ForecastPage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }} placeholder="选择门店">
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          ))}
+          )) : null}
         </Select>
         <Select value={metric} onChange={setMetric} style={{ width: 120 }}>
           <Option value="revenue">营收</Option>

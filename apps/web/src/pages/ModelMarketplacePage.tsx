@@ -144,6 +144,7 @@ const ModelMarketplacePage: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 180 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
+            : null}
           </Select>
         </Space>
         <Space>

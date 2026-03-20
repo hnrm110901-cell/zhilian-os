@@ -42,6 +42,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   SearchOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './HQLayout.module.css';
@@ -122,6 +123,8 @@ const NAV_SECTIONS: NavSection[] = [
       { key: 'forecast',    path: '/hq/forecast',    label: '预测分析',   icon: <LineChartOutlined /> },
       { key: 'reports',     path: '/hq/reports',     label: '报表模板',   icon: <FileSearchOutlined /> },
       { key: 'banquet',     path: '/hq/banquet',     label: '宴会管理',   icon: <CrownOutlined /> },
+      { key: 'pareto',      path: '/hq/pareto-analysis', label: '帕累托分析', icon: <FundOutlined /> },
+      { key: 'flow-inspect', path: '/hq/flow-inspection', label: '流程巡检',  icon: <ClockCircleOutlined /> },
     ],
   },
 ];

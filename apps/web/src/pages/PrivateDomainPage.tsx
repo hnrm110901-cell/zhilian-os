@@ -387,7 +387,7 @@ const PrivateDomainPage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          ))}
+          )) : null}
         </Select>
         <Button icon={<ReloadOutlined />} onClick={loadAll}>刷新</Button>
         <span style={{ color: '#999', fontSize: 12 }}>每60秒自动刷新</span>

@@ -346,6 +346,9 @@ const SmDailyDashboard  = lazy(() => import('./pages/sm/DailyDashboard'));
 const SmDailySettlement = lazy(() => import('./pages/sm/DailySettlement'));
 const SmAbnormalTasks   = lazy(() => import('./pages/sm/AbnormalTasks'));
 const SmWeeklyReview    = lazy(() => import('./pages/sm/WeeklyReview'));
+const SmDailyFlow       = lazy(() => import('./pages/sm/DailyFlow'));
+const HqParetoAnalysis  = lazy(() => import('./pages/hq/ParetoAnalysis'));
+const HqFlowInspection  = lazy(() => import('./pages/hq/FlowInspection'));
 
 // 岗位标准化知识库 + 员工成长溯源 (Phase 2-3 HR知识OS)
 const JobStandardLibrary  = lazy(() => import('./pages/hr/JobStandardLibrary'));
@@ -1115,6 +1118,7 @@ const AppContent: React.FC = () => {
                   <Route path="daily-settlement" element={<SmDailySettlement />} />
                   <Route path="tasks-abnormal"   element={<SmAbnormalTasks />} />
                   <Route path="weekly-review"    element={<SmWeeklyReview />} />
+                  <Route path="daily-flow"      element={<SmDailyFlow />} />
                   <Route path="marketing-tasks" element={<SmMarketingTasks />} />
                   <Route path="health-index"          element={<SmStoreHealthIndex />} />
                 </Route>
@@ -1185,6 +1189,9 @@ const AppContent: React.FC = () => {
                   <Route path="marketing-tasks" element={<HqMarketingTasks />} />
                   <Route path="marketing-tasks/create" element={<HqMarketingTaskCreate />} />
                   <Route path="weight-evolution"  element={<HQWeightEvolution />} />
+                  {/* v3.0 全天流程 + 帕累托分析 */}
+                  <Route path="flow-inspection"  element={<HqFlowInspection />} />
+                  <Route path="pareto-analysis"  element={<HqParetoAnalysis />} />
                 </Route>
 
                 {/* Role-based views — Employee H5 Self-Service (手机) */}
