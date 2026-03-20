@@ -129,7 +129,12 @@ COST_L2_TO_L1: dict[CostCategoryL2, CostCategoryL1] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 class MealPeriodStandard(str, enum.Enum):
-    """标准营业时段"""
+    """标准营业时段（6档细分）
+
+    注意：workforce.py 中的 MealPeriodType 是旧版 4 档枚举（morning/lunch/dinner/all_day），
+    被 StaffingAdvice 和 LaborDemandForecast 的 DB 列使用。
+    两者映射关系见下方 MEAL_PERIOD_COMPAT_MAP。
+    """
     BREAKFAST = "breakfast"       # 06:00-10:00
     LUNCH = "lunch"               # 10:30-14:00
     AFTERNOON = "afternoon"       # 14:00-17:00
@@ -146,6 +151,18 @@ MEAL_PERIOD_HOURS: dict[str, tuple[str, str]] = {
     MealPeriodStandard.DINNER: ("17:00", "21:00"),
     MealPeriodStandard.LATE_NIGHT: ("21:00", "02:00"),
     MealPeriodStandard.ALL_DAY: ("00:00", "23:59"),
+}
+
+# 新版 MealPeriodStandard → 旧版 MealPeriodType(workforce.py) 兼容映射
+# MealPeriodType 有 4 个值: morning/lunch/dinner/all_day
+# MealPeriodStandard 有 6 个值（新增 breakfast/afternoon/late_night）
+MEAL_PERIOD_COMPAT_MAP: dict[str, str] = {
+    MealPeriodStandard.BREAKFAST: "morning",      # breakfast → morning
+    MealPeriodStandard.LUNCH: "lunch",             # 直接对应
+    MealPeriodStandard.AFTERNOON: "lunch",         # afternoon 归入 lunch 时段
+    MealPeriodStandard.DINNER: "dinner",           # 直接对应
+    MealPeriodStandard.LATE_NIGHT: "dinner",       # late_night 归入 dinner 时段
+    MealPeriodStandard.ALL_DAY: "all_day",         # 直接对应
 }
 
 
@@ -303,6 +320,14 @@ FOOD_COST_BENCHMARK_P50: dict[str, float] = {
     CuisineType.BBQ: 35.0,
     CuisineType.GUIZHOU: 32.0,
     CuisineType.GENERAL: 33.0,
+    CuisineType.SHANDONG: 34.0,
+    CuisineType.JIANGSU: 35.0,
+    CuisineType.ZHEJIANG: 34.0,
+    CuisineType.FUJIAN: 36.0,
+    CuisineType.ANHUI: 32.0,
+    CuisineType.DIM_SUM: 30.0,
+    CuisineType.CAFETERIA: 35.0,
+    CuisineType.BAKERY: 28.0,
 }
 
 # 人力成本率基准（p50 中位数，%）
@@ -317,6 +342,14 @@ LABOR_COST_BENCHMARK_P50: dict[str, float] = {
     CuisineType.BBQ: 19.0,
     CuisineType.GUIZHOU: 21.0,
     CuisineType.GENERAL: 22.0,
+    CuisineType.SHANDONG: 22.0,
+    CuisineType.JIANGSU: 23.0,
+    CuisineType.ZHEJIANG: 23.0,
+    CuisineType.FUJIAN: 21.0,
+    CuisineType.ANHUI: 20.0,
+    CuisineType.DIM_SUM: 26.0,
+    CuisineType.CAFETERIA: 28.0,
+    CuisineType.BAKERY: 22.0,
 }
 
 # 租金成本率基准（p50 中位数，%）
@@ -331,4 +364,12 @@ RENT_COST_BENCHMARK_P50: dict[str, float] = {
     CuisineType.BBQ: 10.0,
     CuisineType.GUIZHOU: 9.0,
     CuisineType.GENERAL: 10.0,
+    CuisineType.SHANDONG: 10.0,
+    CuisineType.JIANGSU: 12.0,
+    CuisineType.ZHEJIANG: 13.0,
+    CuisineType.FUJIAN: 10.0,
+    CuisineType.ANHUI: 8.0,
+    CuisineType.DIM_SUM: 14.0,
+    CuisineType.CAFETERIA: 12.0,
+    CuisineType.BAKERY: 15.0,
 }

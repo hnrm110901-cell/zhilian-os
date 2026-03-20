@@ -241,6 +241,107 @@ BENCHMARKS = [
      "行业综合毛利率"),
     (CuisineType.GENERAL, "net_profit_margin", "cost", 3.0, 8.0, 12.0, 16.0, "%", "higher_better",
      "行业综合净利润率"),
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 以下菜系数据量较少，使用 GENERAL 基准微调（确保 CuisineType 全覆盖）
+    # 未来有更多实际客户数据后持续精化
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # 鲁菜 (shandong) — 用料讲究，偏正餐
+    (CuisineType.SHANDONG, "food_cost_ratio", "cost", 31.0, 34.0, 37.0, 40.0, "%", "lower_better",
+     "鲁菜用料考究，食材成本中上"),
+    (CuisineType.SHANDONG, "labor_cost_ratio", "cost", 19.0, 22.0, 25.0, 28.0, "%", "lower_better",
+     "鲁菜工序复杂，人力成本中等"),
+    (CuisineType.SHANDONG, "waste_rate", "waste", 2.5, 4.0, 5.5, 7.0, "%", "lower_better",
+     "鲁菜食材品类多，损耗中等"),
+    (CuisineType.SHANDONG, "gross_profit_margin", "cost", 54.0, 62.0, 66.0, 71.0, "%", "higher_better",
+     "毛利率"),
+    (CuisineType.SHANDONG, "net_profit_margin", "cost", 3.0, 7.0, 11.0, 15.0, "%", "higher_better",
+     "净利润率"),
+
+    # 苏菜/淮扬菜 (jiangsu) — 精工细作，客单价高
+    (CuisineType.JIANGSU, "food_cost_ratio", "cost", 32.0, 35.0, 38.0, 42.0, "%", "lower_better",
+     "淮扬菜注重食材精选，成本中上"),
+    (CuisineType.JIANGSU, "labor_cost_ratio", "cost", 21.0, 24.0, 27.0, 30.0, "%", "lower_better",
+     "淮扬菜刀工精细，人力成本较高"),
+    (CuisineType.JIANGSU, "waste_rate", "waste", 2.0, 3.5, 5.0, 6.5, "%", "lower_better",
+     "损耗率"),
+    (CuisineType.JIANGSU, "gross_profit_margin", "cost", 52.0, 60.0, 65.0, 70.0, "%", "higher_better",
+     "毛利率"),
+    (CuisineType.JIANGSU, "net_profit_margin", "cost", 2.0, 6.0, 10.0, 14.0, "%", "higher_better",
+     "净利润率"),
+
+    # 浙菜 (zhejiang) — 注重鲜味
+    (CuisineType.ZHEJIANG, "food_cost_ratio", "cost", 31.0, 34.0, 37.0, 40.0, "%", "lower_better",
+     "浙菜用料较讲究，食材成本中上"),
+    (CuisineType.ZHEJIANG, "labor_cost_ratio", "cost", 20.0, 23.0, 26.0, 29.0, "%", "lower_better",
+     "浙菜工序适中"),
+    (CuisineType.ZHEJIANG, "waste_rate", "waste", 2.0, 3.5, 5.0, 6.5, "%", "lower_better",
+     "损耗率"),
+    (CuisineType.ZHEJIANG, "gross_profit_margin", "cost", 54.0, 62.0, 66.0, 71.0, "%", "higher_better",
+     "毛利率"),
+    (CuisineType.ZHEJIANG, "net_profit_margin", "cost", 3.0, 7.0, 11.0, 15.0, "%", "higher_better",
+     "净利润率"),
+
+    # 闽菜 (fujian) — 汤类为主，海鲜较多
+    (CuisineType.FUJIAN, "food_cost_ratio", "cost", 33.0, 36.0, 39.0, 43.0, "%", "lower_better",
+     "闽菜海鲜/高汤比重大，食材成本偏高"),
+    (CuisineType.FUJIAN, "labor_cost_ratio", "cost", 19.0, 22.0, 25.0, 28.0, "%", "lower_better",
+     "人力成本中等"),
+    (CuisineType.FUJIAN, "waste_rate", "waste", 2.5, 4.0, 5.5, 7.5, "%", "lower_better",
+     "海鲜类损耗偏高"),
+    (CuisineType.FUJIAN, "gross_profit_margin", "cost", 50.0, 58.0, 63.0, 68.0, "%", "higher_better",
+     "毛利率"),
+    (CuisineType.FUJIAN, "net_profit_margin", "cost", 2.0, 6.0, 10.0, 14.0, "%", "higher_better",
+     "净利润率"),
+
+    # 徽菜 (anhui) — 重油重色，食材保质期较长
+    (CuisineType.ANHUI, "food_cost_ratio", "cost", 29.0, 32.0, 35.0, 38.0, "%", "lower_better",
+     "徽菜食材以腌制/干货为主，成本中等"),
+    (CuisineType.ANHUI, "labor_cost_ratio", "cost", 18.0, 21.0, 24.0, 27.0, "%", "lower_better",
+     "人力成本中等"),
+    (CuisineType.ANHUI, "waste_rate", "waste", 1.5, 3.0, 4.5, 6.0, "%", "lower_better",
+     "腌制/干货食材保质期长，损耗较低"),
+    (CuisineType.ANHUI, "gross_profit_margin", "cost", 56.0, 64.0, 68.0, 73.0, "%", "higher_better",
+     "毛利率"),
+    (CuisineType.ANHUI, "net_profit_margin", "cost", 4.0, 8.0, 12.0, 16.0, "%", "higher_better",
+     "净利润率"),
+
+    # 茶点/早茶 (dim_sum) — 品种极多，手工为主
+    (CuisineType.DIM_SUM, "food_cost_ratio", "cost", 30.0, 33.0, 36.0, 40.0, "%", "lower_better",
+     "茶点食材品种多但单价低"),
+    (CuisineType.DIM_SUM, "labor_cost_ratio", "cost", 24.0, 27.0, 30.0, 34.0, "%", "lower_better",
+     "茶点手工制作多，人力成本行业最高"),
+    (CuisineType.DIM_SUM, "waste_rate", "waste", 3.0, 4.5, 6.0, 8.0, "%", "lower_better",
+     "品种多导致每样备量少，损耗中等偏高"),
+    (CuisineType.DIM_SUM, "gross_profit_margin", "cost", 55.0, 62.0, 67.0, 72.0, "%", "higher_better",
+     "毛利率"),
+    (CuisineType.DIM_SUM, "net_profit_margin", "cost", 2.0, 5.0, 9.0, 13.0, "%", "higher_better",
+     "净利润率较低（人力拉高）"),
+
+    # 团餐/食堂 (cafeteria) — 量大价低，标准化极高
+    (CuisineType.CAFETERIA, "food_cost_ratio", "cost", 35.0, 40.0, 44.0, 48.0, "%", "lower_better",
+     "团餐食材成本占比高（客单低）"),
+    (CuisineType.CAFETERIA, "labor_cost_ratio", "cost", 15.0, 18.0, 21.0, 24.0, "%", "lower_better",
+     "团餐标准化极高，人力成本最低"),
+    (CuisineType.CAFETERIA, "waste_rate", "waste", 3.0, 5.0, 7.0, 10.0, "%", "lower_better",
+     "团餐大锅菜剩余较多，损耗偏高"),
+    (CuisineType.CAFETERIA, "gross_profit_margin", "cost", 45.0, 52.0, 58.0, 64.0, "%", "higher_better",
+     "毛利率偏低"),
+    (CuisineType.CAFETERIA, "net_profit_margin", "cost", 3.0, 6.0, 10.0, 14.0, "%", "higher_better",
+     "净利润率"),
+
+    # 烘焙 (bakery) — 高毛利，损耗高
+    (CuisineType.BAKERY, "food_cost_ratio", "cost", 22.0, 26.0, 30.0, 34.0, "%", "lower_better",
+     "烘焙原料成本低（面粉/黄油/糖）"),
+    (CuisineType.BAKERY, "labor_cost_ratio", "cost", 20.0, 24.0, 28.0, 32.0, "%", "lower_better",
+     "烘焙需要技术工人，人力成本中上"),
+    (CuisineType.BAKERY, "waste_rate", "waste", 4.0, 6.0, 8.0, 12.0, "%", "lower_better",
+     "烘焙产品保质期短，报废率行业最高"),
+    (CuisineType.BAKERY, "gross_profit_margin", "cost", 62.0, 70.0, 75.0, 80.0, "%", "higher_better",
+     "烘焙毛利率行业顶尖"),
+    (CuisineType.BAKERY, "net_profit_margin", "cost", 3.0, 8.0, 13.0, 18.0, "%", "higher_better",
+     "净利润率"),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────

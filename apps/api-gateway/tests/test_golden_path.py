@@ -93,6 +93,52 @@ class TestIndustryStandardsDictionary:
             val = FOOD_COST_BENCHMARK_P50[ct]
             assert 20.0 <= val <= 50.0, f"{ct.value} 食材成本率 {val}% 超出合理范围"
 
+    def test_benchmarks_cover_all_18_cuisines(self):
+        """食材/人力/租金基准线必须覆盖全部 18 个菜系"""
+        from src.constants.industry_standards import (
+            CuisineType, FOOD_COST_BENCHMARK_P50,
+            LABOR_COST_BENCHMARK_P50, RENT_COST_BENCHMARK_P50,
+        )
+
+        all_cuisines = set(CuisineType)
+        for name, benchmark in [
+            ("FOOD_COST", FOOD_COST_BENCHMARK_P50),
+            ("LABOR_COST", LABOR_COST_BENCHMARK_P50),
+            ("RENT_COST", RENT_COST_BENCHMARK_P50),
+        ]:
+            missing = all_cuisines - set(benchmark.keys())
+            assert not missing, f"{name} 缺少菜系: {[c.name for c in missing]}"
+
+    def test_meal_period_compat_map_complete(self):
+        """MEAL_PERIOD_COMPAT_MAP 必须覆盖全部 MealPeriodStandard"""
+        from src.constants.industry_standards import (
+            MEAL_PERIOD_COMPAT_MAP, MealPeriodStandard,
+        )
+
+        for mp in MealPeriodStandard:
+            assert mp in MEAL_PERIOD_COMPAT_MAP, (
+                f"MealPeriodStandard.{mp.name} 缺少兼容映射"
+            )
+
+    def test_constants_package_exports(self):
+        """constants 包 __init__.py 必须导出所有枚举和映射字典"""
+        import src.constants as const_pkg
+
+        # 枚举
+        for enum_name in [
+            "CuisineType", "CostCategoryL1", "CostCategoryL2",
+            "MealPeriodStandard", "JobCode", "JobLevel",
+        ]:
+            assert hasattr(const_pkg, enum_name), f"constants 包缺少导出: {enum_name}"
+
+        # 映射字典
+        for dict_name in [
+            "CUISINE_LABELS", "COST_L2_TO_L1", "MEAL_PERIOD_HOURS",
+            "JOB_CODE_PREFIX", "FOOD_COST_BENCHMARK_P50",
+            "LABOR_COST_BENCHMARK_P50", "RENT_COST_BENCHMARK_P50",
+        ]:
+            assert hasattr(const_pkg, dict_name), f"constants 包缺少导出: {dict_name}"
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Golden Path 2: 岗位标准 → 人员分配链路
