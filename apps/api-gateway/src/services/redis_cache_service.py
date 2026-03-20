@@ -33,24 +33,41 @@ class RedisCacheService:
         try:
             sentinel_hosts_raw = settings.REDIS_SENTINEL_HOSTS.strip()
             if sentinel_hosts_raw:
-                # Sentinel 模式
+                # Sentinel 模式 — 需要同时认证 sentinel 节点和 Redis master
                 from redis.asyncio.sentinel import Sentinel
 
                 sentinels = [(h.split(":")[0], int(h.split(":")[1])) for h in sentinel_hosts_raw.split(",") if ":" in h]
-                sentinel_kwargs = {}
-                if settings.REDIS_SENTINEL_PASSWORD:
-                    sentinel_kwargs["password"] = settings.REDIS_SENTINEL_PASSWORD
-                sentinel = Sentinel(
-                    sentinels,
-                    sentinel_kwargs=sentinel_kwargs,
-                    socket_timeout=5,
-                )
-                self._redis = sentinel.master_for(
-                    settings.REDIS_SENTINEL_MASTER,
-                    db=settings.REDIS_SENTINEL_DB,
-                    decode_responses=True,
-                )
-                logger.info("Redis Sentinel 模式初始化", master=settings.REDIS_SENTINEL_MASTER)
+                redis_password = settings.REDIS_SENTINEL_PASSWORD or None
+
+                try:
+                    sentinel = Sentinel(
+                        sentinels,
+                        sentinel_kwargs={"password": redis_password} if redis_password else {},
+                        password=redis_password,  # Redis master 认证密码
+                        socket_timeout=5,
+                    )
+                    self._redis = sentinel.master_for(
+                        settings.REDIS_SENTINEL_MASTER,
+                        db=settings.REDIS_SENTINEL_DB,
+                        decode_responses=True,
+                    )
+                    await self._redis.ping()
+                    logger.info("Redis Sentinel 模式初始化成功", master=settings.REDIS_SENTINEL_MASTER)
+                except Exception as sentinel_err:
+                    # Sentinel 连接失败 → 降级为直连 Redis master
+                    logger.warning(
+                        "Redis Sentinel 连接失败，降级为直连模式",
+                        error=str(sentinel_err),
+                    )
+                    redis_url = settings.REDIS_URL
+                    self._redis = await redis.from_url(
+                        redis_url,
+                        encoding="utf-8",
+                        decode_responses=True,
+                        max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50")),
+                    )
+                    await self._redis.ping()
+                    logger.info("Redis 直连降级模式初始化成功")
             else:
                 # 直连模式（开发/单机）
                 self._redis = await redis.from_url(
@@ -60,8 +77,8 @@ class RedisCacheService:
                     max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50")),
                 )
                 logger.info("Redis 直连模式初始化", url=settings.REDIS_URL)
+                await self._redis.ping()
 
-            await self._redis.ping()
             self._initialized = True
             logger.info("Redis缓存服务初始化成功")
         except redis.AuthenticationError as e:
