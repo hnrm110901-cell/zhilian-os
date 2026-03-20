@@ -830,9 +830,12 @@ from src.api import platform_analytics
 app.include_router(platform_analytics.router, tags=["platform_analytics"])
 
 # aPaaS Webhook 事件订阅 — Phase 4 Month 10
-from src.api import webhooks
-
-app.include_router(webhooks.router, tags=["webhooks"])
+try:
+    from src.api import webhooks
+    if hasattr(webhooks, 'router'):
+        app.include_router(webhooks.router, tags=["webhooks"])
+except Exception:
+    pass  # webhooks模块可选
 
 # aPaaS API 计量计费 — Phase 4 Month 11
 from src.api import api_billing
