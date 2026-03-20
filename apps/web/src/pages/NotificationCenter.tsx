@@ -458,7 +458,7 @@ const NotificationCenter: React.FC = () => {
                 <Option key={name} value={name}>
                   {template.title}
                 </Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
 

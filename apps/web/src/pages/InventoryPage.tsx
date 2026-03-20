@@ -278,7 +278,7 @@ const InventoryPage: React.FC = () => {
           >
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-            ))}
+            )) : null}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={() => { loadInventory(); loadStats(); }} loading={loading}>刷新</Button>
         </Space>
@@ -462,7 +462,7 @@ const InventoryPage: React.FC = () => {
             <Select placeholder="选择操作类型">
               {Object.entries(TXN_CONFIG).map(([k, v]) => (
                 <Option key={k} value={k}><Tag color={v.color}>{v.text}</Tag></Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item label="数量" name="quantity" rules={[{ required: true }, { type: 'number', min: 0.01 }]}>

@@ -231,6 +231,7 @@ const EmployeePerformancePage: React.FC = () => {
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.id || s.store_id} value={s.id || s.store_id}>{s.name}</Option>)
+            : null}
           </Select>
           <DatePicker
             picker="month"

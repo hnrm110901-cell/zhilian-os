@@ -201,7 +201,7 @@ function MatrixScatter({ storeId, period }: { storeId: string; period: string })
         <Select allowClear placeholder="筛选象限" style={{ width: 150 }} value={quadrant} onChange={setQuadrant}>
           {Object.entries(QUADRANT_CONFIG).map(([k, v]) => (
             <Option key={k} value={k}>{v.icon} {v.label}</Option>
-          ))}
+          )) : null}
         </Select>
         <Button type="primary" icon={<SearchOutlined />} onClick={load} loading={loading}>查询</Button>
       </div>

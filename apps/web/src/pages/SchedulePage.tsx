@@ -397,7 +397,7 @@ const SchedulePage: React.FC = () => {
           <Select value={storeId} onChange={v => { setStoreId(v); }} style={{ width: 160 }}>
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-            ))}
+            )) : null}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={() => { loadEmployees(); if (activeTab === 'week') loadWeekView(); else if (activeTab === 'list') loadSchedules(); else loadStats(); }}>刷新</Button>
         </Space>
@@ -552,7 +552,7 @@ const SchedulePage: React.FC = () => {
                           <Select placeholder="选择员工">
                             {employees.filter(e => e.is_active).map(e => (
                               <Option key={e.id} value={e.id}>{e.name}</Option>
-                            ))}
+                            )) : null}
                           </Select>
                         </Form.Item>
                       </Col>

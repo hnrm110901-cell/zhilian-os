@@ -137,7 +137,7 @@ const EmployeeManagementPage: React.FC = () => {
             <Select>
               {stores.length > 0 ? stores.map((s: any) => (
                 <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item name="phone" label="联系方式"><Input /></Form.Item>

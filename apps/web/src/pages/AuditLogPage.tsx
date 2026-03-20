@@ -353,7 +353,7 @@ const AuditLogPage: React.FC = () => {
                   <Option key={action} value={action}>
                     {action}
                   </Option>
-                ))}
+                )) : null}
               </Select>
               <Select
                 placeholder="资源类型"
@@ -366,7 +366,7 @@ const AuditLogPage: React.FC = () => {
                   <Option key={type} value={type}>
                     {type}
                   </Option>
-                ))}
+                )) : null}
               </Select>
               <Select
                 placeholder="状态"

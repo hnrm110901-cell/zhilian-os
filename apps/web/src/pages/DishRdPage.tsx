@@ -252,7 +252,7 @@ export default function DishRdPage() {
           >
             {Object.entries(DISH_STATUS_MAP).map(([k, v]) => (
               <Option key={k} value={k}>{v.label}</Option>
-            ))}
+            )) : null}
           </Select>
           <Input.Search
             placeholder="菜品名 / 编码"
@@ -295,7 +295,7 @@ export default function DishRdPage() {
                 <Select>
                   {Object.entries(DISH_TYPE_MAP).map(([k, v]) => (
                     <Option key={k} value={k}>{v}</Option>
-                  ))}
+                  )) : null}
                 </Select>
               </Form.Item>
             </Col>

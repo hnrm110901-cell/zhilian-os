@@ -222,7 +222,7 @@ const CampaignList: React.FC<{ storeId: string; onRefresh: () => void }> = ({ st
         >
           {Object.entries(STATUS_LABELS).map(([k, v]) => (
             <Option key={k} value={k}>{v}</Option>
-          ))}
+          )) : null}
         </Select>
         <Button icon={<ReloadOutlined />} onClick={fetchCampaigns}>刷新</Button>
       </Space>
@@ -307,7 +307,7 @@ const CreateCampaign: React.FC<{ storeId: string; onCreated: () => void }> = ({ 
               <Select placeholder="选择目标" onChange={previewStrategy}>
                 {Object.entries(objectiveLabels).map(([k, v]) => (
                   <Option key={k} value={k}>{v}</Option>
-                ))}
+                )) : null}
               </Select>
             </Form.Item>
 
@@ -577,6 +577,7 @@ const MarketingCampaignPage: React.FC = () => {
         <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
           {stores.length > 0
             ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
+          : null}
         </Select>
       </div>
 

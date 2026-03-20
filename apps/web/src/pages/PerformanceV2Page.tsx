@@ -980,7 +980,7 @@ function SkillTreeTab() {
             <Select placeholder="选择岗位">
               {['waiter', 'kitchen', 'cashier', 'store_manager'].map(r => (
                 <Option key={r} value={r}>{r}</Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item name="skill_code" label="技能代码" rules={[{ required: true }]}>
@@ -1019,7 +1019,7 @@ function SkillTreeTab() {
                 <Option key={s.skill_id} value={s.skill_id}>
                   {s.skill_name}（当前 Lv.{s.current_level}）
                 </Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item name="new_level" label="晋升至等级" rules={[{ required: true }]}>

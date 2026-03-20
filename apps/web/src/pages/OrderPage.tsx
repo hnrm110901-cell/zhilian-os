@@ -281,7 +281,7 @@ const OrderPage: React.FC = () => {
           <Select value={storeId} onChange={(v) => setStoreId(v)} style={{ width: 160 }}>
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-            ))}
+            )) : null}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={() => {
             if (activeTab === 'overview') loadTodayOverview();
@@ -405,7 +405,7 @@ const OrderPage: React.FC = () => {
                     <Option value="all">全部状态</Option>
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                       <Option key={k} value={k}>{v.text}</Option>
-                    ))}
+                    )) : null}
                   </Select>
                   <span style={{ color: '#999' }}>共 {filteredOrders.length} 条</span>
                 </Space>

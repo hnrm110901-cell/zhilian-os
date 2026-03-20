@@ -272,7 +272,7 @@ const EdgeHubBindingsPage: React.FC = () => {
             <Select placeholder="选择岗位">
               {POSITION_OPTIONS.map(o => (
                 <Option key={o.value} value={o.value}>{o.label}</Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item name="employeeId" label="员工ID（可选）">

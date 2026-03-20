@@ -831,7 +831,7 @@ const BOMManagementPage: React.FC = () => {
               <Select>
                 {['g', 'kg', 'ml', 'L', '个', '份', '片', '条'].map((u) => (
                   <Option key={u} value={u}>{u}</Option>
-                ))}
+                )) : null}
               </Select>
             </Form.Item>
           </div>

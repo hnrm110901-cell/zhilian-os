@@ -678,7 +678,7 @@ export default function SmHome() {
                       <Select placeholder="请选择原因">
                         {REJECT_REASON_OPTIONS.map((x) => (
                           <Select.Option key={x.value} value={x.value}>{x.label}</Select.Option>
-                        ))}
+                        )) : null}
                       </Select>
                     </Form.Item>
                     {getFieldValue('rejection_reason_code') === 'other' ? (

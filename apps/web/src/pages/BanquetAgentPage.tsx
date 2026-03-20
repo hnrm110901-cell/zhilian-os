@@ -453,7 +453,7 @@ const BanquetAgentPage: React.FC = () => {
                 <Select.Option value="all">全部阶段</Select.Option>
                 {(Object.keys(STAGE_LABEL) as LeadStage[]).map((s) => (
                   <Select.Option key={s} value={s}>{STAGE_LABEL[s]}</Select.Option>
-                ))}
+                )) : null}
               </Select>
               <ZButton variant="primary" onClick={() => {
                 leadCreateForm.setFieldsValue({
@@ -632,7 +632,7 @@ const BanquetAgentPage: React.FC = () => {
             <Select>
               {(Object.keys(STAGE_LABEL) as LeadStage[]).map((s) => (
                 <Select.Option key={s} value={s}>{STAGE_LABEL[s]}</Select.Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item label="跟进记录" name="followup_content" rules={[{ required: true, message: '请输入跟进内容' }]}> 
@@ -659,7 +659,7 @@ const BanquetAgentPage: React.FC = () => {
             <Select>
               {(Object.keys(BANQUET_TYPE_LABEL) as BanquetType[]).map((t) => (
                 <Select.Option key={t} value={t}>{BANQUET_TYPE_LABEL[t]}</Select.Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item label="预计日期" name="expected_date">
@@ -689,7 +689,7 @@ const BanquetAgentPage: React.FC = () => {
             <Select>
               {(Object.keys(BANQUET_TYPE_LABEL) as BanquetType[]).map((t) => (
                 <Select.Option key={t} value={t}>{BANQUET_TYPE_LABEL[t]}</Select.Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item label="宴会日期" name="banquet_date" rules={[{ required: true, message: '请选择日期' }]}>

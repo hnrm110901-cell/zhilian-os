@@ -79,7 +79,7 @@ const AgentMemoryPage: React.FC = () => {
             <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 140 }}>
               {stores.length > 0 ? stores.map((s: any) => (
                 <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-              ))}
+              )) : null}
             </Select>
             <span>智能体：</span>
             <Select value={agentFilter} onChange={setAgentFilter} style={{ width: 120 }} allowClear placeholder="全部">

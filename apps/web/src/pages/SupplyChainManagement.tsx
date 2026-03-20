@@ -539,7 +539,7 @@ const SupplyChainManagement: React.FC = () => {
             <Select>
               {suppliers.filter(s => s.status === 'active').map(s => (
                 <Option key={s.id} value={s.id}>{s.name}</Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
           <Form.Item name="store_id" label="门店ID" rules={[{ required: true }]}>

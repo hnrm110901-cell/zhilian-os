@@ -289,7 +289,7 @@ const OverviewTab: React.FC<{ dish: DishDetail; brandId: string; onRefresh: () =
             <Select value={newStatus} onChange={setNewStatus} style={{ width: '100%' }}>
               {Object.entries(DISH_STATUS_MAP).map(([k, v]) => (
                 <Option key={k} value={k}>{v.label}</Option>
-              ))}
+              )) : null}
             </Select>
           </Form.Item>
         </Form>
@@ -394,7 +394,7 @@ const RecipeBomTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, b
               <Option key={v.id} value={v.id}>
                 {v.version_no} · {v.status}
               </Option>
-            ))}
+            )) : null}
           </Select>
         )}
         <Button icon={<PlusOutlined />} onClick={() => setNewVerOpen(true)}>
@@ -539,7 +539,7 @@ const CostSimTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bra
           >
             {versions.map(v => (
               <Option key={v.id} value={v.id}>{v.version_no} · {v.status}</Option>
-            ))}
+            )) : null}
           </Select>
         )}
         <Button

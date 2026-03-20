@@ -140,6 +140,7 @@ const VoiceWebSocketPage: React.FC = () => {
               <Form.Item label="门店">
                 <Select value={storeId} onChange={setStoreId} disabled={connected} style={{ width: '100%' }}>
                   {stores.map(s => <Option key={s.store_id} value={s.store_id}>{s.name || s.store_id}</Option>)}
+                  : null}
                 </Select>
               </Form.Item>
               <Form.Item label="模式">

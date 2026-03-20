@@ -152,7 +152,7 @@ function AttributionBoard({
         >
           {Object.entries(DRIVER_CONFIG).map(([k, v]) => (
             <Option key={k} value={k}><Tag color={v.color} className={styles.driverTag}>{v.label}</Tag></Option>
-          ))}
+          )) : null}
         </Select>
         <Button type="primary" icon={<SearchOutlined />} onClick={load} loading={loading}>查询</Button>
       </div>

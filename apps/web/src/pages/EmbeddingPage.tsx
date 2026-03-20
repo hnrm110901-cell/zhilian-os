@@ -114,7 +114,7 @@ const EmbeddingPage: React.FC = () => {
                 <Select style={{ width: 120 }}>
                   {stores.map((s: any) => (
                     <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-                  ))}
+                  )) : null}
                 </Select>
               </Form.Item>
               <Form.Item name="epochs" label="训练轮数" initialValue={10}>
@@ -171,7 +171,7 @@ const EmbeddingPage: React.FC = () => {
               <Select style={{ width: 120 }}>
                 {stores.map((s: any) => (
                   <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-                ))}
+                )) : null}
               </Select>
             </Form.Item>
             <Form.Item name="top_k" label="数量" initialValue={5}><InputNumber min={1} max={20} /></Form.Item>

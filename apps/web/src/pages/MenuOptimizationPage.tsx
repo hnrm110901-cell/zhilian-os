@@ -427,7 +427,7 @@ const MenuOptimizationPage: React.FC = () => {
                     style={{ width: 130 }} allowClear placeholder="建议类型">
                     {Object.entries(REC_CONFIG).map(([k, v]) => (
                       <Option key={k} value={k}>{v.icon} {v.label}</Option>
-                    ))}
+                    )) : null}
                   </Select>
                   <Select value={statusFilter} onChange={setStatusFilter} style={{ width: 110 }}>
                     <Option value="pending">待处理</Option>
