@@ -1239,6 +1239,11 @@ app.include_router(hr_api.router, prefix="/api/v1/hr", tags=["HR"])
 from src.api.webhooks.wechat_attendance import router as wechat_attendance_router
 app.include_router(wechat_attendance_router, prefix="/api/v1", tags=["webhooks"])
 
+# 五步闭环经营复盘（拆细账→找真因→定措施→追执行→看结果）
+from src.api import review_session
+
+app.include_router(review_session.router, tags=["review-session"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:

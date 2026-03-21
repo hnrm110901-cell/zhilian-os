@@ -694,6 +694,7 @@ from .reservation_channel import ChannelType, ReservationChannel
 
 # P0 补齐 — 预排菜模型
 from .reservation_pre_order import PreOrderStatus, ReservationPreOrder
+from .review_session import ReviewAction, ReviewChecklist, ReviewSession
 from .reward_penalty import RewardPenaltyRecord
 from .salary_item import SalaryItemDefinition, SalaryItemRecord
 from .schedule_demand import StoreStaffingDemand
