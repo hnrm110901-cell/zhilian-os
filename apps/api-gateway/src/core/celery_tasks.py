@@ -5550,6 +5550,75 @@ def member_agent_dormant_sweep(self) -> Dict[str, Any]:
 
 
 # ============================================================
+# 多品牌运营分析报告（种子客户：尝在一起/最黔线/尚宫厨）
+# ============================================================
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def generate_ops_analysis_report(self) -> Dict[str, Any]:
+    """
+    生成多品牌运营分析报告（HTML + JSON）。
+
+    默认生成最近20天的报告，也可通过环境变量配置:
+      OPS_ANALYSIS_START: 开始日期 yyyy-mm-dd
+      OPS_ANALYSIS_END: 结束日期 yyyy-mm-dd
+    """
+    from datetime import date, timedelta
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.ops_analysis_report_service import OpsAnalysisReportService
+        import json as _json
+
+        # 日期范围：优先环境变量，默认最近20天
+        start_str = os.getenv("OPS_ANALYSIS_START")
+        end_str = os.getenv("OPS_ANALYSIS_END")
+        if start_str and end_str:
+            start_date = date.fromisoformat(start_str)
+            end_date = date.fromisoformat(end_str)
+        else:
+            end_date = date.today() - timedelta(days=1)
+            start_date = end_date - timedelta(days=19)
+
+        output_dir = os.getenv("OPS_ANALYSIS_OUTPUT_DIR", "/tmp/tunxiang-reports")
+        os.makedirs(output_dir, exist_ok=True)
+
+        async with get_db_session() as db:
+            report = await OpsAnalysisReportService.generate(
+                db=db, start_date=start_date, end_date=end_date,
+            )
+            html = await OpsAnalysisReportService.generate_html(
+                db=db, start_date=start_date, end_date=end_date,
+            )
+
+        # 保存文件
+        json_path = os.path.join(output_dir, f"ops_analysis_{start_date}_{end_date}.json")
+        html_path = os.path.join(output_dir, f"ops_analysis_{start_date}_{end_date}.html")
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            _json.dump(report, f, ensure_ascii=False, indent=2, default=str)
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html)
+
+        brand_count = report.get("brand_count", 0)
+        logger.info(
+            "ops_analysis_report.generated",
+            start=str(start_date),
+            end=str(end_date),
+            brands=brand_count,
+            json_path=json_path,
+            html_path=html_path,
+        )
+        return {
+            "status": "ok",
+            "period": report["period"],
+            "brand_count": brand_count,
+            "json_path": json_path,
+            "html_path": html_path,
+        }
+
+    return _run_async(_run())
+
+
+# ============================================================
 # Sprint 4: 增收月报自动生成（每月1日）
 # ============================================================
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=300)

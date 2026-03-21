@@ -1110,10 +1110,11 @@ from src.api import data_lineage_api
 app.include_router(data_lineage_api.router, tags=["data_lineage"])
 
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
-from src.api import decision_hub, monthly_report
+from src.api import decision_hub, monthly_report, ops_analysis_report
 
 app.include_router(decision_hub.router, tags=["decision_hub"])
 app.include_router(monthly_report.router, tags=["monthly_report"])
+app.include_router(ops_analysis_report.router, tags=["ops_analysis_report"])
 
 # Phase 9 — Edge Hub（门店边缘硬件层：主机/设备/耳机绑定/告警）
 from src.api import edge_hub

@@ -647,6 +647,17 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 7},
         },
+        # 多品牌运营分析报告：明早8:00（一次性任务，可改为定期）
+        "ops-analysis-report": {
+            "task": "src.core.celery_tasks.generate_ops_analysis_report",
+            "schedule": crontab(
+                hour=int(os.getenv("OPS_ANALYSIS_HOUR", "8")),
+                minute=int(os.getenv("OPS_ANALYSIS_MINUTE", "0")),
+                day_of_month="1,10,20",
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
         # Sprint 4: 每月1日 08:00 生成上月增收月报
         "revenue-growth-monthly-report": {
             "task": "src.core.celery_tasks.revenue_growth_monthly_report",
