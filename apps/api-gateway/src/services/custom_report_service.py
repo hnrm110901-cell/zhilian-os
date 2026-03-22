@@ -222,14 +222,23 @@ class CustomReportService:
         rows = await self._fetch_data(template.data_source, filters, template.sort_by or [])
         export_fmt = fmt or template.default_format
 
+        date_suffix = datetime.now().strftime('%Y%m%d')
         if export_fmt == ReportFormat.CSV:
             content = self._to_csv(template.columns, rows)
-            filename = f"{template.name}_{datetime.now().strftime('%Y%m%d')}.csv"
+            filename = f"{template.name}_{date_suffix}.csv"
             media_type = "text/csv; charset=utf-8"
         elif export_fmt == ReportFormat.XLSX:
             content = self._to_xlsx(template.name, template.columns, rows)
-            filename = f"{template.name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+            filename = f"{template.name}_{date_suffix}.xlsx"
             media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif export_fmt == ReportFormat.MD:
+            content = self._to_md(template.name, template.columns, rows)
+            filename = f"{template.name}_{date_suffix}.md"
+            media_type = "text/markdown; charset=utf-8"
+        elif export_fmt == ReportFormat.DOCX:
+            content = self._to_docx(template.name, template.columns, rows)
+            filename = f"{template.name}_{date_suffix}.docx"
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         else:
             raise ValueError(f"不支持的导出格式: {export_fmt}")
 
@@ -418,6 +427,77 @@ class CustomReportService:
 
         output = io.BytesIO()
         wb.save(output)
+        return output.getvalue()
+
+    def _to_md(self, title: str, columns: List[Dict], rows: List[Dict]) -> bytes:
+        """生成 Markdown 字节流"""
+        lines: List[str] = []
+        lines.append(f"# {title}")
+        lines.append("")
+        lines.append(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        lines.append("")
+
+        if not rows:
+            lines.append("*暂无数据*")
+            return "\n".join(lines).encode("utf-8")
+
+        # 表头
+        headers = [col.get("label", col["field"]) for col in columns]
+        lines.append("| " + " | ".join(headers) + " |")
+        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+
+        # 数据行（转义管道符）
+        for row in rows:
+            cells = [str(row.get(col["field"], "")).replace("|", "\\|") for col in columns]
+            lines.append("| " + " | ".join(cells) + " |")
+
+        lines.append("")
+        lines.append(f"共 {len(rows)} 条记录")
+        return "\n".join(lines).encode("utf-8")
+
+    def _to_docx(self, title: str, columns: List[Dict], rows: List[Dict]) -> bytes:
+        """生成 DOCX 字节流"""
+        try:
+            from docx import Document
+            from docx.shared import Pt, Inches
+        except ImportError:
+            raise ImportError("请安装 python-docx: pip install python-docx")
+
+        doc = Document()
+
+        # 标题
+        doc.add_heading(title, level=1)
+        doc.add_paragraph(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+        if not rows:
+            doc.add_paragraph("暂无数据")
+        else:
+            # 创建表格（含表头行）
+            headers = [col.get("label", col["field"]) for col in columns]
+            table = doc.add_table(rows=1 + len(rows), cols=len(headers), style="Table Grid")
+
+            # 写入表头
+            for col_idx, header in enumerate(headers):
+                cell = table.rows[0].cells[col_idx]
+                cell.text = header
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.bold = True
+                        run.font.size = Pt(10)
+
+            # 写入数据
+            for row_idx, row in enumerate(rows, start=1):
+                for col_idx, col_def in enumerate(columns):
+                    cell = table.rows[row_idx].cells[col_idx]
+                    cell.text = str(row.get(col_def["field"], ""))
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.size = Pt(9)
+
+            doc.add_paragraph(f"\n共 {len(rows)} 条记录")
+
+        output = io.BytesIO()
+        doc.save(output)
         return output.getvalue()
 
     # ------------------------------------------------------------------ #

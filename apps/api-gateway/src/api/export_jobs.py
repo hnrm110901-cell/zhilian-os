@@ -30,7 +30,7 @@ SUPPORTED_JOB_TYPES = {
 
 class ExportJobCreateRequest(BaseModel):
     job_type: str = Field(..., description="导出类型: transactions/audit_logs/orders")
-    format: str = Field("csv", description="导出格式: csv/xlsx")
+    format: str = Field("csv", description="导出格式: csv/xlsx/md/docx")
     params: Dict[str, Any] = Field(default_factory=dict, description="过滤参数")
 
 
@@ -77,8 +77,8 @@ async def create_export_job(
         raise HTTPException(
             status_code=400, detail=f"不支持的导出类型: {request.job_type}，可选: {list(SUPPORTED_JOB_TYPES.keys())}"
         )
-    if request.format not in ("csv", "xlsx"):
-        raise HTTPException(status_code=400, detail="format 只支持 csv 或 xlsx")
+    if request.format not in ("csv", "xlsx", "md", "docx"):
+        raise HTTPException(status_code=400, detail="format 只支持 csv、xlsx、md 或 docx")
 
     # 创建 ExportJob 记录
     async with get_db_session() as session:
@@ -178,9 +178,13 @@ async def download_export_file(
             raise HTTPException(status_code=410, detail="文件已过期或不存在")
 
         filename = os.path.basename(job.file_path)
-        media_type = (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if job.format == "xlsx" else "text/csv"
-        )
+        format_media_types = {
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "csv": "text/csv",
+            "md": "text/markdown",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+        media_type = format_media_types.get(job.format, "application/octet-stream")
         return FileResponse(
             path=job.file_path,
             filename=filename,

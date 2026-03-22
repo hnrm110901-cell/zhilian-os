@@ -17,6 +17,8 @@ class ReportFormat(str, enum.Enum):
     CSV = "csv"
     XLSX = "xlsx"
     PDF = "pdf"
+    MD = "md"
+    DOCX = "docx"
 
 
 class ScheduleFrequency(str, enum.Enum):

@@ -33,7 +33,7 @@ class TemplateCreateRequest(BaseModel):
     columns: List[ColumnDef] = Field(..., description="要展示的字段列表")
     filters: Optional[Dict[str, Any]] = None
     sort_by: Optional[List[Dict[str, str]]] = None
-    default_format: str = Field("xlsx", description="默认导出格式: csv/xlsx")
+    default_format: str = Field("xlsx", description="默认导出格式: csv/xlsx/md/docx")
     is_public: bool = False
 
 
@@ -68,7 +68,7 @@ class ScheduledReportCreateRequest(BaseModel):
     frequency: str = Field(..., description="频率: daily/weekly/monthly")
     run_at: str = Field("06:00", description="执行时间 HH:MM（UTC）")
     channels: List[str] = Field(..., description="推送渠道: system/email")
-    format: str = Field("xlsx", description="导出格式: csv/xlsx")
+    format: str = Field("xlsx", description="导出格式: csv/xlsx/md/docx")
     recipients: Optional[List[str]] = None
     day_of_week: Optional[int] = Field(None, ge=0, le=6, description="周几执行（0=周一，weekly时有效）")
     day_of_month: Optional[int] = Field(None, ge=1, le=28, description="几号执行（monthly时有效）")
@@ -222,7 +222,7 @@ async def generate_report(
     start_date: Optional[date] = Query(None, description="开始日期"),
     end_date: Optional[date] = Query(None, description="结束日期"),
     store_id: Optional[str] = Query(None, description="门店ID（覆盖模板默认值）"),
-    format: Optional[str] = Query(None, description="导出格式: csv/xlsx（覆盖模板默认值）"),
+    format: Optional[str] = Query(None, description="导出格式: csv/xlsx/md/docx（覆盖模板默认值）"),
     current_user: User = Depends(get_current_active_user),
 ):
     """
