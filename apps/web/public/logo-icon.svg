@@ -2,18 +2,13 @@
 <!--
   屯象OS · Omega Elephant Mark
   Ω 象征「终极解决方案」，与「象」形成视觉双关
-  Squircle (n≈5) 连续曲率容器 · 品牌色 #FF6B2C
+  Squircle 容器 · 品牌色 #FF6B2C
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <!-- Squircle 背景 (连续曲率近似) -->
-  <path d="M50,2 C73,2 85,2 91,8 C98,15 98,27 98,50 C98,73 98,85 91,92 C85,98 73,98 50,98 C27,98 15,98 8,92 C2,85 2,73 2,50 C2,27 2,15 8,8 C15,2 27,2 50,2 Z" fill="#FF6B2C"/>
-  <!-- Ω (Omega) 符号 — 白色 -->
-  <g transform="translate(50, 48)" fill="none" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Ω 主体弧线：从左脚向上画弧到右脚 -->
-    <path d="M-18,18 L-18,10 C-18,-12 -8,-22 0,-22 C8,-22 18,-12 18,10 L18,18"/>
-    <!-- 左脚横线 -->
-    <line x1="-24" y1="18" x2="-12" y2="18"/>
-    <!-- 右脚横线 -->
-    <line x1="12" y1="18" x2="24" y2="18"/>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect fill="#FF6B2C" x="32" y="32" width="448" height="448" rx="96" ry="96"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 160 320 L 160 280 Q 160 160 256 160 Q 352 160 352 280 L 352 320"/>
+    <path d="M 160 320 L 200 320"/>
+    <path d="M 312 320 L 352 320"/>
   </g>
 </svg>
