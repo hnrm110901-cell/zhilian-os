@@ -18,7 +18,7 @@ All tables created and verified in PostgreSQL:
 #### 2. Sample Data Seeded
 Database populated with realistic test data:
 - **3 Users**: admin, manager, staff (password: username123)
-- **1 Store**: 智链餐厅-朝阳店 (STORE001)
+- **1 Store**: 屯象餐厅-朝阳店 (STORE001)
 - **3 Employees**: 张三 (waiter), 李四 (chef), 王五 (waiter)
 - **3 Inventory Items**: 大米, 猪肉, 青菜
 - **3 KPIs**: 总营收, 成本率, 客户满意度

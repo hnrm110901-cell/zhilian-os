@@ -1,14 +1,14 @@
 # 业财税资金一体化（FCT）独立部署指南
 
-本文说明如何将 FCT 以**独立服务**形态部署，与智链OS 解耦，通过 HTTP 对接业务系统（智链OS 或第三方 POS/ERP）。
+本文说明如何将 FCT 以**独立服务**形态部署，与屯象OS 解耦，通过 HTTP 对接业务系统（屯象OS 或第三方 POS/ERP）。
 
 ---
 
 ## 一、适用场景
 
-- 客户已有业务系统，仅采购业财税资金能力，不部署智链OS。
-- 业财税资金与智链OS 分集群部署，通过 `fct.mode=remote` + HTTP 对接。
-- 压测或演示时单独跑 FCT，不启动完整智链OS。
+- 客户已有业务系统，仅采购业财税资金能力，不部署屯象OS。
+- 业财税资金与屯象OS 分集群部署，通过 `fct.mode=remote` + HTTP 对接。
+- 压测或演示时单独跑 FCT，不启动完整屯象OS。
 
 ---
 
@@ -16,8 +16,8 @@
 
 ### 2.1 前提
 
-- 与智链OS 共用同一代码仓（`zhilian-os`），仅换启动入口。
-- 已执行过 FCT 表结构迁移（与智链OS 合并部署时相同）：  
+- 与屯象OS 共用同一代码仓（`zhilian-os`），仅换启动入口。
+- 已执行过 FCT 表结构迁移（与屯象OS 合并部署时相同）：  
   `alembic upgrade head`（在 `apps/api-gateway` 目录下，且 `alembic.ini` 指向同一数据库或独立库均可）。
 
 ### 2.2 环境变量
@@ -34,11 +34,11 @@
 | `CELERY_RESULT_BACKEND` | 是* | 占位即可，如 `redis://localhost:6379/2` |
 | `FCT_API_KEY` | 否 | 独立服务 API Key；设置后请求需带 `X-API-Key`，不设则不做校验（仅建议内网使用） |
 
-\* 沿用智链OS 的 `Settings`，这些字段必填，独立部署时可使用占位值。
+\* 沿用屯象OS 的 `Settings`，这些字段必填，独立部署时可使用占位值。
 
 ### 2.3 启动命令
 
-在 **智链OS 的 api-gateway 目录** 下执行（保证能解析 `src`）：
+在 **屯象OS 的 api-gateway 目录** 下执行（保证能解析 `src`）：
 
 ```bash
 cd apps/api-gateway
@@ -100,27 +100,27 @@ uvicorn fct_standalone_main:app --host 0.0.0.0 --port 8001 --workers 1
 
 ---
 
-## 四、智链OS 对接独立 FCT 服务
+## 四、屯象OS 对接独立 FCT 服务
 
-当 FCT 独立部署时，智链OS 侧配置：
+当 FCT 独立部署时，屯象OS 侧配置：
 
 - `FCT_ENABLED=true`
 - `FCT_MODE=remote`
 - `FCT_BASE_URL=http://fct-service:8001`（或实际独立服务地址）
 - `FCT_EVENT_TARGET=http`
 - `FCT_EVENT_HTTP_URL=http://fct-service:8001/api/v1/events`
-- （若独立服务启用了 API Key）在智链OS 侧调用 FCT 时请求头需带 `X-API-Key`（需在调用 FCT 的代码或配置中传入，当前合并形态为内网直接调 fct_service，未走 HTTP；若后续改为 HTTP 转发，则需在此处配置 Key）。
+- （若独立服务启用了 API Key）在屯象OS 侧调用 FCT 时请求头需带 `X-API-Key`（需在调用 FCT 的代码或配置中传入，当前合并形态为内网直接调 fct_service，未走 HTTP；若后续改为 HTTP 转发，则需在此处配置 Key）。
 
-当前 Phase 2 实现为：独立服务可单独启动并对外提供上述 API；智链OS 在 `mode=remote` 时**通过 HTTP 调用独立服务**的对接逻辑可在后续迭代中在 `fct_integration` 或适配层中增加（例如根据 `FCT_MODE` 和 `FCT_BASE_URL` 选择调用本地 fct_service 或请求独立服务 `/api/v1/events`）。
+当前 Phase 2 实现为：独立服务可单独启动并对外提供上述 API；屯象OS 在 `mode=remote` 时**通过 HTTP 调用独立服务**的对接逻辑可在后续迭代中在 `fct_integration` 或适配层中增加（例如根据 `FCT_MODE` 和 `FCT_BASE_URL` 选择调用本地 fct_service 或请求独立服务 `/api/v1/events`）。
 
 ---
 
 ## 五、Docker 示例（可选）
 
-在 `apps/api-gateway` 目录下可使用与智链OS 同一镜像、仅换启动命令的方式运行独立服务：
+在 `apps/api-gateway` 目录下可使用与屯象OS 同一镜像、仅换启动命令的方式运行独立服务：
 
 ```dockerfile
-# 与智链OS API Gateway 共用镜像，仅 CMD 不同
+# 与屯象OS API Gateway 共用镜像，仅 CMD 不同
 CMD ["uvicorn", "fct_standalone_main:app", "--host", "0.0.0.0", "--port", "8001"]
 ```
 

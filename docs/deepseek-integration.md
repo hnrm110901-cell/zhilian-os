@@ -2,7 +2,7 @@
 
 ## 概述
 
-智链OS现已支持DeepSeek API作为LLM提供商。DeepSeek提供高性价比的大语言模型服务，特别适合中文场景和代码生成任务。
+屯象OS现已支持DeepSeek API作为LLM提供商。DeepSeek提供高性价比的大语言模型服务，特别适合中文场景和代码生成任务。
 
 ## 配置步骤
 
@@ -76,7 +76,7 @@ python src/main.py
 curl -X POST http://localhost:8000/api/v1/llm/test \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "你好，请介绍一下智链OS系统"
+    "prompt": "你好，请介绍一下屯象OS系统"
   }'
 ```
 
@@ -91,7 +91,7 @@ llm_client = get_llm_client()
 # 生成文本
 response = await llm_client.generate(
     prompt="分析这个订单的异常情况",
-    system_prompt="你是智链OS的智能分析助手",
+    system_prompt="你是屯象OS的智能分析助手",
     temperature=0.7,
     max_tokens=1000
 )

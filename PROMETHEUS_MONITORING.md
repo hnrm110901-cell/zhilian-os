@@ -2,7 +2,7 @@
 
 ## 概述
 
-智链OS已集成Prometheus和Grafana监控系统，用于实时监控API Gateway的性能和健康状态。
+屯象OS已集成Prometheus和Grafana监控系统，用于实时监控API Gateway的性能和健康状态。
 
 ## 架构
 

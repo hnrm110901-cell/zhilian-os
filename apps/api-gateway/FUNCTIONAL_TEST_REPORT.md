@@ -1,4 +1,4 @@
-# 智链OS功能测试报告
+# 屯象OS功能测试报告
 ## Functional Test Report
 
 **测试日期**: 2026-02-21

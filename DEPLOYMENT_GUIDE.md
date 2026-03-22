@@ -1,4 +1,4 @@
-# 智链OS腾讯云部署指南
+# 屯象OS腾讯云部署指南
 # Zhilian OS Tencent Cloud Deployment Guide
 
 **服务器**: 42.194.229.21

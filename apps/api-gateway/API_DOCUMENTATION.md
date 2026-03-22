@@ -2,7 +2,7 @@
 
 ## 概述
 
-智链OS API Gateway提供RESTful API接口，支持任务管理、对账、通知等核心业务功能。
+屯象OS API Gateway提供RESTful API接口，支持任务管理、对账、通知等核心业务功能。
 
 **Base URL**: `http://localhost:8000/api/v1`
 

@@ -2,7 +2,7 @@
 
 ## 概述
 
-天财商龙餐饮管理系统API适配器，提供订单管理、菜品管理、会员管理、库存管理等功能的Python封装，支持与智链OS神经系统深度集成。
+天财商龙餐饮管理系统API适配器，提供订单管理、菜品管理、会员管理、库存管理等功能的Python封装，支持与屯象OS神经系统深度集成。
 
 ## 功能特性
 
@@ -150,7 +150,7 @@ result = await adapter.update_inventory(
 )
 ```
 
-## 与智链OS集成
+## 与屯象OS集成
 
 ### 通过集成服务使用
 
@@ -165,13 +165,13 @@ integration_service = AdapterIntegrationService(neural_system=neural_system)
 adapter = TiancaiShanglongAdapter(config)
 integration_service.register_adapter("tiancai", adapter, config)
 
-# 同步订单到智链OS
+# 同步订单到屯象OS
 result = await integration_service.sync_order_from_tiancai(
     order_id="ORD20240001",
     store_id="STORE001"
 )
 
-# 同步菜品到智链OS
+# 同步菜品到屯象OS
 result = await integration_service.sync_dishes_from_tiancai(
     store_id="STORE001"
 )

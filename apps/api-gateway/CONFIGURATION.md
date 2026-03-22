@@ -1,6 +1,6 @@
 # 环境配置指南
 
-本文档详细说明智链OS API Gateway的所有环境变量配置。
+本文档详细说明屯象OS API Gateway的所有环境变量配置。
 
 ## 配置文件
 
@@ -239,7 +239,7 @@ ALIYUN_ACCESS_KEY_ID=your_access_key_id
 ALIYUN_ACCESS_KEY_SECRET=your_access_key_secret
 
 # 短信签名
-ALIYUN_SMS_SIGN_NAME=智链OS
+ALIYUN_SMS_SIGN_NAME=屯象OS
 
 # 短信模板代码
 ALIYUN_SMS_TEMPLATE_CODE=SMS_123456789
@@ -258,7 +258,7 @@ TENCENT_SECRET_KEY=your_secret_key
 TENCENT_SMS_APP_ID=1400123456
 
 # 短信签名
-TENCENT_SMS_SIGN_NAME=智链OS
+TENCENT_SMS_SIGN_NAME=屯象OS
 
 # 短信模板ID
 TENCENT_SMS_TEMPLATE_ID=123456

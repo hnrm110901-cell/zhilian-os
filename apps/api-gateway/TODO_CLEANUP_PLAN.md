@@ -1,5 +1,5 @@
 # TODO 清理计划（收敛结果）
-## 智链OS - API Gateway
+## 屯象OS - API Gateway
 
 **状态**: 已完成  
 **更新日期**: 2026-03-08

@@ -1,6 +1,6 @@
 # 连锁餐饮绩效 Agent 规划
 
-基于连锁餐饮行业门店各岗位绩效与提成结构，规划一套与智链OS 现有 Agent 体系衔接的**绩效 Agent（Performance Agent）**，负责岗位绩效计算、提成规则引擎、绩效报表与自然语言查询。
+基于连锁餐饮行业门店各岗位绩效与提成结构，规划一套与屯象OS 现有 Agent 体系衔接的**绩效 Agent（Performance Agent）**，负责岗位绩效计算、提成规则引擎、绩效报表与自然语言查询。
 
 ---
 
@@ -108,7 +108,7 @@
 - **评价/外卖**：好评、差评、准时率、单量（平台 API 或埋点）。
 - **食安/巡检**：事故、违规、巡检结果（红线与扣减）。
 
-与智链OS 现有组件的对接建议：  
+与屯象OS 现有组件的对接建议：  
 - 绩效 Agent 通过**统一数据服务或数仓**读取上述数据（不替代 POS/ERP，只读）；  
 - 排班、订单、私域等 Agent 已具备的能力可被绩效 Agent **调用或消费其输出**（如排班执行率、订单维度汇总）。
 
@@ -118,7 +118,7 @@
 - **公式执行**：支持简单表达式（加减乘除、条件、min/max）与阶梯（如单量 0–100 单 1 元/单，100–200 单 1.2 元/单）。
 - **追溯**：每条提成/每项得分可关联到规则版本、数据快照或数据源查询条件，便于审计与解释。
 
-### 3.4 与智链OS 其他 Agent 的协作
+### 3.4 与屯象OS 其他 Agent 的协作
 
 | Agent | 协作方式 |
 |-------|----------|
@@ -135,7 +135,7 @@
 
 ### 4.1 与现有 Agent 规范对齐
 
-- 遵循智链OS **BaseAgent** 抽象：`execute(action, params)`、`get_supported_actions()`。
+- 遵循屯象OS **BaseAgent** 抽象：`execute(action, params)`、`get_supported_actions()`。
 - 请求方式：`POST /api/agents/performance`，body：`input_data.action` + `input_data.params`。
 - 响应：与现有 Agent 一致（如 `AgentResponse` 或现有网关约定），包含 success、data、error、execution_time；其中 data 内可含 reasoning、source_data（规则 id、数据周期、关键指标值）便于审计与前端展示。
 
@@ -183,13 +183,13 @@ params: { "query": "A店2月服务员提成总和是多少？", "store_id": "STO
 
 - **岗位与提成**：店长、值班经理、服务员、收银、后厨、外卖专员等岗位的绩效维度与提成形式已按行业惯例梳理，可作为配置模板与规则设计输入。
 - **绩效 Agent**：定位为“**绩效计算与提成执行**”，与现有“**评估与分析**”的 KPI Agent 互补，通过规则引擎 + 结构化数据产出可审计的得分与提成，并支持规则解释与自然语言查询。
-- **落地**：与智链OS 统一 Agent 接口与数据体系对齐，分阶段实现配置、数据、核心计算、解释与 NL、对接上线，即可形成一套可用的连锁餐饮绩效 Agent。
+- **落地**：与屯象OS 统一 Agent 接口与数据体系对齐，分阶段实现配置、数据、核心计算、解释与 NL、对接上线，即可形成一套可用的连锁餐饮绩效 Agent。
 
 ---
 
 ## 七、已实现与部署
 
-### 7.1 已实现（智链OS api-gateway）
+### 7.1 已实现（屯象OS api-gateway）
 
 - **PerformanceAgent**（`apps/api-gateway/src/agents/performance_agent.py`）：6 个 action 已实现（get_role_config、calculate_performance、calculate_commission、get_performance_report、explain_rule、nl_query），当前计算与报表为占位结构，接入指标表与规则引擎后可产出真实数据。
 - **API**：`POST /api/agents/performance`，body：`{ "agent_type": "performance", "input_data": { "action": "<action>", "params": { ... } } }`。

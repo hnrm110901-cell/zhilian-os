@@ -1,8 +1,8 @@
-# 智链OS实时通知系统文档
+# 屯象OS实时通知系统文档
 
 ## 概述
 
-智链OS实时通知系统提供了完整的通知解决方案,支持WebSocket实时推送、多渠道通知(邮件/短信/微信/飞书)、通知模板管理和故障转移机制。
+屯象OS实时通知系统提供了完整的通知解决方案,支持WebSocket实时推送、多渠道通知(邮件/短信/微信/飞书)、通知模板管理和故障转移机制。
 
 ## 系统架构
 
@@ -387,7 +387,7 @@ await feishu_service.send_message(
 # 配置阿里云短信
 ALIYUN_ACCESS_KEY = "your_access_key"
 ALIYUN_ACCESS_SECRET = "your_access_secret"
-ALIYUN_SMS_SIGN = "智链OS"
+ALIYUN_SMS_SIGN = "屯象OS"
 
 # 发送短信
 from src.services.sms_service import sms_service

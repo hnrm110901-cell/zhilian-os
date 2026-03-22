@@ -1,4 +1,4 @@
-# 智链OS - 快速开始指南
+# 屯象OS - 快速开始指南
 
 ## 目录
 1. [系统要求](#系统要求)
@@ -417,4 +417,4 @@ docker-compose exec api-gateway alembic upgrade head
 
 ---
 
-**智链OS** - 让餐厅运营更智能
+**屯象OS** - 让餐厅运营更智能

@@ -1,4 +1,4 @@
-# 智链OS产品功能明细
+# 屯象OS产品功能明细
 ## Zhilian OS - 完整产品功能清单
 
 **版本**: 1.0.0
@@ -9,7 +9,7 @@
 
 ## 📊 产品概览
 
-智链OS (Zhilian Operating System) 是一个基于AI Agent的中餐连锁品牌门店运营智能操作系统，通过5个专业化AI Agent实现从排班、订单、库存到决策的全流程智能化管理。
+屯象OS (Zhilian Operating System) 是一个基于AI Agent的中餐连锁品牌门店运营智能操作系统，通过5个专业化AI Agent实现从排班、订单、库存到决策的全流程智能化管理。
 
 ### 核心数据
 - **API端点总数**: 218个
@@ -764,7 +764,7 @@
 
 ## 📞 联系信息
 
-**项目名称**: 智链OS (Zhilian Operating System)
+**项目名称**: 屯象OS (Zhilian Operating System)
 **版本**: 1.0.0
 **仓库**: github.com:hnrm110901-cell/zhilian-os.git
 **分支**: main

@@ -1,8 +1,8 @@
-# 智链OS移动端功能文档
+# 屯象OS移动端功能文档
 
 ## 概述
 
-智链OS移动端提供了针对移动设备优化的用户界面和API接口,支持店长、服务员、厨师、库管等不同角色在移动设备上高效工作。
+屯象OS移动端提供了针对移动设备优化的用户界面和API接口,支持店长、服务员、厨师、库管等不同角色在移动设备上高效工作。
 
 ## 功能特性
 
@@ -75,7 +75,7 @@ GET /api/v1/mobile/dashboard
     "full_name": "张三",
     "role": "store_manager",
     "store_id": "store-001",
-    "store_name": "智链餐厅(总店)"
+    "store_name": "屯象餐厅(总店)"
   },
   "notifications": {
     "unread_count": 5,

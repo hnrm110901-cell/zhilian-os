@@ -1,6 +1,6 @@
 # 屯象OS · 品牌前后端总设计规范 v1.0
 
-> **品牌升级**: 智链OS → 屯象OS (TUN XIANG OS)
+> **品牌升级**: 屯象OS → 屯象OS (TUN XIANG OS)
 > **生效日期**: 2026-03-12
 > **适用范围**: 全端（Web/Mobile/API/文档/对外物料）
 > **设计哲学**: 东方的魂，西方的骨 — 易经·屯卦的生长意象 × Bauhaus/Rams/Swiss/Tufte 的精确体系
@@ -216,7 +216,7 @@ src/design-system/
 
 ### 3.6 迁移映射（旧 → 新）
 
-| 旧Token (智链) | 新Token (屯象) | 说明 |
+| 旧Token (屯象) | 新Token (屯象) | 说明 |
 |----------------|----------------|------|
 | `--accent: #FF6B2C` | `--tx-mint-500: #0AAF9A` | 品牌主色 |
 | `--bg: #0B1A20` | `--tx-dark-bg: #0B1A20` | 深色底（保留） |
@@ -749,18 +749,18 @@ const txDarkTheme: ThemeConfig = {
 
 | 位置 | 旧值 | 新值 |
 |------|------|------|
-| `src/main.py` title | `智链OS API` | `屯象OS API` |
-| `src/main.py` description | `智链经营助手` | `屯象 · 餐饮人的好伙伴` |
-| Swagger UI 标题 | `智链OS` | `屯象OS` |
+| `src/main.py` title | `屯象OS API` | `屯象OS API` |
+| `src/main.py` description | `屯象经营助手` | `屯象 · 餐饮人的好伙伴` |
+| Swagger UI 标题 | `屯象OS` | `屯象OS` |
 | API响应 header | `X-Powered-By: ZhilianOS` | `X-Powered-By: TunxiangOS` |
-| 前端 `<title>` | `智链OS` | `屯象OS` |
+| 前端 `<title>` | `屯象OS` | `屯象OS` |
 | 前端 Logo组件 | 旧Logo | 屯象Logo SVG |
-| PWA manifest | `name: 智链OS` | `name: 屯象OS` |
+| PWA manifest | `name: 屯象OS` | `name: 屯象OS` |
 
 ### 15.3 AI文案模板
 
 ```python
-# 旧（智链风格 — 冷/技术）
+# 旧（屯象风格 — 冷/技术）
 "智能算法已检测到异常数据，建议执行优化方案。"
 
 # 新（屯象风格 — 温暖/直接）

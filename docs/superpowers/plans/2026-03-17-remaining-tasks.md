@@ -1,4 +1,4 @@
-# 智链OS 剩余任务实现计划（任务3-7）
+# 屯象OS 剩余任务实现计划（任务3-7）
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -401,7 +401,7 @@ POS 数据管道管理页面，展示：
 
 菜单导入工具：
 - 上传区域（支持 Excel/CSV）
-- 字段映射配置（POS字段 → 智链字段）
+- 字段映射配置（POS字段 → 屯象字段）
 - 预览表格 + 冲突检测
 - 导入进度条 + 结果摘要
 

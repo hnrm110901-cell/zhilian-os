@@ -1,8 +1,8 @@
-# 私域运营 Agent 企业微信应用规划及兼容智链OS 整体系统
+# 私域运营 Agent 企业微信应用规划及兼容屯象OS 整体系统
 
 ## 一、目标与范围
 
-将**私域运营 Agent** 作为企业微信（企微）上的**可对话应用**落地，使门店/运营人员在企业微信内通过自然语言获取用户画像、实时指标、推荐建议、排班与库存建议等能力；同时与智链OS 现有企微能力（OAuth 登录、事件推送、管理后台）统一兼容，保证整体系统一致运行。
+将**私域运营 Agent** 作为企业微信（企微）上的**可对话应用**落地，使门店/运营人员在企业微信内通过自然语言获取用户画像、实时指标、推荐建议、排班与库存建议等能力；同时与屯象OS 现有企微能力（OAuth 登录、事件推送、管理后台）统一兼容，保证整体系统一致运行。
 
 | 维度 | 说明 |
 |------|------|
@@ -12,7 +12,7 @@
 
 ---
 
-## 二、智链OS 现有企业微信能力梳理
+## 二、屯象OS 现有企业微信能力梳理
 
 ### 2.1 已有组件
 
@@ -45,12 +45,12 @@
 
 推荐先 **A**，后续可按需拆 **B**。
 
-### 3.2 消息流（与智链OS 兼容）
+### 3.2 消息流（与屯象OS 兼容）
 
 ```
 企业微信用户 → 发送文本
     ↓
-企业微信服务器 → POST 智链OS /wechat/webhook（或 /wechat/private-domain/webhook）
+企业微信服务器 → POST 屯象OS /wechat/webhook（或 /wechat/private-domain/webhook）
     ↓
 api-gateway：验签、解密、解析 XML（FromUserName、MsgType、Content）
     ↓
@@ -67,12 +67,12 @@ WeChatService.send_text_message(content=answer, touser=FromUserName)
 ```
 
 - **兼容点**：同一 api-gateway、同一 WeChatService/WeChatCrypto、同一套 WECHAT_* 配置；仅增加「文本消息 → 私域 Agent → 发回」一条链路。
-- **store_id / 身份**：FromUserName 为企业微信 UserId，可与智链OS User 表（企业微信 OAuth 登录时写入的 wechat_user_id）关联，得到当前用户所属门店/角色，再传入 `params.store_id` 或 `params.context`，供 Agent 按门店过滤或做权限提示。
+- **store_id / 身份**：FromUserName 为企业微信 UserId，可与屯象OS User 表（企业微信 OAuth 登录时写入的 wechat_user_id）关联，得到当前用户所属门店/角色，再传入 `params.store_id` 或 `params.context`，供 Agent 按门店过滤或做权限提示。
 
 ### 3.3 应用菜单与工作台（可选）
 
 - **菜单**：在企微管理后台为自建应用配置「发送消息」及菜单项（如「今日数据」「用户画像」「我的门店」），菜单可发事件或关键字，回调收到后按 EventKey/Content 调用对应 action（如 realtime_metrics、user_portrait），或统一走 nl_query。
-- **工作台**：若使用「应用主页」，可配置为智链OS 管理后台的 H5 链接（如 PrivateDomainPage 的移动端或单独简版），需与现有 web 路由、登录态（Cookie/Token）或企微 JSSDK 鉴权兼容。
+- **工作台**：若使用「应用主页」，可配置为屯象OS 管理后台的 H5 链接（如 PrivateDomainPage 的移动端或单独简版），需与现有 web 路由、登录态（Cookie/Token）或企微 JSSDK 鉴权兼容。
 
 ### 3.4 主动推送与事件协同
 
@@ -82,7 +82,7 @@ WeChatService.send_text_message(content=answer, touser=FromUserName)
 
 ---
 
-## 四、与智链OS 整体系统的兼容性
+## 四、与屯象OS 整体系统的兼容性
 
 ### 4.1 架构位置
 
@@ -95,7 +95,7 @@ WeChatService.send_text_message(content=answer, touser=FromUserName)
      │                   │                   │
      └───────────────────┼───────────────────┘
                          ▼
-              智链OS api-gateway
+              屯象OS api-gateway
                          │
      ┌───────────────────┼───────────────────┬─────────────────────┐
      │                   │                     │                     │
@@ -120,19 +120,19 @@ WeChatService.send_text_message(content=answer, touser=FromUserName)
 | 项 | 说明 |
 |----|------|
 | **环境变量** | 沿用现有 WECHAT_CORP_ID、WECHAT_CORP_SECRET、WECHAT_AGENT_ID、WECHAT_TOKEN、WECHAT_ENCODING_AES_KEY；若采用独立私域应用，可增加 WECHAT_PRIVATE_DOMAIN_AGENT_ID 与对应 Secret/Token/AESKey。 |
-| **回调 URL** | 企业微信后台配置「接收消息」模式，URL 填智链OS 暴露的 https://<domain>/api/v1/wechat/webhook（或独立路径），GET 用于校验、POST 用于收消息。 |
-| **白名单** | 企微要求回调 URL 可公网访问；智链OS 若在内网，需通过网关/反向代理暴露并配置 IP 白名单（企微服务器 IP）。 |
+| **回调 URL** | 企业微信后台配置「接收消息」模式，URL 填屯象OS 暴露的 https://<domain>/api/v1/wechat/webhook（或独立路径），GET 用于校验、POST 用于收消息。 |
+| **白名单** | 企微要求回调 URL 可公网访问；屯象OS 若在内网，需通过网关/反向代理暴露并配置 IP 白名单（企微服务器 IP）。 |
 
 ### 4.3 权限与多门店
 
-- **OAuth 与 User**：企业微信登录后智链OS 的 User 与 wechat_user_id、门店、角色已绑定；webhook 收到的 FromUserName 可查 User 表得到 store_id/role。
+- **OAuth 与 User**：企业微信登录后屯象OS 的 User 与 wechat_user_id、门店、角色已绑定；webhook 收到的 FromUserName 可查 User 表得到 store_id/role。
 - **私域接口**：管理端调用 /api/v1/private-domain/execute 时已带登录态，store_id 由前端或 Query 传入；企微回调侧由 FromUserName 解析出的 store_id 写入 params，保证「谁问就按谁的门店答」。
 - **权限**：若需区分「仅店长可问经营数据」，可在 webhook 处理链中根据 User 的 role 做 action 白名单或提示「无权限」。
 
 ### 4.4 与神经系统 / 其他 Agent 的协同
 
 - **神经系统**：私域 Agent 如需实时订单/会员数据，可依赖现有事件或 API；后续若将「用户问→答案」沉淀为可检索知识，可写入神经系统供 RAG。
-- **其他 Agent**：决策/排班/库存等 Agent 已注册在智链OS；私域对话中若识别到明确场景（如「下周排班」），可在 nl_query 或单独 action 中内部调用对应 Agent，再汇总成一句话回复（当前以私域自身能力为主，扩展点预留）。
+- **其他 Agent**：决策/排班/库存等 Agent 已注册在屯象OS；私域对话中若识别到明确场景（如「下周排班」），可在 nl_query 或单独 action 中内部调用对应 Agent，再汇总成一句话回复（当前以私域自身能力为主，扩展点预留）。
 
 ---
 
@@ -150,7 +150,7 @@ WeChatService.send_text_message(content=answer, touser=FromUserName)
 ## 六、小结
 
 - **企业微信应用**：以「接收用户消息 → 调用私域 Agent（nl_query）→ 企微 API 回复」为主线，复用现有回调与发信能力。
-- **兼容智链OS**：同一 api-gateway、同一配置与认证体系、同一 PrivateDomainAgent；企微端作为新入口，与 Web 管理端、事件推送并列，不替代现有模块。
+- **兼容屯象OS**：同一 api-gateway、同一配置与认证体系、同一 PrivateDomainAgent；企微端作为新入口，与 Web 管理端、事件推送并列，不替代现有模块。
 - **扩展性**：store_id/角色从 User 解析、私域事件接入 trigger、多应用/多回调可选，便于后续按门店与角色做细粒度控制与更多企微能力接入。
 
 以上规划可直接用于排期与产品/运维对齐。

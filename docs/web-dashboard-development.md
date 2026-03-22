@@ -284,7 +284,7 @@ pnpm --filter @zhilian-os/web build
 
 ## 总结
 
-成功完成了智链OS Web管理后台的基础开发，实现了:
+成功完成了屯象OS Web管理后台的基础开发，实现了:
 - 完整的项目结构
 - 7个Agent的页面框架
 - API服务层集成

@@ -151,7 +151,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [2.0.0] — 2026-02-xx
 
-### 智链OS — 10 大 MVP 功能交付
+### 屯象OS — 10 大 MVP 功能交付
 
 - Decision Priority Engine（Top3 决策聚合）
 - Financial Impact Calculator（财务影响计算）

@@ -2,7 +2,7 @@
 
 ## 概述
 
-智链OS现已支持集成大语言模型(LLM)，可以使用OpenAI GPT-4、Anthropic Claude等先进的AI模型来增强Agent系统的智能化水平。
+屯象OS现已支持集成大语言模型(LLM)，可以使用OpenAI GPT-4、Anthropic Claude等先进的AI模型来增强Agent系统的智能化水平。
 
 ## 支持的LLM提供商
 

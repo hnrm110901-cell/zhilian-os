@@ -1,4 +1,4 @@
-# 智链OS代码复盘与测试会话总结
+# 屯象OS代码复盘与测试会话总结
 ## Session Summary - Code Review & Testing
 
 **会话日期**: 2026-02-21
@@ -10,7 +10,7 @@
 
 ## 📊 会话概览 (Session Overview)
 
-本次会话完成了智链OS项目的全面代码复盘和功能测试，发现并修复了4个关键Bug，验证了所有核心功能正常运行，项目达到生产就绪状态。
+本次会话完成了屯象OS项目的全面代码复盘和功能测试，发现并修复了4个关键Bug，验证了所有核心功能正常运行，项目达到生产就绪状态。
 
 ### 关键成果
 - 🐛 修复4个关键Bug
@@ -411,7 +411,7 @@ FUNCTIONAL_TEST_REPORT.md: 16+ KB
 
 ## 📞 联系信息 (Contact)
 
-**项目**: 智链OS (Zhilian Operating System)
+**项目**: 屯象OS (Zhilian Operating System)
 **仓库**: github.com:hnrm110901-cell/zhilian-os.git
 **分支**: main
 **版本**: 1.0.0

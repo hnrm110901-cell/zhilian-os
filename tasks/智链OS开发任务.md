@@ -1,6 +1,6 @@
-# 智链OS 开发任务清单
+# 屯象OS 开发任务清单
 
-> 依据《智链OS-Palantir本体论-兼容性扩展性与产品计划》与 `tasks/todo.md` 整理，便于排期与验收。  
+> 依据《屯象OS-Palantir本体论-兼容性扩展性与产品计划》与 `tasks/todo.md` 整理，便于排期与验收。  
 > 更新日期：2026-02
 
 ---
@@ -64,7 +64,7 @@
 
 ## 六、参考文档
 
-- [智链OS-Palantir本体论-兼容性扩展性与产品计划](../docs/智链OS-Palantir本体论-兼容性扩展性与产品计划.md)
-- [智链OS-Palantir本体论对标分析](../docs/智链OS-Palantir本体论对标分析.md)
+- [屯象OS-Palantir本体论-兼容性扩展性与产品计划](../docs/屯象OS-Palantir本体论-兼容性扩展性与产品计划.md)
+- [屯象OS-Palantir本体论对标分析](../docs/屯象OS-Palantir本体论对标分析.md)
 - [任务清单（todo.md）](./todo.md)
 - [TODO 清理计划](../apps/api-gateway/TODO_CLEANUP_PLAN.md)
