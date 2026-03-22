@@ -79,13 +79,13 @@
 }
 
 .categoryPill:hover {
-  border-color: var(--accent, #0AAF9A);
-  color: var(--accent, #0AAF9A);
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
 }
 
 .categoryPillActive {
-  background: var(--accent, #0AAF9A);
-  border-color: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
   color: #fff;
 }
 

@@ -97,7 +97,7 @@
 .tierBarFill {
   height: 100%;
   border-radius: 3px;
-  background: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
   transition: width 0.4s ease;
 }
 
@@ -170,7 +170,7 @@
 }
 
 .healthValueAccent {
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 .healthValueGreen {
@@ -181,5 +181,5 @@
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }

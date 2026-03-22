@@ -45,7 +45,7 @@
 
 .pillOccupied {
   background: rgba(10, 175, 154, 0.12);
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .pillReserved {
@@ -82,7 +82,7 @@
 
 /* 状态色条 */
 .cardIdle     { border-left-color: #22c55e !important; }
-.cardOccupied { border-left-color: #0AAF9A !important; }
+.cardOccupied { border-left-color: #FF6B2C !important; }
 .cardReserved { border-left-color: #3b82f6 !important; }
 .cardCleaning { border-left-color: #f97316 !important; }
 

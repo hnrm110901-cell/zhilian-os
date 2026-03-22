@@ -340,7 +340,7 @@ const FinanceManagement: React.FC = () => {
         name: '净额',
         type: 'line',
         data: Object.values(cashFlow.cash_flow || {}).map((d: any) => d.net / 100),
-        itemStyle: { color: '#0AAF9A' },
+        itemStyle: { color: '#FF6B2C' },
       },
     ],
   } : null;

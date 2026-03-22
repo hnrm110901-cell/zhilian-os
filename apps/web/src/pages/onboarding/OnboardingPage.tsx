@@ -70,7 +70,7 @@ const BUILD_STAGES = [
 
 const COLOR_MAP: Record<string, string> = {
   green:  '#1A7A52',
-  blue:   '#0AAF9A',
+  blue:   '#FF6B2C',
   yellow: '#faad14',
   red:    '#C53030',
   grey:   '#8c8c8c',

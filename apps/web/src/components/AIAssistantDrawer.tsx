@@ -144,7 +144,7 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = '' }) => 
           <Avatar
             icon={<RobotOutlined />}
             size={28}
-            style={{ backgroundColor: '#0AAF9A' }}
+            style={{ backgroundColor: '#FF6B2C' }}
           />
           <span style={{ fontWeight: 600 }}>屯象智脑</span>
           {scenario && (
@@ -271,7 +271,7 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = '' }) => 
                   <Avatar
                     icon={<RobotOutlined />}
                     size={24}
-                    style={{ backgroundColor: '#0AAF9A', marginRight: 8, flexShrink: 0 }}
+                    style={{ backgroundColor: '#FF6B2C', marginRight: 8, flexShrink: 0 }}
                   />
                 )}
                 <div
@@ -279,7 +279,7 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = '' }) => 
                     maxWidth: '80%',
                     padding: '8px 12px',
                     borderRadius: m.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                    background: m.role === 'user' ? '#0AAF9A' : '#f5f5f5',
+                    background: m.role === 'user' ? '#FF6B2C' : '#f5f5f5',
                     color: m.role === 'user' ? 'white' : '#333',
                     fontSize: 13,
                     lineHeight: '1.5',
@@ -295,7 +295,7 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = '' }) => 
                 <Avatar
                   icon={<RobotOutlined />}
                   size={24}
-                  style={{ backgroundColor: '#0AAF9A' }}
+                  style={{ backgroundColor: '#FF6B2C' }}
                 />
                 <Spin size="small" />
                 <Text type="secondary" style={{ fontSize: 12 }}>AI 正在思考...</Text>

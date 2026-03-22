@@ -76,7 +76,7 @@ const STATUS_LABELS: Record<string, string> = {
   raw: '待处理', mapped: '已映射', attributed: '已归因', archived: '已归档',
 };
 const SOURCE_COLORS: Record<string, string> = {
-  pos: '#0AAF9A', meituan: '#FF4D00', eleme: '#0FC0FC',
+  pos: '#FF6B2C', meituan: '#FF4D00', eleme: '#0FC0FC',
   wechat_pay: '#07C160', erp: '#722ED1', manual: '#8C8C8C', system: '#1890FF',
 };
 
@@ -128,7 +128,7 @@ const eventColumns: ZTableColumn<BusinessEvent>[] = [
         fontWeight: 700,
         fontFamily: 'JetBrains Mono, monospace',
         fontSize: 12,
-        color: v > 0 ? 'var(--accent, #0AAF9A)' : '#8C8C8C',
+        color: v > 0 ? 'var(--accent, #FF6B2C)' : '#8C8C8C',
       }}>
         ¥{Number(v).toFixed(2)}
       </span>
@@ -232,9 +232,9 @@ const BusinessEventsPage: React.FC = () => {
       { name: '食材成本',   value: -costs.food_cost_yuan,            color: '#C8923A' },
       { name: '损耗',       value: -costs.waste_cost_yuan,           color: '#fa541c' },
       { name: '平台抽佣',   value: -costs.platform_commission_yuan,  color: '#722ed1' },
-      { name: '人工费用',   value: -costs.labor_cost_yuan,           color: '#0AAF9A' },
+      { name: '人工费用',   value: -costs.labor_cost_yuan,           color: '#FF6B2C' },
       { name: '其他费用',   value: -costs.other_expense_yuan,        color: '#13c2c2' },
-      { name: '毛利润',     value: profit.gross_profit_yuan,         color: profit.gross_profit_yuan >= 0 ? '#0AAF9A' : '#C53030' },
+      { name: '毛利润',     value: profit.gross_profit_yuan,         color: profit.gross_profit_yuan >= 0 ? '#FF6B2C' : '#C53030' },
     ];
     return {
       tooltip: {

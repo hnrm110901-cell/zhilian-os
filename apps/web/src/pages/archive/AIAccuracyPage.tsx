@@ -69,7 +69,7 @@ const AIAccuracyPage: React.FC = () => {
       data: weeklyTrend.map((w: any) => w.accuracy),
       markLine: { data: [{ type: 'average', name: '均值' }] },
       areaStyle: { opacity: 0.1 },
-      itemStyle: { color: '#0AAF9A' },
+      itemStyle: { color: '#FF6B2C' },
     }],
   };
 

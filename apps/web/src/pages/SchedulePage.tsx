@@ -404,7 +404,7 @@ const SchedulePage: React.FC = () => {
       </div>
 
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}><Card size="small"><Statistic title="在职员工" value={activeCount} prefix={<UserOutlined />} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
+        <Col span={6}><Card size="small"><Statistic title="在职员工" value={activeCount} prefix={<UserOutlined />} valueStyle={{ color: '#FF6B2C' }} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="技能类型" value={skillCount} valueStyle={{ color: '#faad14' }} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="已发布排班" value={publishedCount} prefix={<CalendarOutlined />} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="本周班次" value={weekView?.days?.reduce((acc: number, d: any) => acc + d.shifts.length, 0) ?? '--'} prefix={<ClockCircleOutlined />} valueStyle={{ color: '#722ed1' }} /></Card></Col>

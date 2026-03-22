@@ -118,7 +118,7 @@ function OverviewTab({ data }: { data: Record<string, any> | null }) {
           <Row gutter={16}>
             <Col span={6}><Statistic title="平均健康分" value={Number(data.avg_health_score).toFixed(1)} suffix="/ 100" /></Col>
             <Col span={6}><Statistic title="优秀" value={data.excellent_count ?? 0} valueStyle={{ color: '#1A7A52' }} /></Col>
-            <Col span={6}><Statistic title="良好" value={data.good_count ?? 0} valueStyle={{ color: '#0AAF9A' }} /></Col>
+            <Col span={6}><Statistic title="良好" value={data.good_count ?? 0} valueStyle={{ color: '#FF6B2C' }} /></Col>
             <Col span={6}><Statistic title="待改善" value={(data.poor_count ?? 0) + (data.immediate_action_count ?? 0)} valueStyle={{ color: '#C53030' }} /></Col>
           </Row>
         </Card>
@@ -130,7 +130,7 @@ function OverviewTab({ data }: { data: Record<string, any> | null }) {
           <Row gutter={16}>
             <Col span={6}><Statistic title="⭐ 明星菜" value={data.star_count ?? 0} valueStyle={{ color: '#faad14' }} /></Col>
             <Col span={6}><Statistic title="🐄 现金牛" value={data.cash_cow_count ?? 0} valueStyle={{ color: '#1A7A52' }} /></Col>
-            <Col span={6}><Statistic title="❓ 问题菜" value={data.question_mark_count ?? 0} valueStyle={{ color: '#0AAF9A' }} /></Col>
+            <Col span={6}><Statistic title="❓ 问题菜" value={data.question_mark_count ?? 0} valueStyle={{ color: '#FF6B2C' }} /></Col>
             <Col span={6}><Statistic title="🐕 瘦狗菜" value={data.dog_count ?? 0} valueStyle={{ color: '#8c8c8c' }} /></Col>
           </Row>
           {data.matrix_total_impact_yuan != null && (
@@ -198,7 +198,7 @@ function TrendTab({ history }: { history: Record<string, any>[] }) {
       { type: 'value', name: '环比%', axisLabel: { formatter: (v: number) => `${v}%` } },
     ],
     series: [
-      { name: '总营收', type: 'bar', data: [...history].reverse().map(r => Number(r.total_revenue ?? 0)), itemStyle: { color: '#0AAF9A' } },
+      { name: '总营收', type: 'bar', data: [...history].reverse().map(r => Number(r.total_revenue ?? 0)), itemStyle: { color: '#FF6B2C' } },
       { name: '环比%', type: 'line', yAxisIndex: 1, data: [...history].reverse().map(r => r.revenue_delta_pct != null ? Number(r.revenue_delta_pct) : null), itemStyle: { color: '#1A7A52' }, connectNulls: true },
     ],
   };
@@ -225,7 +225,7 @@ function TrendTab({ history }: { history: Record<string, any>[] }) {
     series: [
       { name: '明星',  type: 'bar', stack: 'total', data: [...history].reverse().map(r => r.star_count ?? 0),          itemStyle: { color: '#faad14' } },
       { name: '现金牛', type: 'bar', stack: 'total', data: [...history].reverse().map(r => r.cash_cow_count ?? 0),      itemStyle: { color: '#1A7A52' } },
-      { name: '问题',  type: 'bar', stack: 'total', data: [...history].reverse().map(r => r.question_mark_count ?? 0), itemStyle: { color: '#0AAF9A' } },
+      { name: '问题',  type: 'bar', stack: 'total', data: [...history].reverse().map(r => r.question_mark_count ?? 0), itemStyle: { color: '#FF6B2C' } },
       { name: '瘦狗',  type: 'bar', stack: 'total', data: [...history].reverse().map(r => r.dog_count ?? 0),           itemStyle: { color: '#8c8c8c' } },
     ],
   };

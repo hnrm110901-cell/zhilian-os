@@ -19,7 +19,7 @@
 /* ── Header ──────────────────────────────────────── */
 
 .header {
-  background: linear-gradient(135deg, #0AAF9A, #08C9B0);
+  background: linear-gradient(135deg, #FF6B2C, #08C9B0);
   border-radius: 12px;
   padding: 24px 20px;
   color: #fff;
@@ -68,7 +68,7 @@
 }
 
 .numWarn { color: #F2994A; }
-.numMint { color: #0AAF9A; }
+.numMint { color: #FF6B2C; }
 
 .summaryLabel {
   font-size: 11px;
@@ -118,7 +118,7 @@
   background: #fff;
   border-radius: 12px;
   padding: 16px;
-  border-left: 3px solid #0AAF9A;
+  border-left: 3px solid #FF6B2C;
 }
 
 .tipsTitle {

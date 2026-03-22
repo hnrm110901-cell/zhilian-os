@@ -211,7 +211,7 @@ const BookingH5: React.FC = () => {
               <span className={styles.confirmValue}>待确认</span>
             </div>
           </div>
-          <a href="/my-booking" style={{ color: '#0AAF9A', fontSize: 14 }}>
+          <a href="/my-booking" style={{ color: '#FF6B2C', fontSize: 14 }}>
             查看我的预订 →
           </a>
         </div>

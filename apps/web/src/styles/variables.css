@@ -1,14 +1,14 @@
 /* ═══ 屯象OS Design System · CSS Variables ═══ */
-/* v4 Apple Aesthetics — 亮色优先 + Mint #0AAF9A */
+/* v4 Apple Aesthetics — 亮色优先 + Orange #FF6B2C */
 /* 注意: 大部分变量由 injectTokens() 在运行时注入 */
 /* 此文件仅定义 CSS-only 场景的 fallback */
 
 :root {
-  /* ── 品牌色 (Mint #0AAF9A) ── */
-  --primary-color:    #0AAF9A;
-  --primary-hover:    #099987;
-  --primary-active:   #078070;
-  --primary-gradient: linear-gradient(135deg, #26C9B4 0%, #0AAF9A 100%);
+  /* ── 品牌色 (Orange #FF6B2C) ── */
+  --primary-color:    #FF6B2C;
+  --primary-hover:    #E85A1E;
+  --primary-active:   #CC4A14;
+  --primary-gradient: linear-gradient(135deg, #FF9160 0%, #FF6B2C 100%);
 
   /* ── 功能色 ── */
   --success-color: #27AE60;
@@ -59,11 +59,11 @@
   --surface:        #FFFFFF;
   --surface-hover:  rgba(0,0,0,0.025);
   --border:         rgba(0,0,0,0.06);
-  --accent:         #0AAF9A;
-  --accent-soft:    rgba(10,175,154,0.07);
+  --accent:         #FF6B2C;
+  --accent-soft:    rgba(255,107,44,0.07);
   --accent-hover:   #099987;
   --accent-active:  #078070;
-  --accent-bg:      rgba(10,175,154,0.06);
+  --accent-bg:      rgba(255,107,44,0.06);
   --green:          #16A34A;
   --red:            #DC2626;
   --yellow:         #D97706;
@@ -141,11 +141,11 @@
   --surface:        #0D2029;
   --surface-hover:  rgba(255,255,255,0.04);
   --border:         rgba(255,255,255,0.06);
-  --accent:         #0AAF9A;
-  --accent-soft:    rgba(10,175,154,0.12);
+  --accent:         #FF6B2C;
+  --accent-soft:    rgba(255,107,44,0.12);
   --accent-hover:   #26C9B4;
   --accent-active:  #4DD3C2;
-  --accent-bg:      rgba(10,175,154,0.08);
+  --accent-bg:      rgba(255,107,44,0.08);
   --green:          #34D399;
   --red:            #F87171;
   --yellow:         #FBBF24;

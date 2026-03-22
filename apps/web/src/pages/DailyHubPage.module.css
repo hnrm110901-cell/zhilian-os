@@ -81,7 +81,7 @@
   border: none;
   padding: 0;
   font-size: 12px;
-  color: #0AAF9A;
+  color: #FF6B2C;
   cursor: pointer;
   font-family: inherit;
   height: auto;
@@ -208,8 +208,8 @@
 }
 
 .phaseBtn:hover {
-  border-color: #0AAF9A;
-  color: #0AAF9A;
+  border-color: #FF6B2C;
+  color: #FF6B2C;
   background: #e6f7ff;
 }
 
@@ -220,8 +220,8 @@
 }
 
 .phaseBtnSelected {
-  border-color: #0AAF9A;
-  color: #0AAF9A;
+  border-color: #FF6B2C;
+  color: #FF6B2C;
   background: #e6f7ff;
 }
 

@@ -110,7 +110,7 @@ const AIEvolutionPage: React.FC = () => {
       {
         name: '采纳率', type: 'line', smooth: true,
         data: weeklyTrend.map(d => +(d.adoption_rate * 100).toFixed(1)),
-        itemStyle: { color: '#0AAF9A' },
+        itemStyle: { color: '#FF6B2C' },
       },
       {
         name: '成功率', type: 'line', smooth: true,
@@ -126,7 +126,7 @@ const AIEvolutionPage: React.FC = () => {
     xAxis: { type: 'category', data: hitlEscalations.map(d => d.date) },
     yAxis: { type: 'value' },
     series: [
-      { name: '总计', type: 'bar', data: hitlEscalations.map(d => d.total), itemStyle: { color: '#0AAF9A' } },
+      { name: '总计', type: 'bar', data: hitlEscalations.map(d => d.total), itemStyle: { color: '#FF6B2C' } },
       { name: '批准', type: 'bar', data: hitlEscalations.map(d => d.approved), itemStyle: { color: '#1A7A52' } },
       { name: '拒绝', type: 'bar', data: hitlEscalations.map(d => d.rejected), itemStyle: { color: '#C53030' } },
     ],
@@ -161,7 +161,7 @@ const AIEvolutionPage: React.FC = () => {
     { title: 'Agent', dataIndex: 'agent_name', key: 'agent_name' },
     {
       title: '采纳率', dataIndex: 'adoption_rate', key: 'adoption_rate',
-      render: (v: number) => <Progress percent={+(v * 100).toFixed(1)} size="small" strokeColor="#0AAF9A" />,
+      render: (v: number) => <Progress percent={+(v * 100).toFixed(1)} size="small" strokeColor="#FF6B2C" />,
     },
     { title: '决策数', dataIndex: 'decisions_made', key: 'decisions_made' },
     {
@@ -198,7 +198,7 @@ const AIEvolutionPage: React.FC = () => {
                   value={+(summary.avg_adoption_rate * 100).toFixed(1)}
                   suffix="%"
                   prefix={<RiseOutlined />}
-                  valueStyle={{ color: '#0AAF9A' }}
+                  valueStyle={{ color: '#FF6B2C' }}
                 />
               </Card>
             </Col>

@@ -66,7 +66,7 @@ const OrderAnalyticsPage: React.FC = () => {
         name: '订单数',
         type: 'bar',
         data: trendPoints.map((d: any) => d.orders),
-        itemStyle: { color: '#0AAF9A' },
+        itemStyle: { color: '#FF6B2C' },
       },
       {
         name: '营收(元)',

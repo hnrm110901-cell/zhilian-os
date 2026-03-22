@@ -175,7 +175,7 @@ const FinancialRecommendationPage: React.FC = () => {
       {
         name: '待处理', type: 'bar', stack: 'total',
         data: stats.map((s) => s.pending),
-        itemStyle: { color: '#0AAF9A' },
+        itemStyle: { color: '#FF6B2C' },
       },
     ],
   };
@@ -357,7 +357,7 @@ const FinancialRecommendationPage: React.FC = () => {
             <Statistic
               title="¥提升潜力"
               value={totalYuan > 0 ? `¥${totalYuan.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}` : '—'}
-              valueStyle={{ color: '#0AAF9A' }}
+              valueStyle={{ color: '#FF6B2C' }}
             />
           </Card>
         </Col>

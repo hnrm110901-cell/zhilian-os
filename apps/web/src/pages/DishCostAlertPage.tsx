@@ -23,7 +23,7 @@ const { Option } = Select;
 const SEVERITY_CONFIG: Record<string, { label: string; color: string; antColor: string }> = {
   critical: { label: '严重', color: '#C53030', antColor: 'red' },
   warning:  { label: '警告', color: '#C8923A', antColor: 'orange' },
-  info:     { label: '提示', color: '#0AAF9A', antColor: 'blue' },
+  info:     { label: '提示', color: '#FF6B2C', antColor: 'blue' },
 };
 
 const ALERT_TYPE_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
@@ -226,7 +226,7 @@ const DishCostAlertPage: React.FC = () => {
         data: [
           { name: '严重', value: summary.by_severity.critical, itemStyle: { color: '#C53030' } },
           { name: '警告', value: summary.by_severity.warning,  itemStyle: { color: '#C8923A' } },
-          { name: '提示', value: summary.by_severity.info,     itemStyle: { color: '#0AAF9A' } },
+          { name: '提示', value: summary.by_severity.info,     itemStyle: { color: '#FF6B2C' } },
         ].filter(d => d.value > 0),
         label: { formatter: '{b}\n{c}条' },
       }],

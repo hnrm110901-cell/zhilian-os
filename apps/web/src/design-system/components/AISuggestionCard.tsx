@@ -50,7 +50,7 @@ export interface AISuggestionCardProps {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const RANK_COLORS = ['#C53030', '#C8923A', '#0AAF9A', '#1A7A52', '#722ed1'];
+const RANK_COLORS = ['#C53030', '#C8923A', '#FF6B2C', '#1A7A52', '#722ed1'];
 
 const DIFFICULTY_MAP: Record<Difficulty, { label: string; cls: string }> = {
   easy:   { label: '容易执行', cls: 'diffEasy'   },
@@ -87,7 +87,7 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   style,
   className,
 }) => {
-  const color  = accentColor ?? (rank != null ? RANK_COLORS[(rank - 1) % RANK_COLORS.length] : '#0AAF9A');
+  const color  = accentColor ?? (rank != null ? RANK_COLORS[(rank - 1) % RANK_COLORS.length] : '#FF6B2C');
   const diff   = difficulty ? DIFFICULTY_MAP[difficulty] : null;
   const saving = savingYuan ?? netBenefitYuan;
 

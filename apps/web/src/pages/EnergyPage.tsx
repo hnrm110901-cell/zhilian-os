@@ -163,7 +163,7 @@ const DashboardTab: React.FC<{ storeId: string; brandId: string }> = ({ storeId,
               value={today?.cost_yuan ?? 0}
               prefix="¥"
               precision={2}
-              valueStyle={{ color: '#0AAF9A' }}
+              valueStyle={{ color: '#FF6B2C' }}
             />
           </Card>
         </Col>
@@ -208,7 +208,7 @@ const DashboardTab: React.FC<{ storeId: string; brandId: string }> = ({ storeId,
                     <Text style={{ fontSize: 12 }}>{val.toFixed(1)} 度 ({pct}%)</Text>
                   </div>
                   <Progress percent={pct} size="small" showInfo={false} strokeColor={
-                    key === 'ac' ? '#0AAF9A' : key === 'kitchen' ? '#C8923A' :
+                    key === 'ac' ? '#FF6B2C' : key === 'kitchen' ? '#C8923A' :
                     key === 'cold_chain' ? '#13c2c2' : key === 'lighting' ? '#fadb14' : '#d9d9d9'
                   } />
                 </div>
@@ -898,7 +898,7 @@ const EnergyPage: React.FC = () => {
     {
       label: '今日电费',
       value: today?.cost_yuan != null ? `¥${today.cost_yuan.toFixed(0)}` : '—',
-      icon: <ThunderboltOutlined style={{ color: '#0AAF9A' }} />,
+      icon: <ThunderboltOutlined style={{ color: '#FF6B2C' }} />,
     },
     {
       label: '非营业耗电',

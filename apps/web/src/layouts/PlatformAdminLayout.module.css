@@ -187,7 +187,7 @@
 }
 
 .sectionIconActive {
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 /* ── Icon ────────────────────────────────────────────────────────────────── */
@@ -227,7 +227,7 @@
 }
 
 .navItemActive {
-  color: #0AAF9A !important;
+  color: #FF6B2C !important;
   background: rgba(10, 175, 154, 0.08) !important;
   font-weight: 500;
 }
@@ -244,7 +244,7 @@
   transform: translateY(-50%);
   width: 3px;
   height: 16px;
-  background: #0AAF9A;
+  background: #FF6B2C;
   border-radius: 0 3px 3px 0;
 }
 
@@ -283,7 +283,7 @@
 
 .badge_new {
   background: rgba(10, 175, 154, 0.15);
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .badge_beta {
@@ -310,7 +310,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #26C9B4 0%, #0AAF9A 100%);
+  background: linear-gradient(135deg, #26C9B4 0%, #FF6B2C 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -329,7 +329,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #26C9B4 0%, #0AAF9A 100%);
+  background: linear-gradient(135deg, #26C9B4 0%, #FF6B2C 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -468,7 +468,7 @@
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(10, 175, 154, 0.12);
-  color: #0AAF9A;
+  color: #FF6B2C;
   letter-spacing: 0.06em;
 }
 

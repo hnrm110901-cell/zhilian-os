@@ -16,12 +16,12 @@
 .action { flex-shrink: 0; align-self: center; }
 
 /* Variants */
-.info    { background: rgba(10,175,154,0.06); border-left-color: #0AAF9A; color: #066E5D; }
+.info    { background: rgba(255,107,44,0.06); border-left-color: #FF6B2C; color: #066E5D; }
 .success { background: rgba(22,163,74,0.06);  border-left-color: #16A34A; color: #15803d; }
 .warning { background: rgba(217,119,6,0.06);  border-left-color: #D97706; color: #92400e; }
 .error   { background: rgba(220,38,38,0.06);  border-left-color: #DC2626; color: #991b1b; }
 
-[data-theme='dark'] .info    { background: rgba(10,175,154,0.1);  color: #6EE7C2; }
+[data-theme='dark'] .info    { background: rgba(255,107,44,0.1);  color: #6EE7C2; }
 [data-theme='dark'] .success { background: rgba(52,211,153,0.1);  color: #34D399; }
 [data-theme='dark'] .warning { background: rgba(251,191,36,0.1);  color: #FBBF24; }
 [data-theme='dark'] .error   { background: rgba(248,113,113,0.1); color: #F87171; }

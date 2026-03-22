@@ -55,7 +55,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #0AAF9A;
+  background: #FF6B2C;
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -110,7 +110,7 @@
 }
 
 .kpiAccent {
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .kpiWarn {
@@ -157,7 +157,7 @@
 .panelBadge {
   font-size: 11px;
   background: rgba(10, 175, 154, 0.15);
-  color: #0AAF9A;
+  color: #FF6B2C;
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -275,7 +275,7 @@
 .actionBtn:hover {
   background: rgba(10, 175, 154, 0.1);
   border-color: rgba(10, 175, 154, 0.3);
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .actionBtn:disabled {
@@ -318,7 +318,7 @@
   flex-shrink: 0;
 }
 
-.healthDotHealthy { background: #0AAF9A; }
+.healthDotHealthy { background: #FF6B2C; }
 .healthDotDegraded { background: #F59E0B; }
 .healthDotError { background: #EF4444; }
 .healthDotDisconnected { background: var(--text-tertiary); }
@@ -410,7 +410,7 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: #0AAF9A;
+  color: #FF6B2C;
   cursor: pointer;
   background: none;
   border: none;
@@ -436,7 +436,7 @@
   width: 20px;
   height: 20px;
   border: 2px solid rgba(10, 175, 154, 0.2);
-  border-top-color: #0AAF9A;
+  border-top-color: #FF6B2C;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-right: 8px;

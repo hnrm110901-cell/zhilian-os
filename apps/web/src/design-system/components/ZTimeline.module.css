@@ -41,7 +41,7 @@
 
 /* Status colors */
 .done .dot    { background: var(--green); }
-.current .dot { background: var(--accent); box-shadow: 0 0 0 4px rgba(10,175,154,0.15); animation: txPulse 2s infinite; }
+.current .dot { background: var(--accent); box-shadow: 0 0 0 4px rgba(255,107,44,0.15); animation: txPulse 2s infinite; }
 .pending .dot { background: rgba(0,0,0,0.08); }
 
 .body { flex: 1; padding-top: 0; }

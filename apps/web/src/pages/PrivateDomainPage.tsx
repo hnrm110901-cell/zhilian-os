@@ -154,7 +154,7 @@ const PrivateDomainPage: React.FC = () => {
       type: 'pie', radius: ['40%', '70%'],
       data: Object.entries(rfmDist).map(([k, v]) => ({
         name: `${k} ${rfmLabel[k] || k}`, value: v,
-        itemStyle: { color: { S1: '#faad14', S2: '#0AAF9A', S3: '#C8923A', S4: '#C53030', S5: '#cf1322' }[k as string] || '#999' },
+        itemStyle: { color: { S1: '#faad14', S2: '#FF6B2C', S3: '#C8923A', S4: '#C53030', S5: '#cf1322' }[k as string] || '#999' },
       })),
     }],
   };
@@ -168,7 +168,7 @@ const PrivateDomainPage: React.FC = () => {
       { type: 'value', name: '比率%', min: 0, max: 100 },
     ],
     series: [
-      { name: '新增会员', type: 'bar', data: trendData.map(d => d.new_members), itemStyle: { color: '#0AAF9A' } },
+      { name: '新增会员', type: 'bar', data: trendData.map(d => d.new_members), itemStyle: { color: '#FF6B2C' } },
       { name: '复购率%', type: 'line', yAxisIndex: 1, data: trendData.map(d => +(d.repurchase_rate * 100).toFixed(1)), smooth: true, itemStyle: { color: '#1A7A52' } },
       { name: '旅程完成率%', type: 'line', yAxisIndex: 1, data: trendData.map(d => +(d.journey_completion * 100).toFixed(1)), smooth: true, itemStyle: { color: '#faad14' } },
     ],
@@ -399,7 +399,7 @@ const PrivateDomainPage: React.FC = () => {
         <Col span={4}><Card size="small"><Statistic title="月复购率" value={((dashboard?.monthly_repurchase_rate || 0) * 100).toFixed(1)} suffix="%" /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="流失预警" value={dashboard?.churn_risk_count ?? '--'} valueStyle={{ color: '#C8923A' }} /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="待处理信号" value={dashboard?.pending_signals ?? '--'} valueStyle={{ color: '#C53030' }} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="运行中旅程" value={dashboard?.running_journeys ?? '--'} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="运行中旅程" value={dashboard?.running_journeys ?? '--'} valueStyle={{ color: '#FF6B2C' }} /></Card></Col>
       </Row>
 
       <Card><Tabs items={tabItems} activeKey={activeTab} onChange={setActiveTab} /></Card>

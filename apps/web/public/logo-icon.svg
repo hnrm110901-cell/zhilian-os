@@ -1,1 +1,19 @@
-<svg id="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF8E53"/><stop offset="100%" stop-color="#FF6B35"/></linearGradient></defs><rect width="100" height="100" fill="url(#brandGradient)" rx="22.5"/><path d="M25,45 C25,25 45,20 60,25 C75,30 85,50 75,70 C65,90 40,85 30,75 C20,65 25,55 35,50 C45,45 60,55 55,70" fill="none" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="35" cy="48" r="3.5" fill="white"/></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  屯象OS · Omega Elephant Mark
+  Ω 象征「终极解决方案」，与「象」形成视觉双关
+  Squircle (n≈5) 连续曲率容器 · 品牌色 #FF6B2C
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Squircle 背景 (连续曲率近似) -->
+  <path d="M50,2 C73,2 85,2 91,8 C98,15 98,27 98,50 C98,73 98,85 91,92 C85,98 73,98 50,98 C27,98 15,98 8,92 C2,85 2,73 2,50 C2,27 2,15 8,8 C15,2 27,2 50,2 Z" fill="#FF6B2C"/>
+  <!-- Ω (Omega) 符号 — 白色 -->
+  <g transform="translate(50, 48)" fill="none" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Ω 主体弧线：从左脚向上画弧到右脚 -->
+    <path d="M-18,18 L-18,10 C-18,-12 -8,-22 0,-22 C8,-22 18,-12 18,10 L18,18"/>
+    <!-- 左脚横线 -->
+    <line x1="-24" y1="18" x2="-12" y2="18"/>
+    <!-- 右脚横线 -->
+    <line x1="12" y1="18" x2="24" y2="18"/>
+  </g>
+</svg>

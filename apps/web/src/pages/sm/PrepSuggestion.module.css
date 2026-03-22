@@ -41,7 +41,7 @@
   transition: all 0.2s;
 }
 .tabActive {
-  background: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
   color: #fff;
   border-radius: 10px;
 }
@@ -98,8 +98,8 @@
   transition: all 0.15s;
 }
 .checked {
-  background: var(--accent, #0AAF9A);
-  border-color: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
   position: relative;
 }
 .checked::after {
@@ -126,7 +126,7 @@
   transition: border-color 0.2s;
 }
 .itemSelected {
-  border-left-color: var(--accent, #0AAF9A);
+  border-left-color: var(--accent, #FF6B2C);
 }
 
 .itemHeader {
@@ -177,11 +177,11 @@
   border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
   outline: none;
 }
 .qtyInput:focus {
-  border-color: var(--accent, #0AAF9A);
+  border-color: var(--accent, #FF6B2C);
 }
 .unitLabel {
   font-size: 12px;
@@ -200,7 +200,7 @@
 .costTag {
   margin-left: auto;
   font-weight: 600;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 /* Confirm bar */
@@ -226,7 +226,7 @@
 .confirmCost {
   font-size: 18px;
   font-weight: 700;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 /* Skeletons */

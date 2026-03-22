@@ -227,9 +227,9 @@ const PayrollPage: React.FC = () => {
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>应发</div>
                   <div style={{ fontSize: 18, color: '#27AE60', fontWeight: 600 }}>¥{(detailData.total_income_yuan ?? 0).toLocaleString()}</div>
                 </div>
-                <div style={{ flex: 1, background: 'rgba(10,175,154,0.1)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                <div style={{ flex: 1, background: 'rgba(255,107,44,0.1)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>实发</div>
-                  <div style={{ fontSize: 18, color: '#0AAF9A', fontWeight: 600 }}>¥{(detailData.net_salary_yuan ?? 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 18, color: '#FF6B2C', fontWeight: 600 }}>¥{(detailData.net_salary_yuan ?? 0).toLocaleString()}</div>
                 </div>
               </div>
 
@@ -239,7 +239,7 @@ const PayrollPage: React.FC = () => {
                 const catLabel: Record<string, string> = { income: '收入项', deduction: '扣除项', subsidy: '补贴项', tax: '税项' };
                 return (
                   <div key={cat} style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, color: '#0AAF9A', marginBottom: 6, fontWeight: 500 }}>
+                    <div style={{ fontSize: 13, color: '#FF6B2C', marginBottom: 6, fontWeight: 500 }}>
                       {catLabel[cat] || cat}
                     </div>
                     {catItems.map((item: SalaryItemDetail, idx: number) => (

@@ -54,7 +54,7 @@ const STATUS_COLOR: Record<string, string> = {
   online:   '#1A7A52',
   offline:  '#C53030',
   degraded: '#C8923A',
-  upgrading:'#0AAF9A',
+  upgrading:'#FF6B2C',
   error:    '#C53030',
 };
 

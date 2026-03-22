@@ -20,7 +20,7 @@ const { Option } = Select;
 // ── Stage definitions ───────────────────────────────────────────────────
 const STAGES = [
   { key: 'lead',        label: '商机',  color: '#8c8c8c', bg: '#f5f5f5' },
-  { key: 'intent',      label: '意向',  color: '#0AAF9A', bg: '#e6f7ff' },
+  { key: 'intent',      label: '意向',  color: '#FF6B2C', bg: '#e6f7ff' },
   { key: 'room_lock',   label: '锁台',  color: '#C8923A', bg: 'rgba(200,146,58,0.08)' },
   { key: 'signed',      label: '签约',  color: '#1A7A52', bg: 'rgba(26,122,82,0.08)' },
   { key: 'preparation', label: '准备',  color: '#722ed1', bg: '#f9f0ff' },
@@ -246,7 +246,7 @@ const FunnelStats: React.FC<{ storeId: string }> = ({ storeId }) => {
               title="商机总量"
               value={totalLead}
               suffix="个"
-              valueStyle={{ color: '#0AAF9A' }}
+              valueStyle={{ color: '#FF6B2C' }}
             />
           </Card>
         </Col>
@@ -503,7 +503,7 @@ const BanquetLifecyclePage: React.FC = () => {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="漏斗总量" value={totalCount} suffix="个" valueStyle={{ color: '#0AAF9A' }} />
+                <Statistic title="漏斗总量" value={totalCount} suffix="个" valueStyle={{ color: '#FF6B2C' }} />
               </Card>
             </Col>
             <Col span={6}>

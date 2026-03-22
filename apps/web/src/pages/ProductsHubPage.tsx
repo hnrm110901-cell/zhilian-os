@@ -91,7 +91,7 @@ function invStatusBadgeType(status: string): 'critical' | 'warning' | 'default' 
 }
 
 function wasteRankColor(i: number): string {
-  return ['#C53030', '#C8923A', '#faad14', '#0AAF9A', '#1A7A52'][i] ?? '#8c8c8c';
+  return ['#C53030', '#C8923A', '#faad14', '#FF6B2C', '#1A7A52'][i] ?? '#8c8c8c';
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ const ProductsHubPage: React.FC = () => {
     {
       label: '库存品类',
       value: totalItems || '—', unit: '种',
-      iconBg: '#e6f7ff', iconColor: '#0AAF9A', icon: <InboxOutlined />,
+      iconBg: '#e6f7ff', iconColor: '#FF6B2C', icon: <InboxOutlined />,
     },
     {
       label: '库存预警',
@@ -306,7 +306,7 @@ const ProductsHubPage: React.FC = () => {
 
             {/* ── 库存状态 ────────────────────────────────────────────────────── */}
             <ZCard
-              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><InboxOutlined style={{ color: '#0AAF9A' }} /><span>库存状态</span></div>}
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><InboxOutlined style={{ color: '#FF6B2C' }} /><span>库存状态</span></div>}
               extra={
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                   {totalValueYuan > 0 && (
@@ -530,7 +530,7 @@ const ProductsHubPage: React.FC = () => {
                     <span className={styles.costCellLabel}>实际成本率</span>
                   </div>
                   <div className={styles.costCell}>
-                    <span className={styles.costCellValue} style={{ color: '#0AAF9A' }}>
+                    <span className={styles.costCellValue} style={{ color: '#FF6B2C' }}>
                       {foodCost.target_pct.toFixed(1)}%
                     </span>
                     <span className={styles.costCellLabel}>目标成本率</span>

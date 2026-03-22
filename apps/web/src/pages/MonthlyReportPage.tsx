@@ -97,7 +97,7 @@ const MonthlyReportPage: React.FC = () => {
         type: 'bar',
         data: chart.revenue_data,
         yAxisIndex: 1,
-        itemStyle: { color: '#0AAF9A', opacity: 0.4 },
+        itemStyle: { color: '#FF6B2C', opacity: 0.4 },
       },
     ],
   } : null;

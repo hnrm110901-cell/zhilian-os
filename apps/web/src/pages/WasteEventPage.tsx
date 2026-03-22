@@ -407,7 +407,7 @@ const WasteEventPage: React.FC = () => {
         </Col>
         <Col span={6}>
           <Card size="small">
-            <Statistic title="已推理/验证" value={analyzedCount} valueStyle={{ color: '#0AAF9A' }} />
+            <Statistic title="已推理/验证" value={analyzedCount} valueStyle={{ color: '#FF6B2C' }} />
           </Card>
         </Col>
         <Col span={6}>
@@ -692,7 +692,7 @@ const WasteEventPage: React.FC = () => {
                           <Progress
                             percent={Math.round(v * 100)}
                             size="small"
-                            strokeColor="#0AAF9A"
+                            strokeColor="#FF6B2C"
                           />
                         </Col>
                       ))}

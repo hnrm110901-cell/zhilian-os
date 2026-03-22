@@ -298,7 +298,7 @@ const EmployeeGrowthPage: React.FC = () => {
             <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
               {wellbeing.trend.map(t => (
                 <div key={t.period} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#0AAF9A' }}>{t.avg}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#FF6B2C' }}>{t.avg}</div>
                   <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>{t.period}</div>
                 </div>
               ))}
@@ -398,7 +398,7 @@ const EmployeeGrowthPage: React.FC = () => {
               ) : (
                 <>
                   <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: '#0AAF9A' }}>
+                    <div style={{ fontSize: 32, fontWeight: 700, color: '#FF6B2C' }}>
                       {journey.wellbeing.overall_score}
                     </div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>

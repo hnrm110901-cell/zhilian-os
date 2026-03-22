@@ -59,7 +59,7 @@ interface ChurnUser {
 
 const SEGMENT_META: Record<string, { color: string; label: string; order: number }> = {
   new:        { color: '#1A7A52', label: '新客',     order: 0 },
-  repurchase: { color: '#0AAF9A', label: '复购客',   order: 1 },
+  repurchase: { color: '#FF6B2C', label: '复购客',   order: 1 },
   high_value: { color: '#722ed1', label: '高价值客', order: 2 },
   dormant:    { color: '#C8923A', label: '沉睡客',   order: 3 },
   churn_risk: { color: '#C53030', label: '流失预警', order: 4 },
@@ -83,7 +83,7 @@ const SIGNAL_URGENCY_TYPE: Record<string, 'critical' | 'warning' | 'default'> = 
 // ── Quick nav ─────────────────────────────────────────────────────────────────
 
 const QUICK_NAV = [
-  { icon: <TeamOutlined style={{ fontSize: 22, color: '#0AAF9A' }} />,          label: '会员中心',   route: '/members' },
+  { icon: <TeamOutlined style={{ fontSize: 22, color: '#FF6B2C' }} />,          label: '会员中心',   route: '/members' },
   { icon: <SearchOutlined style={{ fontSize: 22, color: '#722ed1' }} />,        label: '客户360',   route: '/customer360' },
   { icon: <MobileOutlined style={{ fontSize: 22, color: '#1A7A52' }} />,        label: '私域运营',   route: '/private-domain' },
   { icon: <BarChartOutlined style={{ fontSize: 22, color: '#C8923A' }} />,      label: '渠道毛利',   route: '/channel-profit' },
@@ -199,7 +199,7 @@ export default function CrmHubPage() {
     { icon: <ReloadOutlined style={{ color: '#eb2f96' }} />,           bg: 'rgba(235,47,150,0.06)', label: '复购率',     value: `${d.repurchase_rate.toFixed(1)}`, unit: '%' },
     { icon: <ClockCircleOutlined style={{ color: '#C8923A' }} />,      bg: 'rgba(200,146,58,0.06)', label: '沉睡会员',   value: fmtNum(d.dormant_count),          unit: '人', warn: '需唤醒' },
     { icon: <DollarOutlined style={{ color: '#722ed1' }} />,           bg: 'rgba(114,46,209,0.06)', label: '储值余额',   value: `¥${fmtMoney(d.stored_value_yuan)}` },
-    { icon: <RadarChartOutlined style={{ color: '#0AAF9A' }} />,       bg: 'rgba(10,175,154,0.06)', label: '私域触达率', value: `${d.reach_rate.toFixed(1)}`,     unit: '%' },
+    { icon: <RadarChartOutlined style={{ color: '#FF6B2C' }} />,       bg: 'rgba(255,107,44,0.06)', label: '私域触达率', value: `${d.reach_rate.toFixed(1)}`,     unit: '%' },
   ] : [];
 
   return (
@@ -251,7 +251,7 @@ export default function CrmHubPage() {
       <div className={css.mainGrid}>
         {/* Col 1: 人群分层 */}
         <ZCard
-          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><TeamOutlined style={{ color: '#0AAF9A' }} /><span>人群分层</span></div>}
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><TeamOutlined style={{ color: '#FF6B2C' }} /><span>人群分层</span></div>}
           extra={<a onClick={() => navigate('/members')} style={{ fontSize: 12 }}>会员中心</a>}
         >
           {segs.length === 0 ? (

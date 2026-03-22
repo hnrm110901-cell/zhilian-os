@@ -155,9 +155,9 @@ const PlatformAnalyticsPage: React.FC = () => {
         type: 'line',
         smooth: true,
         data: trends.map(t => t.gross_yuan.toFixed(2)),
-        areaStyle: { opacity: 0.12, color: '#0AAF9A' },
-        lineStyle: { color: '#0AAF9A', width: 2 },
-        itemStyle: { color: '#0AAF9A' },
+        areaStyle: { opacity: 0.12, color: '#FF6B2C' },
+        lineStyle: { color: '#FF6B2C', width: 2 },
+        itemStyle: { color: '#FF6B2C' },
         symbol: 'circle', symbolSize: 5,
       },
       {

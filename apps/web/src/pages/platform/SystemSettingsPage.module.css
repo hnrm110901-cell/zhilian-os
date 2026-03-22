@@ -58,7 +58,7 @@
 
 .sectionIconMint {
   background: rgba(10, 175, 154, 0.12);
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .sectionIconBlue {
@@ -132,7 +132,7 @@
 }
 
 .formInput:focus {
-  border-color: #0AAF9A;
+  border-color: #FF6B2C;
 }
 
 .formInput::placeholder {
@@ -167,7 +167,7 @@
 }
 
 .formSelect:focus {
-  border-color: #0AAF9A;
+  border-color: #FF6B2C;
 }
 
 .formHint {
@@ -185,7 +185,7 @@
 .formStaticMono {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
-  color: #0AAF9A;
+  color: #FF6B2C;
   padding-top: 8px;
 }
 
@@ -244,7 +244,7 @@
 }
 
 .toggleOn {
-  background: #0AAF9A;
+  background: #FF6B2C;
 }
 
 .toggleOn::after {
@@ -310,7 +310,7 @@
 }
 
 .infoValueMint {
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 /* ── Merchant Config Table ──────────────────────────────────────────────────*/
@@ -352,7 +352,7 @@
   font-size: 11px;
   font-weight: 500;
   background: rgba(10, 175, 154, 0.10);
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .merchantTagActive {
@@ -382,7 +382,7 @@
   padding: 8px 20px;
   border: none;
   border-radius: 8px;
-  background: #0AAF9A;
+  background: #FF6B2C;
   color: #fff;
   font-size: 13px;
   font-weight: 500;

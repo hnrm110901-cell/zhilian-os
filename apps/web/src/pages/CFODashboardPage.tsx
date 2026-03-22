@@ -93,7 +93,7 @@ interface CfoDashboard {
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const GRADE_COLORS: Record<string, string> = {
-  A: '#1A7A52', B: '#0AAF9A', C: '#C8923A', D: '#C53030',
+  A: '#1A7A52', B: '#FF6B2C', C: '#C8923A', D: '#C53030',
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -178,7 +178,7 @@ const CFODashboardPage: React.FC = () => {
       sub:      ho
         ? `优秀 ${ho.grade_distribution.A} / 良好 ${ho.grade_distribution.B}`
         : '—',
-      color:    '#0AAF9A',
+      color:    '#FF6B2C',
       icon:     <CheckCircleOutlined />,
     },
     {
@@ -286,8 +286,8 @@ const CFODashboardPage: React.FC = () => {
             name: '品牌均值',
             value: dims.map(d => avg(`${d}_score` as keyof StoreScore)),
             areaStyle: { opacity: 0.2 },
-            lineStyle: { color: '#0AAF9A' },
-            itemStyle: { color: '#0AAF9A' },
+            lineStyle: { color: '#FF6B2C' },
+            itemStyle: { color: '#FF6B2C' },
           },
           {
             name: worst.store_id,

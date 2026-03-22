@@ -7,7 +7,7 @@
   background: var(--surface-hover); color: var(--text-tertiary);
   cursor: pointer; font-size: 13px;
 }
-.tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.tabActive { background: rgba(255,107,44,0.15); color: #FF6B2C; }
 .tableWrap { overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th {
@@ -19,5 +19,5 @@
   padding: 10px 12px; color: var(--text-primary);
   border-bottom: 1px solid var(--surface-hover);
 }
-.highlight { color: #0AAF9A; font-weight: 600; }
+.highlight { color: #FF6B2C; font-weight: 600; }
 .empty { text-align: center; padding: 40px; color: var(--text-tertiary); }

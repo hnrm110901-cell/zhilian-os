@@ -130,7 +130,7 @@ const I18nPage: React.FC = () => {
                     {convertResult.original_amount} {convertResult.original_currency}
                   </Descriptions.Item>
                   <Descriptions.Item label="换算结果">
-                    <Text strong style={{ color: '#0AAF9A', fontSize: 18 }}>
+                    <Text strong style={{ color: '#FF6B2C', fontSize: 18 }}>
                       {convertResult.converted_amount?.toFixed(2)} {convertResult.converted_currency}
                     </Text>
                   </Descriptions.Item>

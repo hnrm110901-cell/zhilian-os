@@ -24,7 +24,7 @@ const { Option } = Select;
 // ── 配置 ──────────────────────────────────────────────────────────────────────
 const ACTION_CONFIG: Record<string, { label: string; color: string; antColor: string; icon: React.ReactNode }> = {
   increase: { label: '建议提价', color: '#1A7A52', antColor: 'success', icon: <RiseOutlined /> },
-  decrease: { label: '建议降价', color: '#0AAF9A', antColor: 'processing', icon: <FallOutlined /> },
+  decrease: { label: '建议降价', color: '#FF6B2C', antColor: 'processing', icon: <FallOutlined /> },
   maintain: { label: '维持定价', color: '#8c8c8c', antColor: 'default', icon: <DollarOutlined /> },
 };
 
@@ -201,7 +201,7 @@ const DishPricingPage: React.FC = () => {
       splitLine: { length: 10, lineStyle: { width: 2, color: '#999' } },
       axisLabel: { distance: 20, color: '#999', fontSize: 10 },
       anchor: { show: true, showAbove: true, size: 20, itemStyle: { borderColor: '#999', borderWidth: 2 } },
-      detail: { valueAnimation: true, formatter: '{value}%', color: '#0AAF9A', fontSize: 22, offsetCenter: [0, '70%'] },
+      detail: { valueAnimation: true, formatter: '{value}%', color: '#FF6B2C', fontSize: 22, offsetCenter: [0, '70%'] },
       title: { offsetCenter: [0, '95%'], fontSize: 12, color: '#8c8c8c' },
       data: [{ value: adoptionRate.toFixed(1), name: '建议采纳率' }],
       itemStyle: { color: adoptionRate >= 60 ? '#1A7A52' : adoptionRate >= 30 ? '#C8923A' : '#C53030' },
@@ -292,7 +292,7 @@ const DishPricingPage: React.FC = () => {
           <Space direction="vertical" size={0}>
             <Tag color={cfg.antColor}>{cfg.icon} {cfg.label}</Tag>
             <Text style={{ fontSize: 12, fontWeight: 600,
-              color: a === 'increase' ? '#1A7A52' : a === 'decrease' ? '#0AAF9A' : '#8c8c8c' }}>
+              color: a === 'increase' ? '#1A7A52' : a === 'decrease' ? '#FF6B2C' : '#8c8c8c' }}>
               → {fmtPrice(r.suggested_price)}
               {r.price_change_pct !== 0 &&
                 <span style={{ fontSize: 11, marginLeft: 4 }}>
@@ -408,7 +408,7 @@ const DishPricingPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="建议降价" value={decreaseCount} suffix="道"
-              prefix={<FallOutlined />} valueStyle={{ color: '#0AAF9A' }} />
+              prefix={<FallOutlined />} valueStyle={{ color: '#FF6B2C' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>

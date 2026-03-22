@@ -275,7 +275,7 @@ const EdgeHubAlertsPage: React.FC = () => {
         </Col>
         <Col xs={8}>
           <Card size="small" className={styles.statCard}>
-            <div className={styles.statNum} style={{ color: openCount > 0 ? '#0AAF9A' : '#1A7A52' }}>{openCount}</div>
+            <div className={styles.statNum} style={{ color: openCount > 0 ? '#FF6B2C' : '#1A7A52' }}>{openCount}</div>
             <div className={styles.statLabel}>未解决总数</div>
           </Card>
         </Col>
@@ -462,7 +462,7 @@ const EdgeHubAlertsPage: React.FC = () => {
           <Timeline
             items={[
               {
-                dot: <BellOutlined style={{ color: LEVEL_COLOR[drawerAlert.level] ?? '#0AAF9A' }} />,
+                dot: <BellOutlined style={{ color: LEVEL_COLOR[drawerAlert.level] ?? '#FF6B2C' }} />,
                 children: (
                   <span>
                     <Tag color={LEVEL_COLOR[drawerAlert.level]}>{LEVEL_LABEL[drawerAlert.level] ?? drawerAlert.level.toUpperCase()}</Tag>

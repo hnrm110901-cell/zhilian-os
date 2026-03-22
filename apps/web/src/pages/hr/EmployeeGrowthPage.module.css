@@ -7,7 +7,7 @@
   background: var(--surface-hover); color: var(--text-secondary);
   cursor: pointer; font-size: 13px;
 }
-.tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.tabActive { background: rgba(255,107,44,0.15); color: #FF6B2C; }
 .filterRow { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
 .select {
   padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
@@ -15,11 +15,11 @@
 }
 .btn {
   padding: 6px 16px; border-radius: 6px; border: none;
-  background: rgba(10,175,154,0.15); color: #0AAF9A;
+  background: rgba(255,107,44,0.15); color: #FF6B2C;
   cursor: pointer; font-size: 13px; font-weight: 500;
 }
-.btn:hover { background: rgba(10,175,154,0.25); }
-.btnPrimary { background: #0AAF9A; color: #0B1A20; }
+.btn:hover { background: rgba(255,107,44,0.25); }
+.btnPrimary { background: #FF6B2C; color: #0B1A20; }
 .btnPrimary:hover { background: #0CC4AD; }
 
 /* ── 卡片网格 ── */
@@ -39,7 +39,7 @@
 }
 .statLabel { font-size: 12px; color: var(--text-tertiary); margin: 0 0 4px; }
 .statValue { font-size: 22px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.statMint { color: #0AAF9A; }
+.statMint { color: #FF6B2C; }
 
 /* ── 里程碑墙 ── */
 .milestoneWall { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -64,14 +64,14 @@
   height: 6px; border-radius: 3px; background: var(--border);
   overflow: hidden; margin-top: 8px;
 }
-.progressFill { height: 100%; border-radius: 3px; background: #0AAF9A; transition: width 0.3s; }
+.progressFill { height: 100%; border-radius: 3px; background: #FF6B2C; transition: width 0.3s; }
 
 /* ── 技能雷达 ── */
 .skillList { display: flex; flex-direction: column; gap: 8px; }
 .skillRow { display: flex; align-items: center; gap: 12px; }
 .skillName { width: 100px; font-size: 12px; color: var(--text-secondary); text-align: right; flex-shrink: 0; }
 .skillBarWrap { flex: 1; height: 8px; border-radius: 4px; background: var(--border); }
-.skillBarFill { height: 100%; border-radius: 4px; background: #0AAF9A; transition: width 0.3s; }
+.skillBarFill { height: 100%; border-radius: 4px; background: #FF6B2C; transition: width 0.3s; }
 .skillScore { width: 32px; font-size: 12px; color: var(--text-secondary); text-align: right; }
 
 /* ── 幸福指数 ── */
@@ -80,7 +80,7 @@
   text-align: center; background: var(--surface-hover);
   border-radius: 8px; padding: 12px 8px;
 }
-.dimScore { font-size: 24px; font-weight: 700; color: #0AAF9A; }
+.dimScore { font-size: 24px; font-weight: 700; color: #FF6B2C; }
 .dimLabel { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
 .dimLow { color: #FF6B6B; }
 
@@ -101,7 +101,7 @@
 .badge {
   display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
 }
-.badgeActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.badgeActive { background: rgba(255,107,44,0.15); color: #FF6B2C; }
 .badgeCompleted { background: rgba(76,175,80,0.15); color: #4CAF50; }
 .badgePaused { background: rgba(255,193,7,0.15); color: #FFC107; }
 .badgeAI { background: rgba(138,43,226,0.15); color: #BA68C8; }

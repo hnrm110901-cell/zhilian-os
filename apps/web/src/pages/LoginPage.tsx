@@ -316,14 +316,14 @@ const PasswordForm: React.FC<{
   <Form name="login" onFinish={onFinish} autoComplete="off" size="large">
     <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
       <Input
-        prefix={<UserOutlined style={{ color: '#0AAF9A' }} />}
+        prefix={<UserOutlined style={{ color: '#FF6B2C' }} />}
         placeholder="用户名"
         style={{ borderRadius: 8 }}
       />
     </Form.Item>
     <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
       <Input.Password
-        prefix={<LockOutlined style={{ color: '#0AAF9A' }} />}
+        prefix={<LockOutlined style={{ color: '#FF6B2C' }} />}
         placeholder="密码"
         style={{ borderRadius: 8 }}
       />

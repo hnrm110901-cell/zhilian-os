@@ -39,8 +39,8 @@
 }
 .tab:hover { color: var(--text-primary); }
 .tabActive {
-  color: var(--accent, #0AAF9A);
-  border-bottom-color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
   font-weight: 600;
 }
 
@@ -56,7 +56,7 @@
   cursor: pointer;
   outline: none;
 }
-.filterSelect:focus { border-color: var(--accent, #0AAF9A); }
+.filterSelect:focus { border-color: var(--accent, #FF6B2C); }
 
 /* Alert event cards */
 .alertList { display: flex; flex-direction: column; gap: 8px; }
@@ -67,7 +67,7 @@
   background: var(--bg-primary, #fff);
   transition: border-color 0.2s;
 }
-.alertCard:hover { border-color: var(--accent, #0AAF9A); }
+.alertCard:hover { border-color: var(--accent, #FF6B2C); }
 .alertCardCritical {
   border-color: #ffccc7;
   background: #fff8f8;
@@ -167,7 +167,7 @@
   outline: none;
 }
 .formInput:focus,
-.formSelect:focus { border-color: var(--accent, #0AAF9A); }
+.formSelect:focus { border-color: var(--accent, #FF6B2C); }
 .formActions { display: flex; gap: 8px; margin-top: 14px; }
 
 /* Money */

@@ -21,7 +21,7 @@ const { Option } = Select;
 
 const PHASE_CONFIG: Record<string, { label: string; color: string; antColor: string }> = {
   launch:  { label: '新品', color: '#1A7A52', antColor: 'green' },
-  growth:  { label: '成长', color: '#0AAF9A', antColor: 'blue' },
+  growth:  { label: '成长', color: '#FF6B2C', antColor: 'blue' },
   peak:    { label: '成熟', color: '#faad14', antColor: 'gold' },
   decline: { label: '衰退', color: '#C8923A', antColor: 'orange' },
   exit:    { label: '退出', color: '#C53030', antColor: 'red' },
@@ -246,7 +246,7 @@ const SummaryAnalysis: React.FC<{ storeId: string }> = ({ storeId }) => {
     ],
     series: [
       { name: '菜品数', type: 'bar', data: summary.by_phase.map(r => r.dish_count),
-        itemStyle: { color: '#0AAF9A' } },
+        itemStyle: { color: '#FF6B2C' } },
       { name: '预测营收(百元)', type: 'bar', yAxisIndex: 1,
         data: summary.by_phase.map(r => (r.total_revenue / 100).toFixed(0)),
         itemStyle: { color: '#1A7A52' } },
@@ -517,7 +517,7 @@ const DishForecastDetail: React.FC<{ storeId: string }> = ({ storeId }) => {
       {
         name: '预测营收', type: 'line', symbol: 'circle',
         data: sortedHistory.map(r => r.predicted_revenue_yuan),
-        lineStyle: { color: '#0AAF9A' }, itemStyle: { color: '#0AAF9A' },
+        lineStyle: { color: '#FF6B2C' }, itemStyle: { color: '#FF6B2C' },
       },
       {
         name: '实际营收', type: 'line', symbol: 'diamond',

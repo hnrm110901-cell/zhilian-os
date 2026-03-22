@@ -53,7 +53,7 @@ const RecruitmentPage: React.FC = () => {
     { key: 'new', label: '新候选人', count: funnel.new, color: '#2D9CDB' },
     { key: 'screening', label: '简历筛选', count: funnel.screening, color: '#9B51E0' },
     { key: 'interview', label: '面试中', count: funnel.interview, color: '#F2994A' },
-    { key: 'offer', label: 'Offer', count: funnel.offer, color: '#0AAF9A' },
+    { key: 'offer', label: 'Offer', count: funnel.offer, color: '#FF6B2C' },
     { key: 'hired', label: '已入职', count: funnel.hired, color: '#27AE60' },
   ] : [];
 

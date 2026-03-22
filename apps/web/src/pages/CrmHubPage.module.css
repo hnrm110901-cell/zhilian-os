@@ -162,7 +162,7 @@
 
 .signalAction {
   font-size: 11px;
-  color: #0AAF9A;
+  color: #FF6B2C;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -244,9 +244,9 @@
 }
 
 .quickNavItem:hover {
-  background: rgba(10,175,154,0.06);
+  background: rgba(255,107,44,0.06);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(10,175,154,0.08);
+  box-shadow: 0 4px 12px rgba(255,107,44,0.08);
 }
 
 .quickNavIcon  { font-size: 22px; line-height: 1; }

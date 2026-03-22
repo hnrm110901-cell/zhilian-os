@@ -50,7 +50,7 @@ const AGENT_TYPE_META: Record<string, { label: string; icon: React.ReactNode; co
   prep_suggestion: {
     label: '智能备料建议',
     icon: <ExperimentOutlined />,
-    color: '#0AAF9A',
+    color: '#FF6B2C',
     desc: '基于预订+历史+库存生成次日备料量，一键生成采购单',
   },
 };

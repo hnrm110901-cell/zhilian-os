@@ -1,7 +1,7 @@
 /**
  * 屯象OS · Dark Theme Token Map
  * 基于 v2 prototype workspace.html 设计规范
- * 深色主题：#0B1A20 深青色背景 + #0AAF9A mint 主色
+ * 深色主题：#0B1A20 深青色背景 + #FF6B2C 品牌橙主色
  */
 import { brand, dark as darkColors, semantic } from '../tokens/colors';
 
@@ -24,12 +24,12 @@ export const darkTheme = {
   '--tx-border-light':    darkColors.border,     // 8%
   '--tx-divider':         darkColors.border,
 
-  // Accent (Mint #0AAF9A)
-  '--tx-accent':          brand[500],            // #0AAF9A
-  '--tx-accent-hover':    brand[400],            // #26C9B4
-  '--tx-accent-active':   brand[300],            // #4DD3C2
-  '--tx-accent-soft':     'rgba(10,175,154,0.15)',
-  '--tx-accent-bg':       'rgba(10,175,154,0.10)',
+  // Accent (Orange #FF6B2C)
+  '--tx-accent':          brand[500],            // #FF6B2C
+  '--tx-accent-hover':    brand[400],            // #FF9160
+  '--tx-accent-active':   brand[300],            // #FFB494
+  '--tx-accent-soft':     'rgba(255,107,44,0.15)',
+  '--tx-accent-bg':       'rgba(255,107,44,0.10)',
 
   // Semantic (brighter in dark for contrast)
   '--tx-success':         '#34D399',

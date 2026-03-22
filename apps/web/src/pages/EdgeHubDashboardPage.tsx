@@ -52,7 +52,7 @@ const STATUS_COLOR: Record<string, string> = {
   online:   '#1A7A52',
   offline:  '#C53030',
   degraded: '#C8923A',
-  upgrading:'#0AAF9A',
+  upgrading:'#FF6B2C',
   normal:   '#1A7A52',
   warning:  '#C8923A',
   critical: '#C53030',
@@ -136,7 +136,7 @@ const EdgeHubDashboardPage: React.FC = () => {
       data: [
         { name: 'P1 严重', value: p1, itemStyle: { color: '#C53030' } },
         { name: 'P2 重要', value: p2, itemStyle: { color: '#C8923A' } },
-        { name: 'P3 一般', value: p3, itemStyle: { color: '#0AAF9A' } },
+        { name: 'P3 一般', value: p3, itemStyle: { color: '#FF6B2C' } },
       ],
       label: { show: false },
     }],

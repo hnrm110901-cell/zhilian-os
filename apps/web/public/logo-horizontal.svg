@@ -1,1 +1,18 @@
-<svg id="logo-horizontal" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0, 0)"><rect width="80" height="80" fill="#FF6B35" rx="18"/><path d="M25,45 C25,25 45,20 60,25 C75,30 85,50 75,70 C65,90 40,85 30,75 C20,65 25,55 35,50 C45,45 60,55 55,70" transform="scale(0.8) translate(12, 12)" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="50.4" r="3" fill="white"/></g><text x="100" y="55" font-family="PingFang SC, SF Pro Display, sans-serif" font-weight="bold" font-size="38" fill="#1D1D1F">屯象OS</text></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  屯象OS · 横排 Lockup
+  Ω Squircle + "屯象OS" 文字 + 副标题
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
+  <!-- Squircle Icon -->
+  <g transform="translate(0, 0)">
+    <path d="M40,2 C58,2 66,2 71,7 C76,12 76,22 76,40 C76,58 76,68 71,73 C66,78 58,78 40,78 C22,78 12,78 7,73 C2,68 2,58 2,40 C2,22 2,12 7,7 C12,2 22,2 40,2 Z" fill="#FF6B2C"/>
+    <g transform="translate(40, 38)" fill="none" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-14,15 L-14,8 C-14,-10 -6,-18 0,-18 C6,-18 14,-10 14,8 L14,15"/>
+      <line x1="-19" y1="15" x2="-9" y2="15"/>
+      <line x1="9" y1="15" x2="19" y2="15"/>
+    </g>
+  </g>
+  <!-- 品牌文字 -->
+  <text x="96" y="52" font-family="'Noto Sans SC', 'PingFang SC', 'SF Pro Display', sans-serif" font-weight="700" font-size="36" fill="#1D1D1F">屯象OS</text>
+</svg>

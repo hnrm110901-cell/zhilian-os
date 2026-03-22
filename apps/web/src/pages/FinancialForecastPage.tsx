@@ -69,7 +69,7 @@ interface AccuracyRecord {
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
-  revenue:        '#0AAF9A',
+  revenue:        '#FF6B2C',
   food_cost_rate: '#C53030',
   profit_margin:  '#1A7A52',
   health_score:   '#722ed1',

@@ -132,8 +132,8 @@ const DEMO_APPROVALS: ApprovalItem[] = [];
 
 const DEMO_AUDIT = [
   { text: '用户 admin 登录系统',               time: '10分钟前', color: '#1A7A52' },
-  { text: '更新 LLM 配置（gpt-4o-mini）',     time: '1小时前',  color: '#0AAF9A' },
-  { text: '导出报表：月度经营报告',              time: '2小时前',  color: '#0AAF9A' },
+  { text: '更新 LLM 配置（gpt-4o-mini）',     time: '1小时前',  color: '#FF6B2C' },
+  { text: '导出报表：月度经营报告',              time: '2小时前',  color: '#FF6B2C' },
   { text: '备份任务完成（全量）',               time: '6小时前',  color: '#1A7A52' },
   { text: '集成状态更新：天财商龙',             time: '昨天',     color: '#8c8c8c' },
 ];
@@ -334,7 +334,7 @@ export default function PlatformHubPage() {
       <div className={css.mainGrid}>
         {/* Col 1: 系统状态 */}
         <ZCard
-          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><BugOutlined style={{ color: '#0AAF9A' }} /><span>系统状态</span></div>}
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><BugOutlined style={{ color: '#FF6B2C' }} /><span>系统状态</span></div>}
           extra={<a onClick={() => navigate('/monitoring')} style={{ fontSize: 12 }}>监控详情</a>}
         >
           <div className={css.healthList}>

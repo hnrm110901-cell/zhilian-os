@@ -237,7 +237,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
             label="OKR整体进度"
             value={okr ? Math.round((okr.overall_progress || 0) * 100) : 0}
             unit="%"
-            color="#0AAF9A"
+            color="#FF6B2C"
           />
         </Col>
       </Row>
@@ -286,7 +286,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
                         backgroundColor:
                           item.rank === 1 ? '#faad14' :
                           item.rank === 2 ? '#bfbfbf' :
-                          item.rank === 3 ? '#d4883a' : '#0AAF9A',
+                          item.rank === 3 ? '#d4883a' : '#FF6B2C',
                       }}
                     />
                     <Text>{item.employee_id}</Text>
@@ -526,7 +526,7 @@ function GamificationTab({ storeId, period }: { storeId: string; period: string 
             backgroundColor:
               rank === 1 ? '#faad14' :
               rank === 2 ? '#bfbfbf' :
-              rank === 3 ? '#d4883a' : '#0AAF9A',
+              rank === 3 ? '#d4883a' : '#FF6B2C',
           }}
         />
       ),
@@ -944,7 +944,7 @@ function SkillTreeTab() {
                     <Progress
                       percent={Math.round(s.progress_pct * 100)}
                       size="small"
-                      strokeColor={s.progress_pct >= 1 ? '#1A7A52' : '#0AAF9A'}
+                      strokeColor={s.progress_pct >= 1 ? '#1A7A52' : '#FF6B2C'}
                     />
                     <Row justify="space-between">
                       <Text type="secondary" style={{ fontSize: 11 }}>岗位：{s.role_id}</Text>

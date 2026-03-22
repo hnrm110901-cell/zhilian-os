@@ -208,7 +208,7 @@ const IMConfigPage: React.FC = () => {
               {syncing ? '同步中...' : '立即同步'}
             </button>
           </div>
-          {syncResult && <div style={{ marginTop: 8, fontSize: 12, color: '#0AAF9A' }}>{syncResult}</div>}
+          {syncResult && <div style={{ marginTop: 8, fontSize: 12, color: '#FF6B2C' }}>{syncResult}</div>}
         </div>
       )}
 

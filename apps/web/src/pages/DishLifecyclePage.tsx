@@ -25,7 +25,7 @@ const PHASE_CONFIG: Record<string, {
   label: string; antColor: string; color: string;
   icon: React.ReactNode; rowClass: string;
 }> = {
-  launch:  { label: '上市', antColor: 'processing', color: '#0AAF9A', icon: <RocketOutlined />, rowClass: styles.rowLaunch },
+  launch:  { label: '上市', antColor: 'processing', color: '#FF6B2C', icon: <RocketOutlined />, rowClass: styles.rowLaunch },
   growth:  { label: '成长', antColor: 'success',    color: '#1A7A52', icon: <RiseOutlined />,   rowClass: '' },
   peak:    { label: '成熟', antColor: 'green',       color: '#389e0d', icon: <TrophyOutlined />, rowClass: '' },
   decline: { label: '衰退', antColor: 'warning',     color: '#C8923A', icon: <FallOutlined />,   rowClass: styles.rowDecline },
@@ -274,7 +274,7 @@ const DishLifecyclePage: React.FC = () => {
           symbol: h.phase_changed ? 'diamond' : 'circle',
           symbolSize: h.phase_changed ? 12 : 6,
         })),
-        lineStyle: { color: '#0AAF9A', width: 2 },
+        lineStyle: { color: '#FF6B2C', width: 2 },
         areaStyle: { color: 'rgba(22,119,255,0.08)' },
       }],
     };

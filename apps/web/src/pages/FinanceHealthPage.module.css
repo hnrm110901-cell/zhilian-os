@@ -51,8 +51,8 @@
 }
 .tab:hover { color: var(--text-primary); }
 .tabActive {
-  color: var(--accent, #0AAF9A);
-  border-bottom-color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
   font-weight: 600;
 }
 
@@ -97,7 +97,7 @@
   background: var(--bg-primary, #fff);
   transition: border-color 0.2s;
 }
-.insightCard:hover { border-color: var(--accent, #0AAF9A); }
+.insightCard:hover { border-color: var(--accent, #FF6B2C); }
 
 .insightHigh   { border-color: #ffccc7; background: #fff8f8; }
 .insightMedium { border-color: #ffe7ba; background: #fffbf0; }
