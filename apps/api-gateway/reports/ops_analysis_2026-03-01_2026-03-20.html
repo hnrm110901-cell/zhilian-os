@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>屯象OS种子客户运营分析报告 (2026-03-01 至 2026-03-20)</title>
+  <style>
+    @media print { @page { size: A4 landscape; margin: 12mm; } }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans SC', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+      color: #333; margin: 0; padding: 24px; font-size: 13px; line-height: 1.6;
+      background: #fafafa;
+    }
+    h1 { font-size: 24px; color: #FF6B2C; margin-bottom: 4px; }
+    h2 { font-size: 18px; color: #1a1a1a; border-bottom: 3px solid #FF6B2C;
+          padding-bottom: 6px; margin-top: 32px; }
+    h3 { font-size: 14px; color: #595959; margin-top: 20px; margin-bottom: 8px; }
+    .subtitle { color: #8c8c8c; margin: 0 0 20px 0; }
+    .cuisine-tag {
+      background: #fff7e6; color: #fa8c16; padding: 2px 8px;
+      border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 8px;
+    }
+    .store-tag {
+      background: #e6f7ff; color: #1890ff; padding: 2px 8px;
+      border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 4px;
+    }
+    .pos-tag {
+      background: #f6ffed; color: #52c41a; padding: 2px 8px;
+      border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 4px;
+    }
+    .badge-error {
+      background: #fff2f0; color: #f5222d; padding: 2px 8px;
+      border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 8px;
+    }
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0;
+    }
+    .kpi-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 8px;
+      padding: 12px 16px; text-align: center;
+    }
+    .kpi-label { font-size: 11px; color: #8c8c8c; margin-bottom: 4px; }
+    .kpi-value { font-size: 20px; font-weight: 700; color: #1a1a1a; }
+    .kpi-value small { font-size: 11px; color: #8c8c8c; font-weight: normal; }
+    .tbl { width: 100%; border-collapse: collapse; margin: 8px 0; background: #fff; }
+    .th { background: #FF6B2C; color: #fff; padding: 8px 12px; text-align: left;
+           font-size: 12px; font-weight: 600; }
+    .td { padding: 6px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .brand-section {
+      background: #fff; border-radius: 12px; padding: 24px; margin: 20px 0;
+      border: 1px solid #e8e8e8; page-break-inside: avoid;
+    }
+    .comparison-section {
+      background: #fff; border-radius: 12px; padding: 24px; margin: 20px 0;
+      border: 2px solid #FF6B2C;
+    }
+    .footer { margin-top: 36px; text-align: center; color: #bfbfbf; font-size: 11px; }
+    .data-sources { margin-top: 16px; color: #8c8c8c; font-size: 11px; }
+    .data-sources li { margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <h1>屯象经营助手 · 种子客户运营分析报告</h1>
+  <p class="subtitle">2026-03-01 至 2026-03-20 · 3个品牌 · 生成于 2026-03-22 06:42</p>
+
+  <div class="comparison-section">
+    <h2 style="border-color:#FF6B2C;">跨品牌经营对比</h2>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th class="th">品牌</th>
+          <th class="th">总营收</th>
+          <th class="th">订单量</th>
+          <th class="th">客单价</th>
+          <th class="th">食材成本率</th>
+          <th class="th">损耗率</th>
+          <th class="th">决策采纳率</th>
+          <th class="th">AI节省</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="td">尝在一起</td>
+          <td class="td num">¥1,757,087</td>
+          <td class="td num">22,546</td>
+          <td class="td num">¥78</td>
+          <td class="td num" style="color:#52c41a;font-weight:bold;">
+            33.2%
+          </td>
+          <td class="td num">2.8%</td>
+          <td class="td num">68%</td>
+          <td class="td num">¥23,438</td>
+        </tr>
+        <tr>
+          <td class="td">最黔线</td>
+          <td class="td num">¥2,840,624</td>
+          <td class="td num">43,989</td>
+          <td class="td num">¥65</td>
+          <td class="td num" style="color:#52c41a;font-weight:bold;">
+            31.5%
+          </td>
+          <td class="td num">2.4%</td>
+          <td class="td num">66%</td>
+          <td class="td num">¥31,368</td>
+        </tr>
+        <tr>
+          <td class="td">尚宫厨</td>
+          <td class="td num">¥3,422,243</td>
+          <td class="td num">26,716</td>
+          <td class="td num">¥128</td>
+          <td class="td num" style="color:#52c41a;font-weight:bold;">
+            30.8%
+          </td>
+          <td class="td num">1.9%</td>
+          <td class="td num">77%</td>
+          <td class="td num">¥26,366</td>
+        </tr></tbody>
+    </table>
+  </div>
+
+  
+        <div class="brand-section">
+          <h2>尝在一起
+            <span class="cuisine-tag">湘菜</span>
+            <span class="store-tag">3家门店</span>
+            <span class="pos-tag">品智收银</span>
+          </h2>
+
+          <h3>核心经营指标</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">总营收</div>
+              <div class="kpi-value">¥1,757,087</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">总订单</div>
+              <div class="kpi-value">22,546</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">总客流</div>
+              <div class="kpi-value">15,606</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">日均营收</div>
+              <div class="kpi-value">¥87,854</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">客单价</div>
+              <div class="kpi-value">¥78</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">周末日均</div>
+              <div class="kpi-value">¥104,082</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">工作日日均</div>
+              <div class="kpi-value">¥82,445</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">周末提升</div>
+              <div class="kpi-value">+26.2%</div>
+            </div>
+          </div>
+
+          <h3>成本分析</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">食材成本</div>
+              <div class="kpi-value">¥583,353</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">食材成本率</div>
+              <div class="kpi-value" style="color:#52c41a;">
+                33.2%
+                <small>（目标 35%）</small>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">损耗成本</div>
+              <div class="kpi-value">¥49,198</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">损耗率</div>
+              <div class="kpi-value">2.8%
+                <small>（目标 3%）</small>
+              </div>
+            </div>
+          </div>
+
+          <h3>AI决策执行</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">总决策数</div>
+              <div class="kpi-value">44</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">已执行</div>
+              <div class="kpi-value">30</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">采纳率</div>
+              <div class="kpi-value">68%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">节省金额</div>
+              <div class="kpi-value">¥23,438</div>
+            </div>
+          </div>
+
+          <h3>门店营收排名</h3>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="th">排名</th><th class="th">门店</th>
+                <th class="th">订单量</th><th class="th">营收</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td class="td">1</td>
+              <td class="td">尝在一起·文和友店</td>
+              <td class="td num">7,948</td>
+              <td class="td num">¥620,000</td>
+            </tr>
+            <tr>
+              <td class="td">2</td>
+              <td class="td">尝在一起·五一广场店</td>
+              <td class="td num">7,051</td>
+              <td class="td num">¥550,000</td>
+            </tr>
+            <tr>
+              <td class="td">3</td>
+              <td class="td">尝在一起·梅溪湖店</td>
+              <td class="td num">6,794</td>
+              <td class="td num">¥530,000</td>
+            </tr></tbody>
+          </table>
+
+          <h3>日趋势明细</h3>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="th">日期</th><th class="th">星期</th>
+                <th class="th">营收</th><th class="th">订单</th>
+                <th class="th">客流</th><th class="th">客单价</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-01</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥109,677</td>
+              <td class="td num">1,463</td>
+              <td class="td num">1,083</td>
+              <td class="td num">¥75</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-02</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥79,623</td>
+              <td class="td num">1,040</td>
+              <td class="td num">684</td>
+              <td class="td num">¥77</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-03</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥74,258</td>
+              <td class="td num">955</td>
+              <td class="td num">711</td>
+              <td class="td num">¥78</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-04</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥74,576</td>
+              <td class="td num">924</td>
+              <td class="td num">606</td>
+              <td class="td num">¥81</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-05</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥88,826</td>
+              <td class="td num">1,185</td>
+              <td class="td num">790</td>
+              <td class="td num">¥75</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-06</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥83,007</td>
+              <td class="td num">1,073</td>
+              <td class="td num">779</td>
+              <td class="td num">¥77</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-07</td>
+              <td class="td">Sat🔴</td>
+              <td class="td num">¥100,566</td>
+              <td class="td num">1,320</td>
+              <td class="td num">900</td>
+              <td class="td num">¥76</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-08</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥100,319</td>
+              <td class="td num">1,263</td>
+              <td class="td num">940</td>
+              <td class="td num">¥79</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-09</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥81,582</td>
+              <td class="td num">1,021</td>
+              <td class="td num">691</td>
+              <td class="td num">¥80</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-10</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥86,189</td>
+              <td class="td num">1,139</td>
+              <td class="td num">805</td>
+              <td class="td num">¥76</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-11</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥82,613</td>
+              <td class="td num">1,061</td>
+              <td class="td num">716</td>
+              <td class="td num">¥78</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-12</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥86,528</td>
+              <td class="td num">1,162</td>
+              <td class="td num">774</td>
+              <td class="td num">¥74</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-13</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥75,832</td>
+              <td class="td num">979</td>
+              <td class="td num">654</td>
+              <td class="td num">¥77</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-14</td>
+              <td class="td">Sat🔴</td>
+              <td class="td num">¥108,436</td>
+              <td class="td num">1,354</td>
+              <td class="td num">925</td>
+              <td class="td num">¥80</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-15</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥101,414</td>
+              <td class="td num">1,260</td>
+              <td class="td num">918</td>
+              <td class="td num">¥80</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-16</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥90,195</td>
+              <td class="td num">1,122</td>
+              <td class="td num">776</td>
+              <td class="td num">¥80</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-17</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥86,821</td>
+              <td class="td num">1,058</td>
+              <td class="td num">766</td>
+              <td class="td num">¥82</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-18</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥80,886</td>
+              <td class="td num">1,059</td>
+              <td class="td num">691</td>
+              <td class="td num">¥76</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-19</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥76,199</td>
+              <td class="td num">947</td>
+              <td class="td num">637</td>
+              <td class="td num">¥80</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-20</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥89,540</td>
+              <td class="td num">1,161</td>
+              <td class="td num">760</td>
+              <td class="td num">¥77</td>
+            </tr></tbody>
+          </table>
+        </div>
+        <div class="brand-section">
+          <h2>最黔线
+            <span class="cuisine-tag">贵州菜</span>
+            <span class="store-tag">6家门店</span>
+            <span class="pos-tag">品智收银</span>
+          </h2>
+
+          <h3>核心经营指标</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">总营收</div>
+              <div class="kpi-value">¥2,840,624</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">总订单</div>
+              <div class="kpi-value">43,989</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">总客流</div>
+              <div class="kpi-value">31,195</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">日均营收</div>
+              <div class="kpi-value">¥142,031</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">客单价</div>
+              <div class="kpi-value">¥65</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">周末日均</div>
+              <div class="kpi-value">¥171,102</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">工作日日均</div>
+              <div class="kpi-value">¥132,341</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">周末提升</div>
+              <div class="kpi-value">+29.3%</div>
+            </div>
+          </div>
+
+          <h3>成本分析</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">食材成本</div>
+              <div class="kpi-value">¥894,797</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">食材成本率</div>
+              <div class="kpi-value" style="color:#52c41a;">
+                31.5%
+                <small>（目标 33%）</small>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">损耗成本</div>
+              <div class="kpi-value">¥68,175</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">损耗率</div>
+              <div class="kpi-value">2.4%
+                <small>（目标 3%）</small>
+              </div>
+            </div>
+          </div>
+
+          <h3>AI决策执行</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">总决策数</div>
+              <div class="kpi-value">29</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">已执行</div>
+              <div class="kpi-value">19</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">采纳率</div>
+              <div class="kpi-value">66%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">节省金额</div>
+              <div class="kpi-value">¥31,368</div>
+            </div>
+          </div>
+
+          <h3>门店营收排名</h3>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="th">排名</th><th class="th">门店</th>
+                <th class="th">订单量</th><th class="th">营收</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td class="td">1</td>
+              <td class="td">最黔线·万达广场店</td>
+              <td class="td num">8,000</td>
+              <td class="td num">¥520,000</td>
+            </tr>
+            <tr>
+              <td class="td">2</td>
+              <td class="td">最黔线·步行街店</td>
+              <td class="td num">7,384</td>
+              <td class="td num">¥480,000</td>
+            </tr>
+            <tr>
+              <td class="td">3</td>
+              <td class="td">最黔线·芙蓉中路店</td>
+              <td class="td num">7,076</td>
+              <td class="td num">¥460,000</td>
+            </tr>
+            <tr>
+              <td class="td">4</td>
+              <td class="td">最黔线·河西店</td>
+              <td class="td num">6,769</td>
+              <td class="td num">¥440,000</td>
+            </tr>
+            <tr>
+              <td class="td">5</td>
+              <td class="td">最黔线·星沙店</td>
+              <td class="td num">6,461</td>
+              <td class="td num">¥420,000</td>
+            </tr>
+            <tr>
+              <td class="td">6</td>
+              <td class="td">最黔线·望城店</td>
+              <td class="td num">6,153</td>
+              <td class="td num">¥400,000</td>
+            </tr></tbody>
+          </table>
+
+          <h3>日趋势明细</h3>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="th">日期</th><th class="th">星期</th>
+                <th class="th">营收</th><th class="th">订单</th>
+                <th class="th">客流</th><th class="th">客单价</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-01</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥168,563</td>
+              <td class="td num">2,524</td>
+              <td class="td num">1,733</td>
+              <td class="td num">¥67</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-02</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥145,248</td>
+              <td class="td num">2,202</td>
+              <td class="td num">1,512</td>
+              <td class="td num">¥66</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-03</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥149,641</td>
+              <td class="td num">2,383</td>
+              <td class="td num">1,740</td>
+              <td class="td num">¥63</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-04</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥149,907</td>
+              <td class="td num">2,338</td>
+              <td class="td num">1,688</td>
+              <td class="td num">¥64</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-05</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥124,972</td>
+              <td class="td num">1,936</td>
+              <td class="td num">1,361</td>
+              <td class="td num">¥65</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-06</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥126,449</td>
+              <td class="td num">1,990</td>
+              <td class="td num">1,317</td>
+              <td class="td num">¥64</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-07</td>
+              <td class="td">Sat🔴</td>
+              <td class="td num">¥166,064</td>
+              <td class="td num">2,646</td>
+              <td class="td num">1,764</td>
+              <td class="td num">¥63</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-08</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥178,759</td>
+              <td class="td num">2,664</td>
+              <td class="td num">1,993</td>
+              <td class="td num">¥67</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-09</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥127,054</td>
+              <td class="td num">2,000</td>
+              <td class="td num">1,493</td>
+              <td class="td num">¥64</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-10</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥126,018</td>
+              <td class="td num">1,939</td>
+              <td class="td num">1,393</td>
+              <td class="td num">¥65</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-11</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥130,214</td>
+              <td class="td num">1,903</td>
+              <td class="td num">1,343</td>
+              <td class="td num">¥68</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-12</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥149,015</td>
+              <td class="td num">2,256</td>
+              <td class="td num">1,508</td>
+              <td class="td num">¥66</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-13</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥121,529</td>
+              <td class="td num">1,889</td>
+              <td class="td num">1,387</td>
+              <td class="td num">¥64</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-14</td>
+              <td class="td">Sat🔴</td>
+              <td class="td num">¥166,837</td>
+              <td class="td num">2,561</td>
+              <td class="td num">1,910</td>
+              <td class="td num">¥65</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-15</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥175,286</td>
+              <td class="td num">2,804</td>
+              <td class="td num">2,072</td>
+              <td class="td num">¥63</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-16</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥125,164</td>
+              <td class="td num">1,891</td>
+              <td class="td num">1,338</td>
+              <td class="td num">¥66</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-17</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥127,311</td>
+              <td class="td num">2,005</td>
+              <td class="td num">1,403</td>
+              <td class="td num">¥63</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-18</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥131,945</td>
+              <td class="td num">2,103</td>
+              <td class="td num">1,485</td>
+              <td class="td num">¥63</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-19</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥132,379</td>
+              <td class="td num">2,079</td>
+              <td class="td num">1,466</td>
+              <td class="td num">¥64</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-20</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥118,269</td>
+              <td class="td num">1,876</td>
+              <td class="td num">1,289</td>
+              <td class="td num">¥63</td>
+            </tr></tbody>
+          </table>
+        </div>
+        <div class="brand-section">
+          <h2>尚宫厨
+            <span class="cuisine-tag">精品创新湘菜</span>
+            <span class="store-tag">5家门店</span>
+            <span class="pos-tag">品智收银</span>
+          </h2>
+
+          <h3>核心经营指标</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">总营收</div>
+              <div class="kpi-value">¥3,422,243</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">总订单</div>
+              <div class="kpi-value">26,716</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">总客流</div>
+              <div class="kpi-value">18,327</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">日均营收</div>
+              <div class="kpi-value">¥171,112</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">客单价</div>
+              <div class="kpi-value">¥128</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">周末日均</div>
+              <div class="kpi-value">¥201,220</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">工作日日均</div>
+              <div class="kpi-value">¥161,076</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">周末提升</div>
+              <div class="kpi-value">+24.9%</div>
+            </div>
+          </div>
+
+          <h3>成本分析</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">食材成本</div>
+              <div class="kpi-value">¥1,054,051</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">食材成本率</div>
+              <div class="kpi-value" style="color:#52c41a;">
+                30.8%
+                <small>（目标 32%）</small>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">损耗成本</div>
+              <div class="kpi-value">¥65,023</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">损耗率</div>
+              <div class="kpi-value">1.9%
+                <small>（目标 2.5%）</small>
+              </div>
+            </div>
+          </div>
+
+          <h3>AI决策执行</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">总决策数</div>
+              <div class="kpi-value">30</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">已执行</div>
+              <div class="kpi-value">23</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">采纳率</div>
+              <div class="kpi-value">77%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">节省金额</div>
+              <div class="kpi-value">¥26,366</div>
+            </div>
+          </div>
+
+          <h3>门店营收排名</h3>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="th">排名</th><th class="th">门店</th>
+                <th class="th">订单量</th><th class="th">营收</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td class="td">1</td>
+              <td class="td">尚宫厨·IFS旗舰店</td>
+              <td class="td num">5,625</td>
+              <td class="td num">¥720,000</td>
+            </tr>
+            <tr>
+              <td class="td">2</td>
+              <td class="td">尚宫厨·德思勤店</td>
+              <td class="td num">5,312</td>
+              <td class="td num">¥680,000</td>
+            </tr>
+            <tr>
+              <td class="td">3</td>
+              <td class="td">尚宫厨·北辰三角洲店</td>
+              <td class="td num">5,078</td>
+              <td class="td num">¥650,000</td>
+            </tr>
+            <tr>
+              <td class="td">4</td>
+              <td class="td">尚宫厨·运达中心店</td>
+              <td class="td num">4,843</td>
+              <td class="td num">¥620,000</td>
+            </tr>
+            <tr>
+              <td class="td">5</td>
+              <td class="td">尚宫厨·保利店</td>
+              <td class="td num">4,687</td>
+              <td class="td num">¥600,000</td>
+            </tr></tbody>
+          </table>
+
+          <h3>日趋势明细</h3>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="th">日期</th><th class="th">星期</th>
+                <th class="th">营收</th><th class="th">订单</th>
+                <th class="th">客流</th><th class="th">客单价</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-01</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥203,314</td>
+              <td class="td num">1,598</td>
+              <td class="td num">1,123</td>
+              <td class="td num">¥127</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-02</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥160,847</td>
+              <td class="td num">1,235</td>
+              <td class="td num">853</td>
+              <td class="td num">¥130</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-03</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥143,072</td>
+              <td class="td num">1,111</td>
+              <td class="td num">769</td>
+              <td class="td num">¥129</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-04</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥154,300</td>
+              <td class="td num">1,171</td>
+              <td class="td num">802</td>
+              <td class="td num">¥132</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-05</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥156,383</td>
+              <td class="td num">1,281</td>
+              <td class="td num">945</td>
+              <td class="td num">¥122</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-06</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥149,987</td>
+              <td class="td num">1,161</td>
+              <td class="td num">836</td>
+              <td class="td num">¥129</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-07</td>
+              <td class="td">Sat🔴</td>
+              <td class="td num">¥194,531</td>
+              <td class="td num">1,569</td>
+              <td class="td num">1,132</td>
+              <td class="td num">¥124</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-08</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥210,497</td>
+              <td class="td num">1,681</td>
+              <td class="td num">1,171</td>
+              <td class="td num">¥125</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-09</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥169,526</td>
+              <td class="td num">1,294</td>
+              <td class="td num">843</td>
+              <td class="td num">¥131</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-10</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥177,282</td>
+              <td class="td num">1,329</td>
+              <td class="td num">878</td>
+              <td class="td num">¥133</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-11</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥173,709</td>
+              <td class="td num">1,348</td>
+              <td class="td num">898</td>
+              <td class="td num">¥129</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-12</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥180,318</td>
+              <td class="td num">1,385</td>
+              <td class="td num">964</td>
+              <td class="td num">¥130</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-13</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥164,313</td>
+              <td class="td num">1,317</td>
+              <td class="td num">863</td>
+              <td class="td num">¥125</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-14</td>
+              <td class="td">Sat🔴</td>
+              <td class="td num">¥203,971</td>
+              <td class="td num">1,630</td>
+              <td class="td num">1,114</td>
+              <td class="td num">¥125</td>
+            </tr>
+            <tr style="background:#fff7e6;">
+              <td class="td">2026-03-15</td>
+              <td class="td">Sun🔴</td>
+              <td class="td num">¥193,786</td>
+              <td class="td num">1,518</td>
+              <td class="td num">1,055</td>
+              <td class="td num">¥128</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-16</td>
+              <td class="td">Mon</td>
+              <td class="td num">¥160,240</td>
+              <td class="td num">1,239</td>
+              <td class="td num">820</td>
+              <td class="td num">¥129</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-17</td>
+              <td class="td">Tue</td>
+              <td class="td num">¥171,807</td>
+              <td class="td num">1,315</td>
+              <td class="td num">895</td>
+              <td class="td num">¥131</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-18</td>
+              <td class="td">Wed</td>
+              <td class="td num">¥144,247</td>
+              <td class="td num">1,152</td>
+              <td class="td num">793</td>
+              <td class="td num">¥125</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-19</td>
+              <td class="td">Thu</td>
+              <td class="td num">¥164,650</td>
+              <td class="td num">1,297</td>
+              <td class="td num">843</td>
+              <td class="td num">¥127</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td class="td">2026-03-20</td>
+              <td class="td">Fri</td>
+              <td class="td num">¥145,463</td>
+              <td class="td num">1,085</td>
+              <td class="td num">730</td>
+              <td class="td num">¥134</td>
+            </tr></tbody>
+          </table>
+        </div>
+
+  <div class="data-sources">
+    <strong>数据来源：</strong>
+    <ul><li>品智收银POS（订单/菜品/营收）</li><li>易订预订系统（预订/桌位/客史）</li><li>微生活会员平台（会员/积分/储值）</li><li>屯象OS内建供应链（采购/供应商评分）</li></ul>
+  </div>
+
+  <div class="footer">
+    屯象经营助手 · v2.0 · 本报告由系统自动生成，数据来源于已对接的POS/预订/会员系统实时同步
+  </div>
+</body>
+</html>
