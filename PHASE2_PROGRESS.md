@@ -276,7 +276,7 @@ async def analyze_menu_profitability(store_id, start_date, end_date, ...)
 # 传统计算 (不准确)
 利润 = 营收 - 食材成本
 
-# 智链OS计算 (准确)
+# 屯象OS计算 (准确)
 净收入 = 营收 - 平台抽佣
 总成本 = 食材成本 + 人工成本 + 管理费用
 净利润 = 净收入 - 总成本

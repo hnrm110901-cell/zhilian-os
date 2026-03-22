@@ -28,7 +28,7 @@
 }
 
 .recCardDecrease {
-  border-left: 4px solid #0AAF9A;
+  border-left: 4px solid #FF6B2C;
 }
 
 .recCardMaintain {
@@ -51,7 +51,7 @@
 }
 
 .priceDown {
-  color: #0AAF9A;
+  color: #FF6B2C;
   font-weight: 600;
 }
 

@@ -1,6 +1,6 @@
 .card {
-  background: linear-gradient(135deg, rgba(10,175,154,0.04) 0%, rgba(10,175,154,0.01) 100%);
-  border-left: 3px solid #0AAF9A;
+  background: linear-gradient(135deg, rgba(255,107,44,0.04) 0%, rgba(255,107,44,0.01) 100%);
+  border-left: 3px solid #FF6B2C;
   border-radius: var(--radius-md, 12px);
   padding: 14px 16px;
   display: flex;
@@ -9,7 +9,7 @@
 }
 
 [data-theme='dark'] .card {
-  background: linear-gradient(135deg, rgba(10,175,154,0.1) 0%, rgba(10,175,154,0.03) 100%);
+  background: linear-gradient(135deg, rgba(255,107,44,0.1) 0%, rgba(255,107,44,0.03) 100%);
 }
 
 .header {
@@ -22,7 +22,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(10,175,154,0.1);
+  background: rgba(255,107,44,0.1);
   display: flex;
   align-items: center;
   justify-content: center;

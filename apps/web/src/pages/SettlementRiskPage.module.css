@@ -51,8 +51,8 @@
 }
 .tab:hover { color: var(--text-primary); }
 .tabActive {
-  color: var(--accent, #0AAF9A);
-  border-bottom-color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
   font-weight: 600;
 }
 
@@ -68,7 +68,7 @@
   cursor: pointer;
   outline: none;
 }
-.filterSelect:focus { border-color: var(--accent, #0AAF9A); }
+.filterSelect:focus { border-color: var(--accent, #FF6B2C); }
 
 /* Money */
 .mono {
@@ -104,7 +104,7 @@
   background: var(--bg-primary, #fff);
   transition: border-color 0.2s;
 }
-.taskCard:hover { border-color: var(--accent, #0AAF9A); }
+.taskCard:hover { border-color: var(--accent, #FF6B2C); }
 .taskDone { opacity: 0.55; }
 
 .taskHeader {

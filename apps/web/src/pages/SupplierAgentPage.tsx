@@ -456,7 +456,7 @@ const SupplierAgentPage: React.FC = () => {
                     <div className={styles.tierDist}>
                       {[
                         { key: 'strategic', label: '战略级', color: '#722ed1' },
-                        { key: 'preferred', label: '优选级', color: '#0AAF9A' },
+                        { key: 'preferred', label: '优选级', color: '#FF6B2C' },
                         { key: 'approved',  label: '合格级', color: '#1A7A52' },
                         { key: 'probation', label: '试用期', color: '#C8923A' },
                       ].map(({ key, label, color }) => (

@@ -2,7 +2,7 @@
 
 ## 适用范围
 
-这是智链OS第一版树莓派 5 边缘节点安装器，目标是尽快把 PoC / 测试店的边缘节点跑起来，而不是一次性做到完整生产化。
+这是屯象OS第一版树莓派 5 边缘节点安装器，目标是尽快把 PoC / 测试店的边缘节点跑起来，而不是一次性做到完整生产化。
 
 当前安装器会完成：
 
@@ -36,7 +36,7 @@
 需要提前准备：
 
 - Raspberry Pi 5，推荐 Raspberry Pi OS 64-bit
-- 能访问智链OS API Gateway 的网络
+- 能访问屯象OS API Gateway 的网络
 - 服务端已配置 `EDGE_BOOTSTRAP_TOKEN`
 - 一个与 `EDGE_BOOTSTRAP_TOKEN` 对应的 `EDGE_API_TOKEN`
 - 对应门店的 `EDGE_STORE_ID`

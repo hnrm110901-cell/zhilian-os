@@ -1,4 +1,4 @@
-# 智链OS 私域运营 Agent 业务流程
+# 屯象OS 私域运营 Agent 业务流程
 
 私域运营 Agent（PrivateDomainAgent）面向连锁餐饮的**用户增长与私域流量运营**，与 OpsAgent（IT 运维）形成双轮：运维保障系统稳定，私域运营驱动获客、留存与转化。
 
@@ -100,4 +100,4 @@
 
 ## 六、企业微信应用
 
-私域运营 Agent 作为企业微信应用的规划、消息流与智链OS 整体兼容性见：**[私域运营 Agent 企业微信应用规划及兼容智链OS 整体系统](private_domain_wechat_app_plan.md)**。要点：复用现有 `/wechat/webhook` 与 WeChatService，在 POST 收到文本消息后调用 `nl_query` 并回发回复；store_id 可从 FromUserName 关联 User 表获得。
+私域运营 Agent 作为企业微信应用的规划、消息流与屯象OS 整体兼容性见：**[私域运营 Agent 企业微信应用规划及兼容屯象OS 整体系统](private_domain_wechat_app_plan.md)**。要点：复用现有 `/wechat/webhook` 与 WeChatService，在 POST 收到文本消息后调用 `nl_query` 并回发回复；store_id 可从 FromUserName 关联 User 表获得。

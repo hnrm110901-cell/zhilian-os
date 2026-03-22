@@ -289,11 +289,11 @@ const CommandCenterPage: React.FC = () => {
             right: 24,
             zIndex: 1000,
             background: '#0D2029',
-            border: '1px solid rgba(10,175,154,0.4)',
+            border: '1px solid rgba(255,107,44,0.4)',
             borderRadius: 8,
             padding: '10px 18px',
             fontSize: 13,
-            color: '#0AAF9A',
+            color: '#FF6B2C',
             maxWidth: 400,
           }}
         >

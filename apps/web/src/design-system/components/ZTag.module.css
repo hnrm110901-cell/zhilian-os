@@ -11,14 +11,14 @@
   border: none;
 }
 
-.mint    { background: rgba(10,175,154,0.08); color: #066E5D; }
+.mint    { background: rgba(255,107,44,0.08); color: #066E5D; }
 .warn    { background: rgba(217,119,6,0.08);  color: #92400e; }
 .danger  { background: rgba(220,38,38,0.08);  color: #991b1b; }
 .ok      { background: rgba(22,163,74,0.08);  color: #15803d; }
 .neutral { background: rgba(0,0,0,0.04);      color: var(--text-secondary); }
 
 /* Dark mode */
-[data-theme='dark'] .mint    { background: rgba(10,175,154,0.12); color: #6EE7C2; }
+[data-theme='dark'] .mint    { background: rgba(255,107,44,0.12); color: #6EE7C2; }
 [data-theme='dark'] .warn    { background: rgba(251,191,36,0.12); color: #FBBF24; }
 [data-theme='dark'] .danger  { background: rgba(248,113,113,0.12); color: #F87171; }
 [data-theme='dark'] .ok      { background: rgba(52,211,153,0.12); color: #34D399; }

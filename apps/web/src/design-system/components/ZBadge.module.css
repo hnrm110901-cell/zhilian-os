@@ -14,6 +14,6 @@
 .critical { background: rgba(220,38,38,0.08);  color: var(--red); }
 .warning  { background: rgba(217,119,6,0.08);  color: var(--yellow); }
 .success  { background: rgba(22,163,74,0.08);  color: var(--green); }
-.info     { background: rgba(10,175,154,0.08); color: var(--accent); }
+.info     { background: rgba(255,107,44,0.08); color: var(--accent); }
 .default  { background: rgba(0,0,0,0.04);      color: var(--text-secondary); }
 .accent   { background: var(--accent-soft);     color: var(--accent); }

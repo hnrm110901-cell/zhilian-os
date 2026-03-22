@@ -328,7 +328,7 @@ function DashboardTab() {
               yAxisIndex: 0,
               data: trend.map(t => t.revenue_yuan),
               smooth: true,
-              itemStyle: { color: '#0AAF9A' },
+              itemStyle: { color: '#FF6B2C' },
               lineStyle: { width: 2 },
             },
             {
@@ -408,7 +408,7 @@ function DashboardTab() {
                 yAxis: { type: 'value' as const, axisLabel: { fontSize: 11, formatter: (v: number) => `${(v / 10000).toFixed(0)}万` } },
                 series: [
                   { name: '目标', type: 'line' as const, data: targetTrend.map(r => r.target_yuan), itemStyle: { color: '#94a3b8' }, lineStyle: { type: 'dashed' as const } },
-                  { name: '实际', type: 'bar' as const,  data: targetTrend.map(r => r.actual_yuan), itemStyle: { color: 'var(--accent, #0AAF9A)' } },
+                  { name: '实际', type: 'bar' as const,  data: targetTrend.map(r => r.actual_yuan), itemStyle: { color: 'var(--accent, #FF6B2C)' } },
                 ],
               }}
             />
@@ -1964,7 +1964,7 @@ function AnalyticsTab() {
     series: [{
       type: 'bar' as const,
       data: [...funnel.stages].reverse().map(s => s.count),
-      itemStyle: { color: 'var(--accent, #0AAF9A)' },
+      itemStyle: { color: 'var(--accent, #FF6B2C)' },
       label: {
         show: true,
         position: 'right' as const,

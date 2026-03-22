@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档详细说明如何配置和集成智链OS的多渠道通知系统,包括邮件、短信、微信、飞书等渠道。
+本文档详细说明如何配置和集成屯象OS的多渠道通知系统,包括邮件、短信、微信、飞书等渠道。
 
 ## 配置管理
 
@@ -18,14 +18,14 @@ EMAIL_SMTP_HOST=smtp.gmail.com
 EMAIL_SMTP_PORT=587
 EMAIL_SMTP_USER=noreply@example.com
 EMAIL_SMTP_PASSWORD=your_password
-EMAIL_SMTP_FROM_NAME=智链OS
+EMAIL_SMTP_FROM_NAME=屯象OS
 EMAIL_SMTP_USE_TLS=true
 
 # 短信配置 (阿里云)
 SMS_PROVIDER=aliyun
 SMS_ALIYUN_ACCESS_KEY_ID=your_access_key
 SMS_ALIYUN_ACCESS_KEY_SECRET=your_secret
-SMS_ALIYUN_SMS_SIGN_NAME=智链OS
+SMS_ALIYUN_SMS_SIGN_NAME=屯象OS
 
 # 微信配置 (企业微信)
 WECHAT_TYPE=corp
@@ -135,7 +135,7 @@ print(f"发送结果: {result}")
 SMS_PROVIDER=aliyun
 SMS_ALIYUN_ACCESS_KEY_ID=LTAI5t...
 SMS_ALIYUN_ACCESS_KEY_SECRET=xxx...
-SMS_ALIYUN_SMS_SIGN_NAME=智链OS
+SMS_ALIYUN_SMS_SIGN_NAME=屯象OS
 SMS_ALIYUN_SMS_REGION=cn-hangzhou
 ```
 
@@ -180,7 +180,7 @@ SMS_PROVIDER=tencent
 SMS_TENCENT_SECRET_ID=AKIDxxx...
 SMS_TENCENT_SECRET_KEY=xxx...
 SMS_TENCENT_SMS_APP_ID=1400xxx
-SMS_TENCENT_SMS_SIGN=智链OS
+SMS_TENCENT_SMS_SIGN=屯象OS
 ```
 
 #### 3. 安装SDK

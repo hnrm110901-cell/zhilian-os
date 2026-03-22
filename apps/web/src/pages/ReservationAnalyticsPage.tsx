@@ -169,7 +169,7 @@ const ReservationAnalyticsPage: React.FC = () => {
     grid: { left: 60, right: 40, top: 10, bottom: 40 },
     xAxis: { type: 'category', data: hours, splitArea: { show: true } },
     yAxis: { type: 'category', data: dayNames },
-    visualMap: { min: 0, max: maxCount, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#f0f0f0', '#ffe0cc', '#0AAF9A'] } },
+    visualMap: { min: 0, max: maxCount, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#f0f0f0', '#ffe0cc', '#FF6B2C'] } },
     series: [{ type: 'heatmap', data: heatmapData, label: { show: false } }],
   };
 
@@ -182,7 +182,7 @@ const ReservationAnalyticsPage: React.FC = () => {
     series: [{
       type: 'bar',
       data: channels.map(c => c.count),
-      itemStyle: { color: '#0AAF9A', borderRadius: [0, 4, 4, 0] },
+      itemStyle: { color: '#FF6B2C', borderRadius: [0, 4, 4, 0] },
       label: { show: true, position: 'right', formatter: '{c}笔' },
     }],
   };
@@ -413,7 +413,7 @@ const ReservationAnalyticsPage: React.FC = () => {
                   总损失: ¥{revenueData.total_loss_yuan}
                 </div>
                 <div style={{ marginTop: 12, fontSize: 13, color: '#666' }}>
-                  <BulbOutlined style={{ color: '#0AAF9A' }} /> {revenueData.recovery_suggestion}
+                  <BulbOutlined style={{ color: '#FF6B2C' }} /> {revenueData.recovery_suggestion}
                 </div>
               </div>
             ) : (
@@ -439,7 +439,7 @@ const ReservationAnalyticsPage: React.FC = () => {
                 <ReactECharts option={cancelPieOption} style={{ height: 200 }} />
                 <ul className={styles.insightsList}>
                   {cancelData.insights?.map((insight: string, i: number) => (
-                    <li key={i}><BulbOutlined style={{ color: '#0AAF9A' }} /> {insight}</li>
+                    <li key={i}><BulbOutlined style={{ color: '#FF6B2C' }} /> {insight}</li>
                   ))}
                 </ul>
               </div>

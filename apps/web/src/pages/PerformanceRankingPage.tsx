@@ -69,7 +69,7 @@ interface TrendItem {
 
 const TIER_COLOR: Record<string, string> = {
   top:       '#1A7A52',
-  above_avg: '#0AAF9A',
+  above_avg: '#FF6B2C',
   below_avg: '#C8923A',
   laggard:   '#C53030',
 };
@@ -193,7 +193,7 @@ const PerformanceRankingPage: React.FC = () => {
         smooth: true,
         symbol: 'circle',
         symbolSize: 8,
-        itemStyle: { color: '#0AAF9A' },
+        itemStyle: { color: '#FF6B2C' },
         lineStyle: { width: 2 },
       },
     ],
@@ -219,7 +219,7 @@ const PerformanceRankingPage: React.FC = () => {
                   const entry = storeRanking?.metrics[m];
                   return entry?.percentile ?? 0;
                 }),
-                itemStyle: { color: '#0AAF9A' },
+                itemStyle: { color: '#FF6B2C' },
                 areaStyle: { opacity: 0.3 },
               },
             ],
@@ -284,7 +284,7 @@ const PerformanceRankingPage: React.FC = () => {
       title: '¥提升潜力', dataIndex: 'yuan_potential', width: 120,
       render: (v: number | null) =>
         v === null ? '—' : (
-          <span style={{ color: '#0AAF9A', fontWeight: 600 }}>
+          <span style={{ color: '#FF6B2C', fontWeight: 600 }}>
             ¥{Math.abs(v).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
           </span>
         ),
@@ -297,7 +297,7 @@ const PerformanceRankingPage: React.FC = () => {
     {
       title: '排名', dataIndex: 'rank', width: 60,
       render: (v: number) => (
-        <span style={{ fontWeight: 700, color: v === 1 ? '#faad14' : v <= 3 ? '#0AAF9A' : undefined }}>
+        <span style={{ fontWeight: 700, color: v === 1 ? '#faad14' : v <= 3 ? '#FF6B2C' : undefined }}>
           {v === 1 ? <TrophyOutlined /> : null} {v}
         </span>
       ),
@@ -325,7 +325,7 @@ const PerformanceRankingPage: React.FC = () => {
         <Progress
           percent={r.percentile ?? 0}
           size="small"
-          strokeColor={TIER_COLOR[r.tier] ?? '#0AAF9A'}
+          strokeColor={TIER_COLOR[r.tier] ?? '#FF6B2C'}
           showInfo={false}
         />
       ),

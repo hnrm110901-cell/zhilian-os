@@ -1,5 +1,5 @@
 # Week 2 Day 3 进度报告
-## 智链OS架构重构 · 激活周
+## 屯象OS架构重构 · 激活周
 
 **日期**: 2026-02-21
 **主题**: InventoryAgent + Celery Beat调度

@@ -345,7 +345,7 @@ const InventoryPage: React.FC = () => {
           <Row gutter={16}>
             <Col span={8}>
               <Card size="small" style={{ marginBottom: 16 }}>
-                <Statistic title="库存总价值" value={((stats?.total_value || 0) / 100).toFixed(2)} prefix="¥" valueStyle={{ color: '#0AAF9A' }} />
+                <Statistic title="库存总价值" value={((stats?.total_value || 0) / 100).toFixed(2)} prefix="¥" valueStyle={{ color: '#FF6B2C' }} />
               </Card>
               <Card size="small" title="库存状态分布">
                 <ReactECharts option={statusBarOption} style={{ height: 200 }} />

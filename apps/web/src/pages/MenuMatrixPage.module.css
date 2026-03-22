@@ -19,7 +19,7 @@
 /* ── 象限颜色 ───────────────────────────────────────────── */
 .tagStar         { background: #fffbe6; border-color: #faad14; color: #d48806; }
 .tagCashCow      { background: rgba(26,122,82,0.08); border-color: #1A7A52; color: #389e0d; }
-.tagQuestionMark { background: #e6f4ff; border-color: #0AAF9A; color: #0958d9; }
+.tagQuestionMark { background: #e6f4ff; border-color: #FF6B2C; color: #0958d9; }
 .tagDog          { background: #fff2f0; border-color: #C53030; color: #cf1322; }
 
 /* ── 优先级徽标 ─────────────────────────────────────────── */

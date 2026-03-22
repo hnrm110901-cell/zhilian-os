@@ -154,9 +154,9 @@ const SystemHealthPage: React.FC = () => {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}><RobotOutlined style={{ color: '#0AAF9A' }} /></div>
+                <div style={{ fontSize: 32, marginBottom: 8 }}><RobotOutlined style={{ color: '#FF6B2C' }} /></div>
                 <div style={{ fontWeight: 600, fontSize: 16 }}>活跃 Agent</div>
-                <div style={{ fontSize: 24, color: '#0AAF9A' }}>{agents.length}</div>
+                <div style={{ fontSize: 24, color: '#FF6B2C' }}>{agents.length}</div>
               </div>
             </Card>
           </Col>

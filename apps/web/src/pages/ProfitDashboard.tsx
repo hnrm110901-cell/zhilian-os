@@ -99,7 +99,7 @@ const ingredientColumns: ZTableColumn<any>[] = [
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 28, height: 28, borderRadius: '50%',
-        background: rank <= 3 ? '#0AAF9A' : '#d9d9d9',
+        background: rank <= 3 ? '#FF6B2C' : '#d9d9d9',
         color: rank <= 3 ? '#fff' : '#666',
         fontWeight: 700, fontSize: 13,
       }}>
@@ -117,7 +117,7 @@ const ingredientColumns: ZTableColumn<any>[] = [
     title: '用料成本',
     align: 'right',
     render: (yuan: number) => (
-      <strong style={{ color: '#0AAF9A' }}>
+      <strong style={{ color: '#FF6B2C' }}>
         ¥{yuan?.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
       </strong>
     ),
@@ -127,7 +127,7 @@ const ingredientColumns: ZTableColumn<any>[] = [
     title: '占实际成本',
     width: 150,
     render: (pct: number) => {
-      const color = pct >= 20 ? '#C53030' : pct >= 10 ? '#faad14' : '#0AAF9A';
+      const color = pct >= 20 ? '#C53030' : pct >= 10 ? '#faad14' : '#FF6B2C';
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 90, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
@@ -250,9 +250,9 @@ const ProfitDashboard: React.FC = () => {
         name: '理论成本率',
         type: 'line',
         data: rankingData.stores.map(s => s.theoretical_pct),
-        lineStyle: { color: '#0AAF9A', type: 'dashed' },
+        lineStyle: { color: '#FF6B2C', type: 'dashed' },
         symbol: 'circle', symbolSize: 6,
-        itemStyle: { color: '#0AAF9A' },
+        itemStyle: { color: '#FF6B2C' },
       },
     ],
   } : {};
@@ -279,9 +279,9 @@ const ProfitDashboard: React.FC = () => {
         {
           name: '成本率', type: 'line', yAxisIndex: 0,
           data: chart.cost_rate_data.map((v: number, i: number) => ({
-            value: v, itemStyle: { color: chart.point_colors[i] || '#0AAF9A' },
+            value: v, itemStyle: { color: chart.point_colors[i] || '#FF6B2C' },
           })),
-          lineStyle: { color: '#0AAF9A', width: 2 },
+          lineStyle: { color: '#FF6B2C', width: 2 },
           areaStyle: { opacity: 0.1 },
           symbol: 'circle', symbolSize: 8,
           markLine: {
@@ -630,7 +630,7 @@ const ProfitDashboard: React.FC = () => {
                     <ZCard
                       title={
                         <span>
-                          <DollarOutlined style={{ color: '#0AAF9A', marginRight: 6 }} />
+                          <DollarOutlined style={{ color: '#FF6B2C', marginRight: 6 }} />
                           Top 10 食材用料成本（按金额排序）
                         </span>
                       }

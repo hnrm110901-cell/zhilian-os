@@ -40,8 +40,8 @@
 }
 .tab:hover { color: var(--text-primary); }
 .tabActive {
-  color: var(--accent, #0AAF9A);
-  border-bottom-color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
   font-weight: 600;
 }
 
@@ -59,9 +59,9 @@
   font-size: 13px;
   flex-wrap: wrap;
 }
-.planRow:hover { border-color: var(--accent, #0AAF9A); }
+.planRow:hover { border-color: var(--accent, #FF6B2C); }
 .planRowActive {
-  border-color: var(--accent, #0AAF9A);
+  border-color: var(--accent, #FF6B2C);
   background: rgba(10, 175, 154, 0.04);
 }
 .planPeriod {
@@ -138,5 +138,5 @@
   color: var(--text-primary);
   outline: none;
 }
-.formInput:focus { border-color: var(--accent, #0AAF9A); }
+.formInput:focus { border-color: var(--accent, #FF6B2C); }
 .formActions { display: flex; gap: 8px; margin-top: 16px; }

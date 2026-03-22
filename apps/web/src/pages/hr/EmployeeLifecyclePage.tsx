@@ -32,7 +32,7 @@ const CHANGE_TYPE_COLORS: Record<string, string> = {
   onboard: '#27AE60',
   probation: '#2D9CDB',
   transfer: '#F2994A',
-  promotion: '#0AAF9A',
+  promotion: '#FF6B2C',
   demotion: '#EB5757',
   salary_adj: '#9B59B6',
   resign: '#EB5757',

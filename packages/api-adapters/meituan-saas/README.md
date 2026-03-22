@@ -2,7 +2,7 @@
 
 ## 概述
 
-美团餐饮SAAS平台API适配器，提供订单管理、门店管理、商品管理、配送管理等功能的Python封装，支持与智链OS神经系统深度集成。
+美团餐饮SAAS平台API适配器，提供订单管理、门店管理、商品管理、配送管理等功能的Python封装，支持与屯象OS神经系统深度集成。
 
 ## 功能特性
 
@@ -142,7 +142,7 @@ print(f"骑手电话: {logistics['courier_phone']}")
 print(f"当前位置: ({logistics['latitude']}, {logistics['longitude']})")
 ```
 
-## 与智链OS集成
+## 与屯象OS集成
 
 ### 通过集成服务使用
 
@@ -157,13 +157,13 @@ integration_service = AdapterIntegrationService(neural_system=neural_system)
 adapter = MeituanSaasAdapter(config)
 integration_service.register_adapter("meituan", adapter, config)
 
-# 同步订单到智链OS
+# 同步订单到屯象OS
 result = await integration_service.sync_order_from_meituan(
     order_id="MT20240001",
     store_id="STORE001"
 )
 
-# 同步商品到智链OS
+# 同步商品到屯象OS
 result = await integration_service.sync_dishes_from_meituan(
     store_id="STORE001"
 )
@@ -316,7 +316,7 @@ async def meituan_order_webhook(request: Request):
     order_id = data.get("order_id")
     status = data.get("status")
 
-    # 同步到智链OS
+    # 同步到屯象OS
     await integration_service.sync_order_from_meituan(
         order_id=order_id,
         store_id="STORE001"

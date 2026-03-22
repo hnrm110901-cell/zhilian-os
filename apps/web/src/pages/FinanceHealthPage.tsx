@@ -197,9 +197,9 @@ const FinanceHealthPage: React.FC = () => {
           name: '总评分',
           type: 'line',
           data: ht.map(r => Number(r.total_score)),
-          lineStyle: { width: 3, color: '#0AAF9A' },
+          lineStyle: { width: 3, color: '#FF6B2C' },
           symbol: 'circle', symbolSize: 6,
-          itemStyle: { color: '#0AAF9A' },
+          itemStyle: { color: '#FF6B2C' },
           markLine: {
             data: [
               { yAxis: 80, lineStyle: { color: '#1A7A52', type: 'dashed' }, label: { formatter: 'A', fontSize: 10 } },
@@ -247,7 +247,7 @@ const FinanceHealthPage: React.FC = () => {
           type: 'bar',
           yAxisIndex: 1,
           data: pt.map(r => r.net_revenue_yuan),
-          itemStyle: { color: 'rgba(10,175,154,0.35)' },
+          itemStyle: { color: 'rgba(255,107,44,0.35)' },
           barMaxWidth: 28,
         },
       ],

@@ -1,6 +1,6 @@
 
 
-# **《智链OS 宴会管理 Agent PRD 总纲 V1》**
+# **《屯象OS 宴会管理 Agent PRD 总纲 V1》**
 
 
 
@@ -8,7 +8,7 @@
 
 版本：V1.0
 
-产品名称：智链OS Banquet Agent
+产品名称：屯象OS Banquet Agent
 
 产品定位：连锁餐饮宴会经营智能体系统
 
@@ -126,7 +126,7 @@
 
 
 
-智链OS 宴会 Agent 是：
+屯象OS 宴会 Agent 是：
 
 ```
 Banquet Intelligence System
@@ -1338,7 +1338,7 @@ V1坚持：
 
 
 
-智链OS 宴会 Agent 的核心目标：
+屯象OS 宴会 Agent 的核心目标：
 
 ```
 让宴会管理从预订系统

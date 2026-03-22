@@ -257,7 +257,7 @@ const ReservationPage: React.FC = () => {
         <Col span={4}><Card size="small"><Statistic title="今日总预约" value={overview?.total ?? '--'} /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="待确认" value={overview?.pending_count ?? '--'} valueStyle={{ color: '#C8923A' }} /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="已确认" value={overview?.confirmed_count ?? '--'} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="已入座" value={overview?.seated_count ?? '--'} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="已入座" value={overview?.seated_count ?? '--'} valueStyle={{ color: '#FF6B2C' }} /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="未到店" value={overview?.no_show_count ?? '--'} valueStyle={{ color: '#C53030' }} /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="今日总人数" value={overview?.total_guests ?? '--'} suffix="人" /></Card></Col>
       </Row>

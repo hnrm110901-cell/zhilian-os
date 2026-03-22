@@ -44,7 +44,7 @@
 .amountLarge {
   font-size: 22px;
   font-weight: 800;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 .profitLarge {
@@ -96,5 +96,5 @@
   font-size: 13px;
 }
 
-.amountCellAccent { color: var(--accent, #0AAF9A); }
+.amountCellAccent { color: var(--accent, #FF6B2C); }
 .amountCellGreen  { color: #1A7A52; }

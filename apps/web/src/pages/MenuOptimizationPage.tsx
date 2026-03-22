@@ -22,7 +22,7 @@ const { Option } = Select;
 // ── 建议类型配置 ──────────────────────────────────────────────────────────────
 const REC_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   price_increase: { label: '提价空间', color: '#1A7A52',  icon: '📈' },
-  cost_reduction: { label: '降本优化', color: '#0AAF9A',  icon: '🔧' },
+  cost_reduction: { label: '降本优化', color: '#FF6B2C',  icon: '🔧' },
   promote:        { label: '推广增量', color: '#C8923A',  icon: '📣' },
   discontinue:    { label: '建议下架', color: '#C53030',  icon: '🗑️' },
   bundle:         { label: '套餐捆绑', color: '#722ed1',  icon: '🎁' },
@@ -31,7 +31,7 @@ const REC_CONFIG: Record<string, { label: string; color: string; icon: string }>
 const BCG_CONFIG: Record<string, { label: string; color: string }> = {
   star:          { label: '明星菜', color: '#faad14' },
   cash_cow:      { label: '现金牛', color: '#1A7A52' },
-  question_mark: { label: '问题菜', color: '#0AAF9A' },
+  question_mark: { label: '问题菜', color: '#FF6B2C' },
   dog:           { label: '瘦狗菜', color: '#C53030' },
 };
 
@@ -390,7 +390,7 @@ const MenuOptimizationPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="待处理建议" value={pendingRecs} suffix="条"
-              prefix={<BulbOutlined />} valueStyle={{ color: '#0AAF9A' }} />
+              prefix={<BulbOutlined />} valueStyle={{ color: '#FF6B2C' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>

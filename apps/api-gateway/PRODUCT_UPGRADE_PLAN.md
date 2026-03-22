@@ -1,4 +1,4 @@
-# 智链OS产品升级方案 - 响应微盟/有赞视角
+# 屯象OS产品升级方案 - 响应微盟/有赞视角
 # Zhilian OS Product Upgrade Plan - Response to Weimob/Youzan Perspective
 
 **反馈来源**: 微盟/有赞产品负责人视角
@@ -11,7 +11,7 @@
 
 ### 1.1 关键观点
 
-> "智链OS是完美的'省钱机器'，但餐饮老板最大的痛点永远是'怎么带来更多的客人（GMV）'"
+> "屯象OS是完美的'省钱机器'，但餐饮老板最大的痛点永远是'怎么带来更多的客人（GMV）'"
 
 **认同度**: 100%
 
@@ -104,9 +104,9 @@ class MarketingAgent:
 **架构设计**:
 ```
 ┌─────────────────────────────────────────────┐
-│         智链OS - 核心平台                    │
+│         屯象OS - 核心平台                    │
 │  ┌─────────────────────────────────────┐   │
-│  │  智链OpenAPI规范                     │   │
+│  │  屯象OpenAPI规范                     │   │
 │  │  - 标准数据模型                      │   │
 │  │  - 统一接口协议                      │   │
 │  │  - 开发者文档                        │   │
@@ -129,12 +129,12 @@ class MarketingAgent:
 
 **实施步骤**:
 
-1. **定义智链OpenAPI规范**
+1. **定义屯象OpenAPI规范**
 ```python
 # src/core/zhilian_open_api.py
 
 class ZhilianOpenAPI:
-    """智链OpenAPI规范"""
+    """屯象OpenAPI规范"""
 
     # 标准数据模型
     class StandardOrder:
@@ -304,7 +304,7 @@ def audit_vector_query(tenant_id, query, results):
 **新卖点**: "带资进组的超级虚拟店长"
 
 **话术升级**:
-> "智链OS = 10年经验的精算师 + 顶级店长的运营经验 + 私域营销专家"
+> "屯象OS = 10年经验的精算师 + 顶级店长的运营经验 + 私域营销专家"
 
 **具体包装**:
 1. **精算师能力**
@@ -347,7 +347,7 @@ def audit_vector_query(tenant_id, query, results):
 
 ```
 ┌─────────────────────────────────────────────┐
-│         智链OS aPaaS平台                     │
+│         屯象OS aPaaS平台                     │
 │                                              │
 │  ┌─────────────────────────────────────┐   │
 │  │  1. API网关层                        │   │
@@ -448,7 +448,7 @@ def audit_vector_query(tenant_id, query, results):
 ### Phase 2: aPaaS平台建设（2-3个月）
 
 **Month 1: 标准化**
-- [ ] 定义智链OpenAPI规范
+- [ ] 定义屯象OpenAPI规范
 - [ ] 开发标准数据模型
 - [ ] 建立API网关
 
@@ -532,7 +532,7 @@ def audit_vector_query(tenant_id, query, results):
 ### 8.1 核心升级
 
 ✅ **补足增长引擎** - Marketing Agent
-✅ **PaaS化架构** - 智链OpenAPI + ISV生态
+✅ **PaaS化架构** - 屯象OpenAPI + ISV生态
 ✅ **多模态容错** - 语音指令白名单
 ✅ **安全加固** - 向量数据库物理隔离
 
@@ -549,7 +549,7 @@ def audit_vector_query(tenant_id, query, results):
 
 ### 8.3 最终愿景
 
-> 将智链OS打造成**餐饮行业的Salesforce**：
+> 将屯象OS打造成**餐饮行业的Salesforce**：
 > - 强大的PaaS平台
 > - 繁荣的ISV生态
 > - 完整的营销+运营闭环

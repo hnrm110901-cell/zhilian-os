@@ -1,5 +1,5 @@
 .card {
-  border-left: 3px solid #0AAF9A;
+  border-left: 3px solid #FF6B2C;
   border-radius: var(--radius-md, 12px);
   background: var(--surface, #fff);
   box-shadow: var(--shadow-sm);
@@ -149,7 +149,7 @@
   padding: 8px 0;
   border: none;
   border-radius: var(--radius-sm, 8px);
-  background: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -159,7 +159,7 @@
 
 .dispatchBtn:hover:not(:disabled) {
   opacity: 0.88;
-  box-shadow: 0 2px 8px rgba(10,175,154,0.25);
+  box-shadow: 0 2px 8px rgba(255,107,44,0.25);
 }
 
 .dispatchBtn:disabled {

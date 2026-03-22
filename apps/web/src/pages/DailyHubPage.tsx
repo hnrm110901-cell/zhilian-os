@@ -28,7 +28,7 @@ const { Text, Title } = Typography;
 const OPS_PHASES = [
   { label: '班前准备',   start:  0, end: 10.5, icon: <TeamOutlined />,         color: '#8c8c8c' },
   { label: '午市中',     start: 10.5, end: 14,  icon: <FireOutlined />,         color: '#C8923A' },
-  { label: '午市收尾',  start: 14,  end: 16,  icon: <ClockCircleOutlined />,   color: '#0AAF9A' },
+  { label: '午市收尾',  start: 14,  end: 16,  icon: <ClockCircleOutlined />,   color: '#FF6B2C' },
   { label: '晚市备战',  start: 16,  end: 17.5, icon: <BulbOutlined />,         color: '#722ed1' },
   { label: '晚市中',     start: 17.5, end: 21,  icon: <FireOutlined />,         color: '#C53030' },
   { label: '日结复盘',  start: 21,  end: 24,  icon: <CheckCircleOutlined />,   color: '#1A7A52' },
@@ -135,7 +135,7 @@ const DailyHubPage: React.FC = () => {
       type: 'bar',
       data: [
         { value: ((banquet?.deterministic_revenue || 0) / 100).toFixed(0), itemStyle: { color: '#f5a623' } },
-        { value: ((forecast?.regular_track?.predicted_revenue || 0) / 100).toFixed(0), itemStyle: { color: '#0AAF9A' } },
+        { value: ((forecast?.regular_track?.predicted_revenue || 0) / 100).toFixed(0), itemStyle: { color: '#FF6B2C' } },
       ],
     }],
   };
@@ -170,7 +170,7 @@ const DailyHubPage: React.FC = () => {
             {
               title: '今日营收',
               value: review?.total_revenue ? `¥${(review.total_revenue / 100).toFixed(0)}` : '—',
-              icon: <DollarOutlined style={{ color: '#0AAF9A' }} />,
+              icon: <DollarOutlined style={{ color: '#FF6B2C' }} />,
               sub: review?.order_count ? `${review.order_count} 单` : null,
             },
             {

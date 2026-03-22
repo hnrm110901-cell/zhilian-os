@@ -1,14 +1,14 @@
-# 智链OS API适配器集成指南
+# 屯象OS API适配器集成指南
 
 ## 概述
 
-智链OS API适配器集成服务提供统一的接口，用于连接各种第三方餐饮管理系统（天财商龙、美团SAAS、奥琦韦、品智等），并与智链OS神经系统深度集成，实现数据的实时同步和智能处理。
+屯象OS API适配器集成服务提供统一的接口，用于连接各种第三方餐饮管理系统（天财商龙、美团SAAS、奥琦韦、品智等），并与屯象OS神经系统深度集成，实现数据的实时同步和智能处理。
 
 ## 架构设计
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      智链OS神经系统                          │
+│                      屯象OS神经系统                          │
 │  (Neural System - 事件驱动 + 向量数据库 + 联邦学习)          │
 └────────────────────┬────────────────────────────────────────┘
                      │
@@ -145,7 +145,7 @@ curl -X POST http://localhost:8000/api/adapters/register \
 
 ### 场景1: 订单同步
 
-当天财商龙或美团收到新订单时，自动同步到智链OS神经系统：
+当天财商龙或美团收到新订单时，自动同步到屯象OS神经系统：
 
 ```bash
 # 从天财商龙同步订单
@@ -167,7 +167,7 @@ curl -X POST http://localhost:8000/api/adapters/sync/order \
   }'
 ```
 
-**智链OS处理流程**:
+**屯象OS处理流程**:
 1. 接收订单数据
 2. 转换为标准格式
 3. 发送到神经系统事件队列
@@ -177,7 +177,7 @@ curl -X POST http://localhost:8000/api/adapters/sync/order \
 
 ### 场景2: 菜品同步
 
-定期从各系统同步菜品信息到智链OS：
+定期从各系统同步菜品信息到屯象OS：
 
 ```bash
 # 从天财商龙同步菜品
@@ -197,7 +197,7 @@ curl -X POST http://localhost:8000/api/adapters/sync/dishes \
   }'
 ```
 
-**智链OS处理流程**:
+**屯象OS处理流程**:
 1. 批量获取菜品数据
 2. 转换为标准格式
 3. 向量化菜品描述
@@ -206,7 +206,7 @@ curl -X POST http://localhost:8000/api/adapters/sync/dishes \
 
 ### 场景3: 库存同步
 
-智链OS检测到库存变化时，同步到各平台：
+屯象OS检测到库存变化时，同步到各平台：
 
 ```bash
 # 同步库存到美团
@@ -507,7 +507,7 @@ async def tiancai_order_webhook(request: Request):
 - [天财商龙适配器文档](../tiancai-shanglong/README.md)
 - [美团SAAS适配器文档](../meituan-saas/README.md)
 - [奥琦韦适配器文档](../aoqiwei/README.md)
-- [智链OS神经系统文档](../../apps/api-gateway/docs/NEURAL_SYSTEM.md)
+- [屯象OS神经系统文档](../../apps/api-gateway/docs/NEURAL_SYSTEM.md)
 
 ## 许可证
 

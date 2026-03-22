@@ -56,7 +56,7 @@ const LEVEL_NAMES: Record<number, string> = {
 
 const LEVEL_COLORS: Record<number, string> = {
   1: 'var(--text-secondary)',
-  2: '#0AAF9A',
+  2: '#FF6B2C',
   3: '#C8923A',
   4: '#722ed1',
 };
@@ -70,7 +70,7 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: '#1A7A52', POST: '#0AAF9A', PUT: '#C8923A', DELETE: '#C53030', PATCH: '#722ed1',
+  GET: '#1A7A52', POST: '#FF6B2C', PUT: '#C8923A', DELETE: '#C53030', PATCH: '#722ed1',
 };
 
 const TABS = [

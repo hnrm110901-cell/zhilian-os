@@ -25,7 +25,7 @@
 .xl  { width: 64px; height: 64px; font-size: 22px; }
 
 /* Color variants (role-based) */
-.mint    { background: rgba(10,175,154,0.12); color: var(--accent); }
+.mint    { background: rgba(255,107,44,0.12); color: var(--accent); }
 .blue    { background: rgba(0,122,255,0.10);  color: #007AFF; }
 .green   { background: rgba(26,122,82,0.12);  color: var(--green); }
 .purple  { background: rgba(175,82,222,0.12); color: #AF52DE; }

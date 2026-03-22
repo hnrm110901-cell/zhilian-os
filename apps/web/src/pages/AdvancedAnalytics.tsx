@@ -140,7 +140,7 @@ const AdvancedAnalytics: React.FC = () => {
         type: 'line',
         yAxisIndex: 0,
         data: salesPrediction.predictions.map((p: any) => p.predicted_revenue / 100),
-        itemStyle: { color: '#0AAF9A' },
+        itemStyle: { color: '#FF6B2C' },
         areaStyle: { opacity: 0.3 },
       },
       {
@@ -183,7 +183,7 @@ const AdvancedAnalytics: React.FC = () => {
             const hour = timePatterns.hourly_analysis[params.dataIndex].hour;
             if (hour >= 11 && hour < 14) return '#ff7875'; // 午餐
             if (hour >= 17 && hour < 21) return '#ffa940'; // 晚餐
-            return '#0AAF9A';
+            return '#FF6B2C';
           },
         },
       },
@@ -313,7 +313,7 @@ const AdvancedAnalytics: React.FC = () => {
                   <Col span={8}>
                     <Card>
                       <div>平均日营收</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0AAF9A' }}>
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#FF6B2C' }}>
                         ¥{(salesPrediction.average_daily_revenue / 100).toFixed(2)}
                       </div>
                     </Card>
@@ -444,7 +444,7 @@ const AdvancedAnalytics: React.FC = () => {
                     <Col span={8} key={index}>
                       <Card>
                         <div>高峰时段 #{index + 1}</div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#0AAF9A' }}>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#FF6B2C' }}>
                           {peak.hour}:00 ({peak.period})
                         </div>
                         <div style={{ color: '#666' }}>

@@ -628,7 +628,7 @@ const MerchantManagementPage: React.FC = () => {
       case 2:
         return (
           <>
-            <div style={{ marginBottom: 16, padding: '10px 12px', background: 'rgba(10,175,154,0.06)', borderRadius: 8, fontSize: 13 }}>
+            <div style={{ marginBottom: 16, padding: '10px 12px', background: 'rgba(255,107,44,0.06)', borderRadius: 8, fontSize: 13 }}>
               此账号将作为商户的首位管理员（店长角色），拥有品牌内全部数据权限
             </div>
             <Row gutter={16}>
@@ -663,7 +663,7 @@ const MerchantManagementPage: React.FC = () => {
       {/* ── Stats ───────────────────────────────────────────────────────────── */}
       <Row gutter={16} className={styles.statsRow}>
         {[
-          { label: '商户总数', value: stats?.total_merchants ?? 0, color: '#0AAF9A', icon: <BankOutlined /> },
+          { label: '商户总数', value: stats?.total_merchants ?? 0, color: '#FF6B2C', icon: <BankOutlined /> },
           { label: '运营中', value: stats?.active_merchants ?? 0, color: '#52c41a', icon: <CheckCircleOutlined /> },
           { label: '已停用', value: stats?.inactive_merchants ?? 0, color: '#ff4d4f', icon: <StopOutlined /> },
           { label: '总门店', value: stats?.total_stores ?? 0, color: '#1677ff', icon: <ShopOutlined /> },

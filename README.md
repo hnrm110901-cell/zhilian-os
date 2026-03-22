@@ -3,7 +3,10 @@
 > 连锁餐饮 AI 经营决策系统 — 餐饮人的好伙伴
 
 <p align="center">
-  <img src="apps/web/public/logo-mark-v3.svg" alt="屯象OS" width="80" />
+  <img src="apps/web/public/logo-icon.svg" alt="屯象OS" width="120" />
+</p>
+<p align="center">
+  <strong>Ω — 终极解决方案 · 象的厚重沉稳</strong>
 </p>
 
 ## 产品定位
@@ -109,10 +112,10 @@ L3  内容区       面包屑 · KPI 卡片 · AI 建议卡 · 数据钻取
 
 | 组件 | 技术 |
 |------|------|
-| 框架 | React 18 + TypeScript |
+| 框架 | React 19 + TypeScript 5.9 |
 | UI 库 | Ant Design 5 + 自研 Z 组件库 |
-| 图表 | ECharts (ReactECharts) |
-| 构建 | Vite 5 |
+| 图表 | ECharts 5 (ReactECharts) + ChartTrend (Canvas) |
+| 构建 | Vite 7.3 |
 | 样式 | CSS Modules + Design Token 系统 |
 | 路由 | React Router 6 (角色路由 /sm /chef /floor /hq) |
 

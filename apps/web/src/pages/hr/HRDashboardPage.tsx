@@ -486,7 +486,7 @@ const HRDashboardPage: React.FC = () => {
             onClick={() => navigate('/attendance-report')}
           >
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 4 }}>出勤率</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#0AAF9A' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: '#FF6B2C' }}>
               {overview?.attendance_rate_pct != null ? `${overview.attendance_rate_pct}%` : '-'}
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>
@@ -522,7 +522,7 @@ const HRDashboardPage: React.FC = () => {
             onClick={() => navigate('/training-dashboard')}
           >
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 4 }}>培训完成率</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#0AAF9A' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: '#FF6B2C' }}>
               {training?.completion_rate_pct != null ? `${training.completion_rate_pct}%` : '-'}
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>
@@ -536,7 +536,7 @@ const HRDashboardPage: React.FC = () => {
       <Card
         title={
           <Space>
-            <AppstoreOutlined style={{ color: '#0AAF9A' }} />
+            <AppstoreOutlined style={{ color: '#FF6B2C' }} />
             <span style={{ fontWeight: 700 }}>快捷导航</span>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', fontWeight: 400 }}>
               全部HR模块一键直达
@@ -564,8 +564,8 @@ const HRDashboardPage: React.FC = () => {
                     }}
                     onClick={() => navigate(mod.path)}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLDivElement).style.background = 'rgba(10,175,154,0.08)';
-                      (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(10,175,154,0.25)';
+                      (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,107,44,0.08)';
+                      (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,107,44,0.25)';
                     }}
                     onMouseLeave={e => {
                       (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
@@ -575,7 +575,7 @@ const HRDashboardPage: React.FC = () => {
                     <div style={{
                       width: 36, height: 36, borderRadius: 8,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(10,175,154,0.12)', color: '#0AAF9A', fontSize: 18,
+                      background: 'rgba(255,107,44,0.12)', color: '#FF6B2C', fontSize: 18,
                       flexShrink: 0,
                     }}>
                       {mod.icon}
@@ -599,7 +599,7 @@ const HRDashboardPage: React.FC = () => {
                           backgroundColor:
                             mod.key === 'leave' ? '#EB5757'
                             : mod.key === 'contract' ? '#F2994A'
-                            : '#0AAF9A',
+                            : '#FF6B2C',
                         }}
                       />
                     )}
@@ -638,7 +638,7 @@ const HRDashboardPage: React.FC = () => {
               总决策 <b style={{ color: 'rgba(255,255,255,0.85)' }}>{flywheel.total_decisions}</b>
             </span>
             <span style={{ color: 'rgba(255,255,255,0.45)' }}>
-              采纳率 <b style={{ color: '#0AAF9A' }}>{(flywheel.acceptance_rate * 100).toFixed(0)}%</b>
+              采纳率 <b style={{ color: '#FF6B2C' }}>{(flywheel.acceptance_rate * 100).toFixed(0)}%</b>
             </span>
             {flywheel.calibration_summary && (
               <span style={{ color: 'rgba(255,255,255,0.45)' }}>
@@ -667,11 +667,11 @@ const HRDashboardPage: React.FC = () => {
                   <Col xs={24} md={8} key={decision.id}>
                     <div style={{
                       padding: 16, borderRadius: 10,
-                      background: isRisk ? 'rgba(235,87,87,0.06)' : 'rgba(10,175,154,0.06)',
-                      border: `1px solid ${isRisk ? 'rgba(235,87,87,0.15)' : 'rgba(10,175,154,0.15)'}`,
+                      background: isRisk ? 'rgba(235,87,87,0.06)' : 'rgba(255,107,44,0.06)',
+                      border: `1px solid ${isRisk ? 'rgba(235,87,87,0.15)' : 'rgba(255,107,44,0.15)'}`,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                        {isRisk ? <WarningOutlined style={{ color: '#EB5757' }} /> : <ThunderboltOutlined style={{ color: '#0AAF9A' }} />}
+                        {isRisk ? <WarningOutlined style={{ color: '#EB5757' }} /> : <ThunderboltOutlined style={{ color: '#FF6B2C' }} />}
                         <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>
                           {DECISION_TYPE_LABEL[decision.decision_type] || decision.decision_type}
                         </span>

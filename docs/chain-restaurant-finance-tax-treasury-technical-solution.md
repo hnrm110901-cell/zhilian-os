@@ -1,11 +1,11 @@
-# 连锁餐饮业、财、税、资金一体化 — 技术方案（智链OS 扩展）
+# 连锁餐饮业、财、税、资金一体化 — 技术方案（屯象OS 扩展）
 
 ## 文档说明
 
-本技术方案在《[连锁餐饮业财税资金一体化数字化解决方案](./chain-restaurant-finance-tax-treasury-solution.md)》业务方案基础上，给出**结合智链OS 的扩展实现**与**交付形态**设计，支持：
+本技术方案在《[连锁餐饮业财税资金一体化数字化解决方案](./chain-restaurant-finance-tax-treasury-solution.md)》业务方案基础上，给出**结合屯象OS 的扩展实现**与**交付形态**设计，支持：
 
-- **合并销售及应用**：业财税资金作为智链OS 的可选扩展模块，与现有 Agent、适配器、API 一起部署与销售。
-- **独立销售和交付**：业财税资金作为独立产品部署，通过标准 API/事件与智链OS 或第三方业务系统对接，可单独签约与交付。
+- **合并销售及应用**：业财税资金作为屯象OS 的可选扩展模块，与现有 Agent、适配器、API 一起部署与销售。
+- **独立销售和交付**：业财税资金作为独立产品部署，通过标准 API/事件与屯象OS 或第三方业务系统对接，可单独签约与交付。
 
 ---
 
@@ -14,9 +14,9 @@
 ### 1.1 两种部署形态
 
 ```
-形态A：合并部署（智链OS + 业财税资金一体化）
+形态A：合并部署（屯象OS + 业财税资金一体化）
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         智链OS API Gateway (单进程/单集群)                     │
+│                         屯象OS API Gateway (单进程/单集群)                     │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │ 现有路由: /api/v1/agents/*, /api/v1/finance/*, /api/v1/enterprise/*  │   │
 │  │ 扩展路由: /api/v1/fct/* (业财税资金) [可选挂载]                       │   │
@@ -34,7 +34,7 @@
 
 形态B：独立部署（业财税资金独立产品）
 ┌─────────────────────────────┐     ┌─────────────────────────────────────────┐
-│ 智链OS（或其它业务系统）      │     │ 业财税资金一体化服务 (独立进程/集群)      │
+│ 屯象OS（或其它业务系统）      │     │ 业财税资金一体化服务 (独立进程/集群)      │
 │ - Agent / 适配器 / 现有API   │     │ - 凭证规则引擎 / 总账 / 税务 / 资金 / 对账 │
 │ - 推送事件或调用开放API      │────▶│ - REST API + Webhook 入参                 │
 └─────────────────────────────┘     │ - 独立 DB / Redis / 可选消息队列          │
@@ -45,14 +45,14 @@
 
 | 原则 | 说明 |
 |------|------|
-| **模块可插拔** | 业财税资金功能通过配置/开关启用，未启用时不影响智链OS 原有启动与路由。 |
+| **模块可插拔** | 业财税资金功能通过配置/开关启用，未启用时不影响屯象OS 原有启动与路由。 |
 | **接口契约统一** | 合并与独立形态对外暴露同一套「业财事件 / 主数据 / 查询」契约，便于前端与集成一致。 |
-| **数据源可替换** | 业务数据可来自智链OS 适配器/Agent，也可来自独立部署时的外部系统（通过 API/文件/消息）。 |
-| **独立可运行** | 独立部署时仅依赖 DB/Redis 与配置，不依赖智链OS 进程；与智链OS 的对接通过 HTTP/消息完成。 |
+| **数据源可替换** | 业务数据可来自屯象OS 适配器/Agent，也可来自独立部署时的外部系统（通过 API/文件/消息）。 |
+| **独立可运行** | 独立部署时仅依赖 DB/Redis 与配置，不依赖屯象OS 进程；与屯象OS 的对接通过 HTTP/消息完成。 |
 
 ---
 
-## 二、模块边界与在智链OS 中的位置
+## 二、模块边界与在屯象OS 中的位置
 
 ### 2.1 新增/扩展组件
 
@@ -60,13 +60,13 @@
 |------|------|----------|----------|
 | **fct-api** | 业财税资金 REST API（凭证、总账、税务、资金、对账、报表） | 挂载在 API Gateway 下 `/api/v1/fct/*` | 独立服务唯一入口 |
 | **fct-core** | 凭证规则引擎、主数据服务、自动化凭证、成本分摊 | 与 Gateway 同进程或同集群内网调用 | 独立进程核心逻辑 |
-| **fct-integration** | 接收业务事件、拉取智链OS 或外部数据、推送事件到 fct-core | 订阅智链OS 事件 / 调用智链OS 只读 API | 仅对接外部系统 API/消息 |
+| **fct-integration** | 接收业务事件、拉取屯象OS 或外部数据、推送事件到 fct-core | 订阅屯象OS 事件 / 调用屯象OS 只读 API | 仅对接外部系统 API/消息 |
 | **业财税资金 Agent（可选）** | 自然语言查询、报表解读、审批建议等 | 注册到 AgentService，与决策/绩效等并列 | 独立形态可无或通过独立服务提供 |
 
-### 2.2 与智链OS 现有模块的关系
+### 2.2 与屯象OS 现有模块的关系
 
 ```
-智链OS 现有                    业财税资金扩展                数据流
+屯象OS 现有                    业财税资金扩展                数据流
 ─────────────────────────────────────────────────────────────────────────
 api/agents.py                  可选: finance_tax Agent        Agent 可读 fct 报表/凭证
 api/finance.py                 保留；fct 可复用权限与部分 API  现有 /finance 与 /fct 并存
@@ -77,8 +77,8 @@ packages/agents/performance   绩效与薪酬数据可入账到 fct      写入 
 reconciliation (对账)          可扩展为资金对账或复用逻辑     按需合并或独立
 ```
 
-- **合并形态**：fct-api、fct-core、fct-integration 以**可选包/命名空间**形式存在于智链OS 仓库（或子仓），通过 `settings.FCT_ENABLED` 或环境变量控制挂载与初始化。
-- **独立形态**：fct-* 单独仓库/镜像，独立部署；与智链OS 的集成仅通过「事件推送 + 开放 API」完成，无代码级依赖。
+- **合并形态**：fct-api、fct-core、fct-integration 以**可选包/命名空间**形式存在于屯象OS 仓库（或子仓），通过 `settings.FCT_ENABLED` 或环境变量控制挂载与初始化。
+- **独立形态**：fct-* 单独仓库/镜像，独立部署；与屯象OS 的集成仅通过「事件推送 + 开放 API」完成，无代码级依赖。
 
 ---
 
@@ -86,7 +86,7 @@ reconciliation (对账)          可扩展为资金对账或复用逻辑     按
 
 ### 3.1 业财事件（入参）
 
-业务侧（智链OS 或外部）向业财税资金推送「业财事件」，用于驱动自动凭证与对账。统一采用 **REST 或 消息体** 一致结构。
+业务侧（屯象OS 或外部）向业财税资金推送「业财事件」，用于驱动自动凭证与对账。统一采用 **REST 或 消息体** 一致结构。
 
 **端点（合并形态）**：`POST /api/v1/fct/events`  
 **端点（独立形态）**：`POST /api/v1/events` 或同一路径（由独立服务路由决定）
@@ -153,16 +153,16 @@ reconciliation (对账)          可扩展为资金对账或复用逻辑     按
 
 ### 3.4 认证与多租户
 
-- **合并形态**：复用智链OS 的 JWT、RBAC 与 `tenant_id`，fct 路由使用相同 `get_current_active_user` 与权限键（如 `fct:read` / `fct:write`）。
-- **独立形态**：独立服务自带 API Key 或 JWT 签发，请求头携带 `X-Tenant-Id` 或等价字段做租户隔离；与智链OS 对接时可为「系统级」密钥 + 租户标识。
+- **合并形态**：复用屯象OS 的 JWT、RBAC 与 `tenant_id`，fct 路由使用相同 `get_current_active_user` 与权限键（如 `fct:read` / `fct:write`）。
+- **独立形态**：独立服务自带 API Key 或 JWT 签发，请求头携带 `X-Tenant-Id` 或等价字段做租户隔离；与屯象OS 对接时可为「系统级」密钥 + 租户标识。
 
 ---
 
-## 四、智链OS 侧集成实现要点
+## 四、屯象OS 侧集成实现要点
 
 ### 4.1 事件来源：从适配器/Agent 到 fct
 
-- **推荐方式**：智链OS 在「日结完成、入库完成、平台结算拉取完成」等节点，向**内部事件总线**或**直接 HTTP 调用**发送业财事件；fct-integration 订阅或接收后写入 fct-core 队列并驱动凭证规则引擎。
+- **推荐方式**：屯象OS 在「日结完成、入库完成、平台结算拉取完成」等节点，向**内部事件总线**或**直接 HTTP 调用**发送业财事件；fct-integration 订阅或接收后写入 fct-core 队列并驱动凭证规则引擎。
 - **实现位置**：
   - 适配器层：在品智/天财/奥琦韦等适配器的「日结/订单汇总」接口成功回调中，组装 `store_daily_settlement` 等事件并推送。
   - 或由定时任务从现有 `orders` / `inventory` / `finance` 等表聚合后推送。
@@ -171,7 +171,7 @@ reconciliation (对账)          可扩展为资金对账或复用逻辑     按
 
 ### 4.2 配置与开关
 
-在智链OS 中通过配置控制业财税资金扩展是否启用，例如：
+在屯象OS 中通过配置控制业财税资金扩展是否启用，例如：
 
 ```yaml
 # config/zhilian.yaml 或 环境变量
@@ -185,7 +185,7 @@ fct:
 
 - `enabled: false`：不加载 fct 路由、不注册 fct Agent、不推送业财事件。
 - `mode: embedded`：使用同进程/同集群的 fct-api（合并交付）。
-- `mode: remote`：业财事件与查询请求发往 `base_url`（独立交付，智链OS 作为调用方）。
+- `mode: remote`：业财事件与查询请求发往 `base_url`（独立交付，屯象OS 作为调用方）。
 
 ### 4.3 路由挂载（合并形态）
 
@@ -213,23 +213,23 @@ if getattr(settings, "FCT_ENABLED", False):
 ### 5.1 运行边界
 
 - 独立服务仅包含：fct-api、fct-core、fct-integration（对接外部业务系统）、自身 DB/Redis。
-- 不依赖智链OS 的 FastAPI 应用、Agent 实现、适配器实现；不依赖企业微信/飞书。
+- 不依赖屯象OS 的 FastAPI 应用、Agent 实现、适配器实现；不依赖企业微信/飞书。
 
-### 5.2 与智链OS 的对接方式（独立形态）
+### 5.2 与屯象OS 的对接方式（独立形态）
 
 | 场景 | 方向 | 方式 |
 |------|------|------|
-| 业财事件入 fct | 智链OS → 业财税资金 | 智链OS 调用 `POST https://fct-service/api/v1/events`（或投递到客户指定的 MQ） |
-| 主数据 | 智链OS → 业财税资金 或 业财税资金 → 智链OS | 按需：业财税资金提供 `PUT /master/*` 供智链OS 同步；或业财税资金拉取智链OS 开放 API |
-| 报表/凭证查询 | 智链OS / 大屏 → 业财税资金 | 智链OS 或前端直连 `GET https://fct-service/api/v1/fct/reports/*`，带 API Key + 租户 |
+| 业财事件入 fct | 屯象OS → 业财税资金 | 屯象OS 调用 `POST https://fct-service/api/v1/events`（或投递到客户指定的 MQ） |
+| 主数据 | 屯象OS → 业财税资金 或 业财税资金 → 屯象OS | 按需：业财税资金提供 `PUT /master/*` 供屯象OS 同步；或业财税资金拉取屯象OS 开放 API |
+| 报表/凭证查询 | 屯象OS / 大屏 → 业财税资金 | 屯象OS 或前端直连 `GET https://fct-service/api/v1/fct/reports/*`，带 API Key + 租户 |
 
-### 5.3 与第三方业务系统对接（无智链OS）
+### 5.3 与第三方业务系统对接（无屯象OS）
 
 - 业财事件：第三方 POS/ERP 通过 HTTP 或 MQ 向独立服务推送同一套 `event_type` + `payload` 契约。
 - 主数据：第三方调用业财税资金的主数据 API 同步门店、客商、科目等。
 - 凭证/报表：由业财税资金产品自身提供前端或 API 给客户使用。
 
-这样同一套业财税资金产品可「带智链OS 卖」或「不带智链OS、对接客户已有系统」独立交付。
+这样同一套业财税资金产品可「带屯象OS 卖」或「不带屯象OS、对接客户已有系统」独立交付。
 
 ---
 
@@ -237,12 +237,12 @@ if getattr(settings, "FCT_ENABLED", False):
 
 ### 6.1 合并形态
 
-- **推荐**：与智链OS 共用 PostgreSQL，使用独立 schema（如 `fct`）存放凭证、总账、税务、资金、对账表，便于同库事务与联合查询；Redis 可共用或使用独立 key 前缀（如 `fct:`）。
-- **可选**：独立数据库实例（如 `fct_db`），通过连接串与智链OS 分离，适合对数据隔离有强要求的客户。
+- **推荐**：与屯象OS 共用 PostgreSQL，使用独立 schema（如 `fct`）存放凭证、总账、税务、资金、对账表，便于同库事务与联合查询；Redis 可共用或使用独立 key 前缀（如 `fct:`）。
+- **可选**：独立数据库实例（如 `fct_db`），通过连接串与屯象OS 分离，适合对数据隔离有强要求的客户。
 
 ### 6.2 独立形态
 
-- 独立服务自带 PostgreSQL（及可选 Redis/队列），不访问智链OS 库。
+- 独立服务自带 PostgreSQL（及可选 Redis/队列），不访问屯象OS 库。
 - 所有业务数据通过「事件 + 主数据 API」进入，不直连客户 POS/ERP 数据库（除非客户要求并单独开发连接器）。
 
 ### 6.3 数据模型要点（示意）
@@ -262,11 +262,11 @@ if getattr(settings, "FCT_ENABLED", False):
 
 | 项目 | 说明 |
 |------|------|
-| **产品名称** | 智链OS · 业财税资金一体化扩展包 |
-| **交付物** | 智链OS 部署包 + 启用 fct 的配置 + 可选 fct Agent；同一套部署文档与运维体系。 |
-| **依赖** | 智链OS 已就绪（含至少一种收银/ERP 适配器或可提供日结/订单数据）。 |
+| **产品名称** | 屯象OS · 业财税资金一体化扩展包 |
+| **交付物** | 屯象OS 部署包 + 启用 fct 的配置 + 可选 fct Agent；同一套部署文档与运维体系。 |
+| **依赖** | 屯象OS 已就绪（含至少一种收银/ERP 适配器或可提供日结/订单数据）。 |
 | **配置** | `FCT_ENABLED=true`，`fct.mode=embedded`，主数据与凭证规则按客户初始化。 |
-| **验收** | 日结/采购等事件推送后，能在智链OS 内看到 fct 凭证与报表；企业微信/飞书可选用 fct Agent 查询。 |
+| **验收** | 日结/采购等事件推送后，能在屯象OS 内看到 fct 凭证与报表；企业微信/飞书可选用 fct Agent 查询。 |
 
 ### 7.2 独立销售和交付
 
@@ -274,23 +274,23 @@ if getattr(settings, "FCT_ENABLED", False):
 |------|------|
 | **产品名称** | 业财税资金一体化平台（独立版） |
 | **交付物** | 独立部署包（同仓换入口 `fct_standalone_main` 或镜像）+ [独立部署指南](./fct-standalone-deployment.md) + 与业务系统对接规范（事件/主数据/报表 API）。 |
-| **依赖** | 客户提供业务系统（POS/ERP/智链OS 等）的推送能力（HTTP 或 MQ）或只读 API；客户提供主数据或接受从业务系统同步。 |
-| **配置** | 独立服务 `base_url`、数据库、Redis、与业务系统对接的 URL/密钥；若客户使用智链OS，在智链OS 侧配置 `fct.mode=remote` 与 `fct.base_url`。 |
+| **依赖** | 客户提供业务系统（POS/ERP/屯象OS 等）的推送能力（HTTP 或 MQ）或只读 API；客户提供主数据或接受从业务系统同步。 |
+| **配置** | 独立服务 `base_url`、数据库、Redis、与业务系统对接的 URL/密钥；若客户使用屯象OS，在屯象OS 侧配置 `fct.mode=remote` 与 `fct.base_url`。 |
 | **验收** | 客户业务系统推送业财事件后，独立服务生成凭证、总账、资金与税务数据；客户可通过独立服务前端或 API 查看报表与对账结果。 |
 
 ### 7.3 组合报价建议
 
-- **仅智链OS**：不包含 fct 模块，不涉及业财税资金报价。
-- **智链OS + 业财税资金（合并）**：按「智链OS 许可 + 业财税资金扩展许可」报价，实施时一次部署、统一升级。
-- **业财税资金（独立）**：按「业财税资金平台许可 + 对接实施」报价，可与智链OS 并行销售（客户先上业财税或先上智链OS 均可）。
+- **仅屯象OS**：不包含 fct 模块，不涉及业财税资金报价。
+- **屯象OS + 业财税资金（合并）**：按「屯象OS 许可 + 业财税资金扩展许可」报价，实施时一次部署、统一升级。
+- **业财税资金（独立）**：按「业财税资金平台许可 + 对接实施」报价，可与屯象OS 并行销售（客户先上业财税或先上屯象OS 均可）。
 
 ---
 
 ## 八、实施路线建议
 
-1. **Phase 1**：在智链OS 仓库内新增 `fct-api`、`fct-core` 最小闭环（事件接入 → 凭证规则 → 凭证存储 + 查询 API），配置开关与路由条件挂载，实现**合并形态**可交付。
-2. **Phase 2**：将 fct 抽离为可独立启动的服务（同一套代码或子仓），实现**独立形态**部署与文档；与智链OS 的对接仅通过「事件 + 查询 API」验证。
-3. **Phase 3**：完善主数据同步、资金对账、税务开票/申报对接与报表；可选业财税资金 Agent 与智链OS 决策/绩效等 Agent 的联动。
+1. **Phase 1**：在屯象OS 仓库内新增 `fct-api`、`fct-core` 最小闭环（事件接入 → 凭证规则 → 凭证存储 + 查询 API），配置开关与路由条件挂载，实现**合并形态**可交付。
+2. **Phase 2**：将 fct 抽离为可独立启动的服务（同一套代码或子仓），实现**独立形态**部署与文档；与屯象OS 的对接仅通过「事件 + 查询 API」验证。
+3. **Phase 3**：完善主数据同步、资金对账、税务开票/申报对接与报表；可选业财税资金 Agent 与屯象OS 决策/绩效等 Agent 的联动。
 
 ### 实施进度（开发记录）
 
@@ -298,14 +298,14 @@ if getattr(settings, "FCT_ENABLED", False):
 |------|------|------|
 | **Phase 1** | ✅ 已完成 | 事件接入、凭证规则（门店日结、采购入库）、凭证存储、总账余额汇总、查询 API、配置开关与条件挂载。 |
 | **Phase 1+** | ✅ 已完成 | 对账完成后自动推送日结事件；采购入库凭证规则；总账余额按科目汇总。 |
-| **Phase 2** | ✅ 已完成 | 独立服务形态：独立入口、API Key 认证、公开路由、部署文档；与智链OS 通过 HTTP 对接。 |
+| **Phase 2** | ✅ 已完成 | 独立服务形态：独立入口、API Key 认证、公开路由、部署文档；与屯象OS 通过 HTTP 对接。 |
 | **Phase 3** | ✅ 已完成 | 主数据同步（门店/客商/科目/银行）、资金流水与对账状态 API、税务发票/申报占位 API、业财期间汇总报表、FCT Agent（get_report/explain_voucher/reconciliation_status）。 |
 | **Phase 3+** | ✅ 已完成 | **业财税资金报表汇总及分析**：`GET /reports/aggregate` 四维汇总、`GET /reports/trend` 期间趋势；**按门店/区域拆分**：`GET /reports/by_entity`、`GET /reports/by_region`；**同比环比分析**：`GET /reports/comparison?compare_type=yoy|mom|qoq`；FCT Agent 支持 report_type=aggregate/trend/by_entity/by_region/comparison。 |
 | **行业对标与四流合一** | ✅ 已做 | 学习合思/金蝶/四流合一等行业方案，见 [业财税行业对标与完善路线图](./fct-industry-benchmark-and-roadmap.md)；**四流合一追溯**：事件 payload 可传 `invoice_no`、`source_doc_id`、`order_id` 等，生成凭证时写入 `voucher.attachments`，便于票-账-业务单关联。 |
 | **年度计划与达成分析** | ✅ 已完成 | **年度计划**：`PUT/GET /fct/plans` 维护业财税资金年度目标；**计划 vs 实际**：按日/周/月/季对比（含成本/资金）；每期及年度返回 **累计达成率**、**收入类剩余目标**（target_remaining / year_target_remaining：revenue、tax_amount、cash_in，正=未达成）、**成本/支出类剩余预算**（budget_remaining / year_budget_remaining：cost、cash_out，正=预算有余）；趋势含 cost，支持 quarter。 |
 | **Phase 4** | ✅ 已完成 | **费控/备用金**：备用金主档与流水（申请/冲销/还款）；**预算占位**：预算 upsert、占用校验、占用接口；**发票闭环**：发票与凭证关联、按凭证查发票、验真占位；**审批流占位**：审批记录创建与按业务单查询。详见 [行业对标与路线图](./fct-industry-benchmark-and-roadmap.md) 3.2。 |
 
-**Phase 1 代码位置（智链OS api-gateway）**：
+**Phase 1 代码位置（屯象OS api-gateway）**：
 
 - 配置：`src/core/config.py`（`FCT_ENABLED`, `FCT_MODE`, `FCT_BASE_URL`, `FCT_EVENT_TARGET`, `FCT_EVENT_HTTP_URL`）
 - 权限：`src/core/permissions.py`（`FCT_READ`, `FCT_WRITE`）
@@ -370,7 +370,7 @@ if getattr(settings, "FCT_ENABLED", False):
 **Phase 2 独立部署（代码与文档）**：
 
 - 独立服务入口：`apps/api-gateway/fct_standalone_main.py`（`uvicorn fct_standalone_main:app --port 8001`）
-- 公开 API（无智链OS 用户/权限依赖）：`src/api/fct_public.py`（API Key 认证 `X-API-Key`，契约与合并形态一致，含 Phase 4 备用金/预算/发票/审批路由）
+- 公开 API（无屯象OS 用户/权限依赖）：`src/api/fct_public.py`（API Key 认证 `X-API-Key`，契约与合并形态一致，含 Phase 4 备用金/预算/发票/审批路由）
 - 配置：`FCT_API_KEY`（可选，独立服务请求校验）
 - 部署与对接说明：[FCT 独立部署指南](./fct-standalone-deployment.md)
 - 契约：`POST /api/v1/events` 或 `POST /api/v1/fct/events` 接收业财事件；`GET /api/v1/fct/vouchers`、`/ledger/balances` 等查询；Phase 4 见上
@@ -381,14 +381,14 @@ if getattr(settings, "FCT_ENABLED", False):
 
 | 文档 | 关系 |
 |------|------|
-| [连锁餐饮业财税资金一体化数字化解决方案](./chain-restaurant-finance-tax-treasury-solution.md) | 业务方案：业/财/税/资金能力与实施建议；本技术方案在其基础上给出智链OS 扩展与双形态交付设计。 |
-| [业财税行业对标与完善路线图](./fct-industry-benchmark-and-roadmap.md) | 行业方案（合思/金蝶/四流合一）对标、智链OS 差距与 Phase 4/长期路线图；取长补短参考。 |
+| [连锁餐饮业财税资金一体化数字化解决方案](./chain-restaurant-finance-tax-treasury-solution.md) | 业务方案：业/财/税/资金能力与实施建议；本技术方案在其基础上给出屯象OS 扩展与双形态交付设计。 |
+| [业财税行业对标与完善路线图](./fct-industry-benchmark-and-roadmap.md) | 行业方案（合思/金蝶/四流合一）对标、屯象OS 差距与 Phase 4/长期路线图；取长补短参考。 |
 | [FCT 财务部门可正常使用完整性评估](./fct-completeness-for-finance-department.md) | 从连锁餐饮财务部门日常使用角度评估 FCT 完整性与缺口，P0/P1 已落地，P2/P3 待排期。 |
 | [FCT 完全闭环管理与操作检测报告](./fct-closed-loop-detection.md) | 按业务流检测业财税资金是否可完全闭环；结论与缺口清单（流水勾对、期间结账、申报取数、合并报表等）。 |
 | [FCT 最小工作台对接说明](./fct-workbench-integration.md) | 凭证/总账/资金录入等 API 的对接说明，供前端或第三方实现最小工作台。 |
-| [智链OS 系统架构](./architecture.md) | 本方案扩展其「应用层」与「数据/集成层」，增加 fct 模块与事件流。 |
+| [屯象OS 系统架构](./architecture.md) | 本方案扩展其「应用层」与「数据/集成层」，增加 fct 模块与事件流。 |
 | [API 适配器集成指南](../packages/api-adapters/INTEGRATION_GUIDE.md) | 适配器作为业财事件数据源，在日结/订单等回调中推送事件到 fct。 |
 
 ---
 
-*文档版本：v1.0 | 适用于智链OS 业财税资金扩展的技术评审与实施规划。*
+*文档版本：v1.0 | 适用于屯象OS 业财税资金扩展的技术评审与实施规划。*

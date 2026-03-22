@@ -452,8 +452,8 @@
 }
 
 .resChipActive {
-  background: var(--accent, #0AAF9A);
-  border-color: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
   color: #fff;
 }
 
@@ -617,7 +617,7 @@
 
 .customerAmount {
   font-size: 12px;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 .detailBody { display: flex; flex-direction: column; gap: 16px; }
@@ -685,7 +685,7 @@
 .funnelKpiValue {
   font-size: 22px;
   font-weight: 700;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 .funnelKpiLabel {
@@ -758,7 +758,7 @@
 .arKpiValue {
   font-size: 20px;
   font-weight: 700;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 .arKpiLabel {
@@ -895,7 +895,7 @@
 
 .targetPct {
   font-weight: 600;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 .targetDone {
@@ -912,7 +912,7 @@
 
 .targetBarFill {
   height: 100%;
-  background: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
   border-radius: 4px;
   transition: width 0.4s;
 }
@@ -954,7 +954,7 @@
   border-radius: 6px;
   padding: 6px 12px;
   font-size: 13px;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
   cursor: pointer;
   width: 100%;
   text-align: center;
@@ -1014,7 +1014,7 @@
 .excStatsBody { display: flex; flex-direction: column; gap: 12px; }
 .excStatsSummary { display: flex; gap: 24px; padding-bottom: 8px; border-bottom: 1px solid var(--border, #eee); }
 .excStatItem { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.excStatValue { font-size: 22px; font-weight: 700; color: var(--accent, #0AAF9A); }
+.excStatValue { font-size: 22px; font-weight: 700; color: var(--accent, #FF6B2C); }
 .excStatLabel { font-size: 12px; color: var(--text-secondary, #888); }
 .excStatsByType { display: flex; flex-direction: column; gap: 6px; }
 .excStatTypeRow { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -1050,7 +1050,7 @@
 .crossStoreId { font-size: 14px; font-weight: 600; color: var(--text-primary, #111); }
 .crossStoreMeta { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
 .crossStoreRight { text-align: right; }
-.crossStoreRevenue { font-size: 15px; font-weight: 700; color: var(--accent, #0AAF9A); }
+.crossStoreRevenue { font-size: 15px; font-weight: 700; color: var(--accent, #FF6B2C); }
 .crossStoreMargin { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
 
 /* ── Phase 13: 目标进度增强 ─────────────────────────────── */
@@ -1088,8 +1088,8 @@
   white-space: nowrap;
 }
 .chipActive {
-  background: var(--accent, #0AAF9A);
-  border-color: var(--accent, #0AAF9A);
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
   color: #fff;
 }
 
@@ -1105,7 +1105,7 @@
 }
 .quoteRow:last-child { border-bottom: none; }
 .quoteLeft  { flex: 1; min-width: 0; }
-.quoteAmount { font-size: 15px; font-weight: 700; color: var(--accent, #0AAF9A); }
+.quoteAmount { font-size: 15px; font-weight: 700; color: var(--accent, #FF6B2C); }
 .quoteMeta   { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
 .quoteRight  { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -1136,7 +1136,7 @@
 /* ── Phase 14: Hall Schedule ── */
 .hallSelector   { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .hallChip       { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border, #eee); background: #fff; font-size: 13px; cursor: pointer; }
-.hallChipActive { background: var(--accent, #0AAF9A); border-color: var(--accent, #0AAF9A); color: #fff; }
+.hallChipActive { background: var(--accent, #FF6B2C); border-color: var(--accent, #FF6B2C); color: #fff; }
 .hallBooked     { background: rgba(10, 175, 154, 0.12); border: 1px solid rgba(10, 175, 154, 0.4); }
 
 /* ── Phase 15: 服务品质 ── */
@@ -1161,7 +1161,7 @@
 .leadTimeBucketLabel { font-size: 11px; color: var(--text-secondary, #888); margin-bottom: 4px; }
 .leadTimeBucketCount { font-size: 20px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
 .leadTimeBar      { height: 4px; background: var(--border, #eee); border-radius: 2px; overflow: hidden; }
-.leadTimeBarFill  { height: 100%; background: var(--accent, #0AAF9A); border-radius: 2px; transition: width 0.4s; }
+.leadTimeBarFill  { height: 100%; background: var(--accent, #FF6B2C); border-radius: 2px; transition: width 0.4s; }
 
 /* ── Phase 15: 客户保留 ── */
 .retentionBody     { display: flex; flex-direction: column; gap: 12px; }
@@ -1175,7 +1175,7 @@
 .retentionTopRow:last-child { border-bottom: none; }
 .retentionTopName   { flex: 1; font-weight: 600; }
 .retentionTopOrders { color: var(--text-secondary, #888); width: 48px; }
-.retentionTopAmount { font-weight: 600; color: var(--accent, #0AAF9A); }
+.retentionTopAmount { font-weight: 600; color: var(--accent, #FF6B2C); }
 
 /* ── Phase 15: 取消分析 ── */
 .cancelBody     { display: flex; flex-direction: column; gap: 12px; }
@@ -1204,7 +1204,7 @@
 .deltaAbove      { color: #22c55e; }
 .deltaBelow      { color: #dc2626; }
 .deltaOnPar      { color: var(--text-secondary, #888); }
-.crossStoreSelf  { background: rgba(10, 175, 154, 0.06); border-left: 3px solid var(--accent, #0AAF9A); }
+.crossStoreSelf  { background: rgba(10, 175, 154, 0.06); border-left: 3px solid var(--accent, #FF6B2C); }
 
 /* ── Phase 16: 月度执行摘要 ── */
 .execSummaryBody  { display: flex; flex-direction: column; gap: 12px; }
@@ -1226,11 +1226,11 @@
 .pkgProfitBars    { display: flex; flex-direction: column; gap: 3px; }
 .pkgBar           { height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
 .pkgBarTheo       { height: 100%; background: #93c5fd; border-radius: 3px; }
-.pkgBarActual     { height: 100%; background: var(--accent, #0AAF9A); border-radius: 3px; }
+.pkgBarActual     { height: 100%; background: var(--accent, #FF6B2C); border-radius: 3px; }
 .pkgProfitOrderCnt{ font-size: 12px; color: var(--text-secondary, #888); text-align: right; }
 .pkgProfitLegend  { display: flex; gap: 12px; font-size: 11px; color: #888; padding-top: 4px; }
 .pkgLegendTheo    { color: #93c5fd; }
-.pkgLegendActual  { color: var(--accent, #0AAF9A); }
+.pkgLegendActual  { color: var(--accent, #FF6B2C); }
 
 /* ── Phase 17: 季节性 ──────────────────────────────────────── */
 .seasonalBody     { display: flex; flex-direction: column; gap: 8px; }
@@ -1238,11 +1238,11 @@
 .monthHeatRow     { display: flex; gap: 4px; flex-wrap: wrap; }
 .monthCell        { flex: 1; min-width: 28px; padding: 6px 4px; text-align: center;
                     font-size: 11px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; }
-.monthCellPeak    { background: var(--accent, #0AAF9A); color: #fff; border-color: var(--accent, #0AAF9A); font-weight: 700; }
+.monthCellPeak    { background: var(--accent, #FF6B2C); color: #fff; border-color: var(--accent, #FF6B2C); font-weight: 700; }
 .monthCellLow     { background: #f1f5f9; color: #cbd5e1; }
 .weekdayBars      { display: flex; gap: 6px; align-items: flex-end; height: 60px; }
 .weekdayBarItem   { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; justify-content: flex-end; }
-.weekdayBar       { width: 100%; background: var(--accent, #0AAF9A); border-radius: 2px 2px 0 0; min-height: 4px; }
+.weekdayBar       { width: 100%; background: var(--accent, #FF6B2C); border-radius: 2px 2px 0 0; min-height: 4px; }
 .weekdayLabel     { font-size: 11px; color: var(--text-secondary, #888); }
 
 /* ── Phase 17: 营收预测 ─────────────────────────────────────── */
@@ -1253,7 +1253,7 @@
 .forecastKpiValue { font-size: 18px; font-weight: 700; }
 .forecastKpiLabel { font-size: 11px; color: var(--text-secondary, #888); }
 .forecastProgress { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
-.forecastProgressBar { height: 100%; background: var(--accent, #0AAF9A); border-radius: 4px; transition: width .4s; }
+.forecastProgressBar { height: 100%; background: var(--accent, #FF6B2C); border-radius: 4px; transition: width .4s; }
 .forecastProgressLabel { font-size: 12px; color: var(--text-secondary, #888); }
 
 /* ── Phase 17: 运营简报 Tab ────────────────────────────────── */
@@ -1281,13 +1281,13 @@
 .srcRoiRow        { display: grid; grid-template-columns: 80px 1fr 100px; align-items: center; gap: 12px; }
 .srcName          { font-size: 13px; font-weight: 600; color: var(--text-primary, #111); }
 .srcBar           { position: relative; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
-.srcBarFill       { height: 100%; background: var(--accent, #0AAF9A); border-radius: 4px; transition: width 0.4s; }
+.srcBarFill       { height: 100%; background: var(--accent, #FF6B2C); border-radius: 4px; transition: width 0.4s; }
 .srcConv          { font-size: 12px; color: #64748b; text-align: right; }
 .srcRevenue       { font-size: 12px; color: var(--text-primary, #111); text-align: right; font-weight: 600; }
 
 .priceGrid        { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .priceBucket      { background: #f8fafc; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
-.priceBucketRange { font-size: 12px; font-weight: 700; color: var(--accent, #0AAF9A); }
+.priceBucketRange { font-size: 12px; font-weight: 700; color: var(--accent, #FF6B2C); }
 .priceBucketLabel { font-size: 11px; color: #94a3b8; }
 .priceBucketConv  { font-size: 15px; font-weight: 700; color: var(--text-primary, #111); }
 .priceBucketAvg   { font-size: 12px; color: #64748b; }
@@ -1304,7 +1304,7 @@
 .contractAlertRow:last-child { border-bottom: none; }
 .contractAlertDate { font-size: 13px; font-weight: 600; color: var(--text-primary, #111); }
 .contractAlertMeta { font-size: 12px; color: #64748b; margin-top: 2px; }
-.contractAlertAmount { font-size: 14px; font-weight: 700; color: var(--accent, #0AAF9A); }
+.contractAlertAmount { font-size: 14px; font-weight: 700; color: var(--accent, #FF6B2C); }
 .contractPhone     { font-size: 12px; color: #94a3b8; }
 
 /* ─── Phase 18: ReviewsTab ─── */
@@ -1321,7 +1321,7 @@
 .reviewStarCount   { font-size: 12px; color: var(--text-primary, #111); font-weight: 600; text-align: right; }
 .reviewTrendRow    { display: flex; align-items: flex-end; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
 .reviewTrendItem   { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 40px; }
-.reviewTrendBar    { width: 28px; background: var(--accent, #0AAF9A); border-radius: 3px 3px 0 0; min-height: 2px; }
+.reviewTrendBar    { width: 28px; background: var(--accent, #FF6B2C); border-radius: 3px 3px 0 0; min-height: 2px; }
 .reviewTrendLabel  { font-size: 10px; color: #94a3b8; white-space: nowrap; }
 .reviewLowList     { display: flex; flex-direction: column; gap: 12px; }
 .reviewLowRow      { padding: 10px; background: #fff5f5; border-radius: 8px; border-left: 3px solid #ef4444; }
@@ -1340,7 +1340,7 @@
 .rankingBody        { flex: 1; min-width: 0; }
 .rankingTitle       { font-size: 13px; font-weight: 600; color: var(--text-primary, #111); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rankingMeta        { font-size: 12px; color: #64748b; margin-top: 2px; }
-.rankingMargin      { font-size: 15px; font-weight: 700; color: var(--accent, #0AAF9A); flex-shrink: 0; }
+.rankingMargin      { font-size: 15px; font-weight: 700; color: var(--accent, #FF6B2C); flex-shrink: 0; }
 
 .costBreakdown      { display: flex; flex-direction: column; gap: 16px; }
 .costRow            { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: #f8fafc; border-radius: 8px; }
@@ -1351,7 +1351,7 @@
 .costSegBar         { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
 .costSegFill        { height: 100%; border-radius: 3px; transition: width 0.3s; }
 .costSegVal         { font-size: 11px; color: #64748b; text-align: right; }
-.costMargin         { font-size: 12px; font-weight: 600; color: var(--accent, #0AAF9A); text-align: right; }
+.costMargin         { font-size: 12px; font-weight: 600; color: var(--accent, #FF6B2C); text-align: right; }
 
 .agingGrid          { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .agingBucket        { background: #f8fafc; border-radius: 8px; padding: 12px; }
@@ -1379,7 +1379,7 @@
 
 .benchmarkChart     { display: flex; align-items: flex-end; gap: 4px; height: 100px; overflow-x: auto; padding-bottom: 4px; }
 .benchmarkItem      { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 32px; }
-.benchmarkBar       { width: 22px; background: var(--accent, #0AAF9A); border-radius: 3px 3px 0 0; min-height: 2px; }
+.benchmarkBar       { width: 22px; background: var(--accent, #FF6B2C); border-radius: 3px 3px 0 0; min-height: 2px; }
 .benchmarkLabel     { font-size: 10px; color: #94a3b8; white-space: nowrap; }
 
 /* ── Phase 21: 客户洞察 & 获客漏斗 ── */
@@ -1411,7 +1411,7 @@
 .funnelRow          { display: grid; grid-template-columns: 80px 1fr 40px 50px; align-items: center; gap: 8px; }
 .funnelLabel        { font-size: 12px; color: #374151; }
 .funnelBar          { background: #f3f4f6; border-radius: 3px; height: 14px; overflow: hidden; }
-.funnelFill         { height: 100%; background: var(--accent, #0AAF9A); border-radius: 3px; transition: width .3s; }
+.funnelFill         { height: 100%; background: var(--accent, #FF6B2C); border-radius: 3px; transition: width .3s; }
 .funnelCount        { font-size: 12px; font-weight: 600; color: #111827; text-align: right; }
 .funnelConv         { font-size: 11px; color: #16a34a; text-align: right; }
 
@@ -1450,14 +1450,14 @@
 .typeRow            { display: grid; grid-template-columns: 80px 1fr 40px; align-items: center; gap: 8px; }
 .typeLabel          { font-size: 12px; color: #374151; }
 .typeBarWrap        { background: #f3f4f6; border-radius: 3px; height: 12px; overflow: hidden; }
-.typeBar            { height: 100%; background: var(--accent, #0AAF9A); border-radius: 3px; transition: width .3s; }
+.typeBar            { height: 100%; background: var(--accent, #FF6B2C); border-radius: 3px; transition: width .3s; }
 .typePct            { font-size: 11px; color: #6b7280; text-align: right; }
 
 /* 营收预测 Tab */
 .revenueForecastTab { display: flex; flex-direction: column; gap: 16px; }
 .forecastChart      { display: flex; align-items: flex-end; gap: 4px; height: 110px; overflow-x: auto; padding-bottom: 20px; }
 .fcBarItem          { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 28px; flex: 1; }
-.fcBarActual        { width: 100%; background: var(--accent, #0AAF9A); border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; }
+.fcBarActual        { width: 100%; background: var(--accent, #FF6B2C); border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; }
 .fcBarForecast      { width: 100%; background: #94a3b8; border-radius: 2px 2px 0 0; min-height: 2px; border: 1px dashed #64748b; transition: height .3s; }
 .fcLabel            { font-size: 9px; color: #6b7280; white-space: nowrap; }
 
@@ -1561,7 +1561,7 @@
 .typeSeriesRow      { display: grid; grid-template-columns: 80px 1fr 48px; align-items: center; gap: 10px; }
 .typeSeriesLabel    { font-size: 12px; color: #374151; }
 .typeSeriesBar      { background: #f3f4f6; border-radius: 3px; height: 12px; overflow: hidden; }
-.typeSeriesFill     { height: 100%; background: var(--accent, #0AAF9A); border-radius: 3px; transition: width .3s; }
+.typeSeriesFill     { height: 100%; background: var(--accent, #FF6B2C); border-radius: 3px; transition: width .3s; }
 .typeSeriesTotal    { font-size: 12px; font-weight: 600; color: #374151; text-align: right; }
 
 /* 预警中心 Tab */

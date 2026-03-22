@@ -33,15 +33,15 @@
 }
 
 .quickBtn:hover {
-  border-color: #0AAF9A;
-  color: #0AAF9A;
+  border-color: #FF6B2C;
+  color: #FF6B2C;
   background: rgba(10, 175, 154, 0.08);
 }
 
 .quickBtnAccent {
-  background: #0AAF9A;
+  background: #FF6B2C;
   color: #fff;
-  border-color: #0AAF9A;
+  border-color: #FF6B2C;
 }
 
 .quickBtnAccent:hover {
@@ -161,7 +161,7 @@
 }
 
 .refreshIconBtn:hover {
-  color: #0AAF9A;
+  color: #FF6B2C;
   background: rgba(10, 175, 154, 0.08);
 }
 
@@ -209,7 +209,7 @@
 }
 
 .merchantCard:hover {
-  border-color: #0AAF9A;
+  border-color: #FF6B2C;
   box-shadow: 0 2px 12px rgba(10, 175, 154, 0.15);
   transform: translateY(-1px);
 }
@@ -369,7 +369,7 @@
 
 .suggestionImpact {
   font-size: 12px;
-  color: #0AAF9A;
+  color: #FF6B2C;
   font-weight: 500;
 }
 
@@ -380,7 +380,7 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #0AAF9A;
+  color: #FF6B2C;
   background: transparent;
   border: none;
   cursor: pointer;

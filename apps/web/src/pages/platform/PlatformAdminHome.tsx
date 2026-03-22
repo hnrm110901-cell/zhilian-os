@@ -315,7 +315,7 @@ const PlatformAdminHome: React.FC = () => {
 
       {/* ── 1. Hero KPI Bar ─────────────────────────────────────────── */}
       <div className={styles.heroBar}>
-        <ZKpi label="接入商户" value={stats.total_merchants} unit="家" change={0} changeLabel={`活跃 ${stats.active_merchants} 家`} size="lg" color="#0AAF9A" />
+        <ZKpi label="接入商户" value={stats.total_merchants} unit="家" change={0} changeLabel={`活跃 ${stats.active_merchants} 家`} size="lg" color="#FF6B2C" />
         <ZKpi label="管理门店" value={stats.total_stores} unit="家" change={0} changeLabel="全部门店" size="lg" />
         <ZKpi label="系统用户" value={stats.active_users} unit="人" change={0} changeLabel="活跃用户" size="lg" color="#722ED1" />
         <ZKpi
@@ -370,7 +370,7 @@ const PlatformAdminHome: React.FC = () => {
             <StatusRow label="Redis"      status={status.redis} />
           </div>
           <div className={styles.trendLabel}>API 可用率（近 7 天）</div>
-          <ChartTrend data={TREND_DATA} height={72} color="#0AAF9A" unit="%" />
+          <ChartTrend data={TREND_DATA} height={72} color="#FF6B2C" unit="%" />
         </ZCard>
       </div>
 
@@ -496,7 +496,7 @@ const MerchantCardItem: React.FC<{ merchant: MerchantCard; onClick: () => void }
 
 const eventTypeIcon: Record<SystemEvent['type'], React.ReactNode> = {
   system:   <ThunderboltOutlined style={{ color: '#6E6E73', fontSize: 12 }} />,
-  merchant: <CheckCircleOutlined style={{ color: '#0AAF9A', fontSize: 12 }} />,
+  merchant: <CheckCircleOutlined style={{ color: '#FF6B2C', fontSize: 12 }} />,
   ai:       <BulbOutlined        style={{ color: '#722ED1', fontSize: 12 }} />,
   alert:    <ClockCircleOutlined style={{ color: '#faad14', fontSize: 12 }} />,
 };

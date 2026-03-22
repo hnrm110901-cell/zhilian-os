@@ -263,7 +263,7 @@ const AuditLogPage: React.FC = () => {
         type: 'bar',
         data: systemStats.resource_stats.map((item: any) => item.count),
         itemStyle: {
-          color: '#0AAF9A',
+          color: '#FF6B2C',
         },
       },
     ],

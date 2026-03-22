@@ -23,7 +23,7 @@ const { Option } = Select;
 const BCG_CONFIG = {
   star:          { label: '明星菜', color: '#faad14', bg: '#fffbe6', icon: '⭐' },
   cash_cow:      { label: '现金牛', color: '#1A7A52', bg: 'rgba(26,122,82,0.08)', icon: '🐄' },
-  question_mark: { label: '问题菜', color: '#0AAF9A', bg: '#e6f4ff', icon: '❓' },
+  question_mark: { label: '问题菜', color: '#FF6B2C', bg: '#e6f4ff', icon: '❓' },
   dog:           { label: '瘦狗菜', color: '#C53030', bg: '#fff2f0', icon: '🐶' },
 } as const;
 
@@ -169,7 +169,7 @@ const DishProfitabilityPage: React.FC = () => {
     const seriesMap: Record<BcgKey, { name: string; color: string; data: [number, number, string, string][] }> = {
       star:          { name: '⭐明星菜', color: '#faad14', data: [] },
       cash_cow:      { name: '🐄现金牛', color: '#1A7A52', data: [] },
-      question_mark: { name: '❓问题菜', color: '#0AAF9A', data: [] },
+      question_mark: { name: '❓问题菜', color: '#FF6B2C', data: [] },
       dog:           { name: '🐶瘦狗菜', color: '#C53030', data: [] },
     };
     dishes.forEach(d => {
@@ -249,7 +249,7 @@ const DishProfitabilityPage: React.FC = () => {
     series: [
       { name: '毛利率%',    type: 'line', data: trend.map(t => t.gross_profit_margin.toFixed(1)), smooth: true, itemStyle: { color: '#1A7A52' } },
       { name: '食材成本率%', type: 'line', data: trend.map(t => t.food_cost_rate.toFixed(1)),      smooth: true, itemStyle: { color: '#C53030' } },
-      { name: '销量',       type: 'bar',  data: trend.map(t => t.order_count), yAxisIndex: 1, itemStyle: { color: '#0AAF9A', opacity: 0.6 } },
+      { name: '销量',       type: 'bar',  data: trend.map(t => t.order_count), yAxisIndex: 1, itemStyle: { color: '#FF6B2C', opacity: 0.6 } },
     ],
   });
 
@@ -367,7 +367,7 @@ const DishProfitabilityPage: React.FC = () => {
               value={dishes.length}
               suffix="道"
               prefix={<BarChartOutlined />}
-              valueStyle={{ color: '#0AAF9A' }}
+              valueStyle={{ color: '#FF6B2C' }}
             />
           </Card>
         </Col>

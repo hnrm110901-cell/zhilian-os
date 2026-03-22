@@ -13,7 +13,7 @@
 }
 
 /* 阶段标签色 */
-.phaseLaunch  { color: #0AAF9A; }
+.phaseLaunch  { color: #FF6B2C; }
 .phaseGrowth  { color: #1A7A52; font-weight: 600; }
 .phasePeak    { color: #389e0d; font-weight: 600; }
 .phaseDecline { color: #C8923A; }

@@ -1,1 +1,14 @@
-<svg id="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF8E53"/><stop offset="100%" stop-color="#FF6B35"/></linearGradient></defs><rect width="100" height="100" fill="url(#brandGradient)" rx="22.5"/><path d="M25,45 C25,25 45,20 60,25 C75,30 85,50 75,70 C65,90 40,85 30,75 C20,65 25,55 35,50 C45,45 60,55 55,70" fill="none" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="35" cy="48" r="3.5" fill="white"/></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  屯象OS · Omega Elephant Mark
+  Ω 象征「终极解决方案」，与「象」形成视觉双关
+  Squircle 容器 · 品牌色 #FF6B2C
+-->
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect fill="#FF6B2C" x="32" y="32" width="448" height="448" rx="96" ry="96"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 160 320 L 160 280 Q 160 160 256 160 Q 352 160 352 280 L 352 320"/>
+    <path d="M 160 320 L 200 320"/>
+    <path d="M 312 320 L 352 320"/>
+  </g>
+</svg>

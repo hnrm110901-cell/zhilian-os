@@ -364,7 +364,7 @@ const SupplyChainManagement: React.FC = () => {
               title="进行中订单"
               value={purchaseOrders.filter(o => ['approved', 'ordered', 'shipped'].includes(o.status)).length}
               prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#0AAF9A' }}
+              valueStyle={{ color: '#FF6B2C' }}
             />
           </Card>
         </Col>

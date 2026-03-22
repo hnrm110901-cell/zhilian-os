@@ -90,7 +90,7 @@ const STATUS_COLOR: Record<string, string> = {
 const TREND_ICON: Record<string, React.ReactNode> = {
   up: <RiseOutlined style={{ color: '#1A7A52' }} />,
   down: <FallOutlined style={{ color: '#C53030' }} />,
-  stable: <BarChartOutlined style={{ color: '#0AAF9A' }} />,
+  stable: <BarChartOutlined style={{ color: '#FF6B2C' }} />,
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────

@@ -54,7 +54,7 @@ const DishCostPage: React.FC = () => {
       type: 'bar',
       data: items.slice(0, 15).map((d: any) => ({
         value: d.profit_margin,
-        itemStyle: { color: d.profit_margin >= 60 ? '#1A7A52' : d.profit_margin >= 40 ? '#0AAF9A' : '#C53030' },
+        itemStyle: { color: d.profit_margin >= 60 ? '#1A7A52' : d.profit_margin >= 40 ? '#FF6B2C' : '#C53030' },
       })),
     }],
   };

@@ -24,7 +24,7 @@ const { Option } = Select;
 
 const TIER_CONFIG: Record<string, { label: string; color: string; antColor: string; rowClass: string }> = {
   excellent: { label: '优秀', color: '#1A7A52', antColor: 'green',  rowClass: 'rowExcellent' },
-  good:      { label: '良好', color: '#0AAF9A', antColor: 'blue',   rowClass: 'rowGood' },
+  good:      { label: '良好', color: '#FF6B2C', antColor: 'blue',   rowClass: 'rowGood' },
   fair:      { label: '一般', color: '#faad14', antColor: 'gold',   rowClass: 'rowFair' },
   poor:      { label: '较差', color: '#C53030', antColor: 'red',    rowClass: 'rowPoor' },
 };
@@ -32,7 +32,7 @@ const TIER_CONFIG: Record<string, { label: string; color: string; antColor: stri
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   immediate: { label: '立即介入', color: '#C53030', icon: <ExclamationCircleOutlined /> },
   monitor:   { label: '密切观察', color: '#faad14', icon: <EyeOutlined /> },
-  maintain:  { label: '保持现状', color: '#0AAF9A', icon: <CheckCircleOutlined /> },
+  maintain:  { label: '保持现状', color: '#FF6B2C', icon: <CheckCircleOutlined /> },
   promote:   { label: '重点推广', color: '#1A7A52', icon: <RocketOutlined /> },
 };
 
@@ -119,7 +119,7 @@ interface HistoryRec {
 
 function scoreBar(score: number, max = 100) {
   const pct = Math.round((score / max) * 100);
-  const color = pct >= 80 ? '#1A7A52' : pct >= 60 ? '#0AAF9A' : pct >= 40 ? '#faad14' : '#C53030';
+  const color = pct >= 80 ? '#1A7A52' : pct >= 60 ? '#FF6B2C' : pct >= 40 ? '#faad14' : '#C53030';
   return (
     <div style={{ minWidth: 110 }}>
       <Progress percent={pct} strokeColor={color} size="small" format={() => score.toFixed(1)} />
@@ -485,7 +485,7 @@ const DishHealthHistory: React.FC<{ storeId: string }> = ({ storeId }) => {
     series: [
       { name: '综合评分', type: 'line', symbol: 'circle', lineStyle: { width: 2 },
         data: sortedHistory.map(r => r.total_score),
-        itemStyle: { color: '#0AAF9A' } },
+        itemStyle: { color: '#FF6B2C' } },
       { name: '盈利能力', type: 'bar', stack: 'score', barMaxWidth: 30,
         data: sortedHistory.map(r => r.profitability_score),
         itemStyle: { color: 'rgba(82,196,26,0.6)' } },

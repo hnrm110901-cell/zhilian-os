@@ -28,7 +28,7 @@ const applyTheme = (theme: 'light' | 'dark') => {
   injectTokens();
   const metaThemeColor = document.querySelector('meta[name="theme-color"]');
   if (metaThemeColor) {
-    metaThemeColor.setAttribute('content', theme === 'dark' ? '#0B1A20' : '#0AAF9A');
+    metaThemeColor.setAttribute('content', theme === 'dark' ? '#0B1A20' : '#FF6B2C');
   }
 };
 

@@ -17,7 +17,7 @@ const tierColor: Record<string, string> = {
   VIP: 'gold', '高价值': 'blue', '中价值': 'green', '低价值': 'orange', '流失风险': 'red',
 };
 const eventIcon: Record<string, React.ReactNode> = {
-  order: <ShoppingOutlined style={{ color: '#0AAF9A' }} />,
+  order: <ShoppingOutlined style={{ color: '#FF6B2C' }} />,
   reservation: <CalendarOutlined style={{ color: '#1A7A52' }} />,
   pos_transaction: <CreditCardOutlined style={{ color: '#722ed1' }} />,
 };
@@ -92,7 +92,7 @@ const Customer360Page: React.FC = () => {
           <Col span={8}>
             <Card size="small" title="基础信息">
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <Avatar size={64} icon={<UserOutlined />} style={{ backgroundColor: '#0AAF9A' }} />
+                <Avatar size={64} icon={<UserOutlined />} style={{ backgroundColor: '#FF6B2C' }} />
                 <div style={{ marginTop: 8, fontWeight: 600, fontSize: 16 }}>
                   {profile.member_info?.name || profile.customer_identifier}
                 </div>

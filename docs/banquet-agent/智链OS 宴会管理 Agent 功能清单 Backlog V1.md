@@ -1,4 +1,4 @@
-# **《智链OS 宴会管理 Agent 功能清单 Backlog V1》**
+# **《屯象OS 宴会管理 Agent 功能清单 Backlog V1》**
 
 
 
@@ -6,7 +6,7 @@
 
 版本：V1.0
 
-产品名称：智链OS Banquet Agent
+产品名称：屯象OS Banquet Agent
 
 文档类型：研发排期版 Backlog
 
@@ -1605,7 +1605,7 @@ Epic K 权限、审计与基础配置
 
 
 
-目标：把宴会系统接入智链OS主干。
+目标：把宴会系统接入屯象OS主干。
 
 
 
@@ -2137,7 +2137,7 @@ V1 建议团队配置：
 
 
 
-**智链OS 宴会管理 Agent Backlog V1** 的本质是：
+**屯象OS 宴会管理 Agent Backlog V1** 的本质是：
 
 
 

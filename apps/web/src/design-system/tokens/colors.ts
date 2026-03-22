@@ -1,21 +1,20 @@
 /**
  * 屯象OS · 色彩Token
- * 品牌色: Mint #0AAF9A — v2 设计系统
- * 基于 v2 prototype workspace.html 设计规范
+ * 品牌色: Orange #FF6B2C — 品牌识别指南 v1.0
  */
 
-// ── Mint 品牌主色阶 ──
+// ── 品牌主色阶（橙色 #FF6B2C）──
 export const brand = {
-  50:  '#E6F7F5',
-  100: '#B3EBE4',
-  200: '#80DFD3',
-  300: '#4DD3C2',
-  400: '#26C9B4',
-  500: '#0AAF9A',  // Primary — --color-primary
-  600: '#099987',  // Hover
-  700: '#078070',  // Active/Pressed
-  800: '#056659',
-  900: '#034D43',
+  50:  '#FFF3ED',
+  100: '#FFE0D1',
+  200: '#FFCBB3',
+  300: '#FFB494',
+  400: '#FF9160',
+  500: '#FF6B2C',  // Primary — --color-primary
+  600: '#E85A1E',  // Hover
+  700: '#CC4A14',  // Active/Pressed
+  800: '#A63B0E',
+  900: '#802D0A',
 } as const;
 
 // ── 保留旧名 mint 作为别名，兼容现有引用 ──
@@ -82,7 +81,7 @@ export const dark = {
 
 // ── 快捷常量 ──
 export const colors = {
-  accent:  brand[500],   // #0AAF9A
+  accent:  brand[500],   // #FF6B2C
   green:   semantic.success,
   red:     semantic.danger,
   yellow:  warm.sun,

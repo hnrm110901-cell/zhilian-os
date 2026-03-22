@@ -94,7 +94,7 @@
 
 ## Phase 11 — 供应商管理 Agent（Supplier Intelligence）
 
-> 北极星：「乐才告诉你买了什么；智链OS告诉你该从谁买、多少钱、有没有风险。」
+> 北极星：「乐才告诉你买了什么；屯象OS告诉你该从谁买、多少钱、有没有风险。」
 
 ### 全部完成（2026-03-11）
 
@@ -176,8 +176,8 @@
 
 ## Phase 8 — 人力管理 Agent（Workforce Intelligence）
 
-> 来源：智链OS_人力管理Agent_产品设计方案.txt + 智链OS人力管理Agent架构.md（2026-03-08）
-> 北极星：「乐才告诉你昨天用了多少人工成本；智链OS告诉你明天少排1个人能多赚多少钱。」
+> 来源：屯象OS_人力管理Agent_产品设计方案.txt + 屯象OS人力管理Agent架构.md（2026-03-08）
+> 北极星：「乐才告诉你昨天用了多少人工成本；屯象OS告诉你明天少排1个人能多赚多少钱。」
 > 差异化定位：不做第二个乐才（合规管理工具），做连锁餐饮的**人力经营决策系统**
 
 ---
@@ -341,7 +341,7 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 
 
 
-> 来源：智链OS产品开发计划明细v2（融合Toast建议）2026-03-04
+> 来源：屯象OS产品开发计划明细v2（融合Toast建议）2026-03-04
 > North Star：续费率≥95% | 客户成本率降低2个点 | 客户ROI≥10x
 
 ### P0 — 本周（Week 1）
@@ -386,7 +386,7 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 
 ## Sprint v2.1 — 从"工具"到"主动外脑"
 
-> 来源：智链OS架构升级深度分析 + 三大设计假设重构方案（2026-03-05）
+> 来源：屯象OS架构升级深度分析 + 三大设计假设重构方案（2026-03-05）
 > 目标：系统主动找老板，老板30秒读懂生意状态
 > 原则：在现有代码上叠加能力层，不重写，不扩张 MVP 范围
 
@@ -452,7 +452,7 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 - [x] 为所有 package agent 测试目录添加 conftest.py（sys.path 修复）
 - [x] 新增私域运营 18个增长 action（AARRR 框架）
 - [x] 企微 webhook 接入私域 Agent 对话（P0/P1）
-- [x] 生成智链OS功能明细思维导图
+- [x] 生成屯象OS功能明细思维导图
 - [x] Phase 3 安全加固：SecurityHeadersMiddleware（防 XSS/点击劫持/MIME 嗅探/HSTS）
 - [x] Phase 3 安全加固：CORS 配置环境感知（明确 methods/headers，不使用 *）
 - [x] Phase 3 安全加固：Nginx SSL/TLS 配置（HTTP→HTTPS 重定向、TLS 1.2+、安全头、OCSP Stapling）

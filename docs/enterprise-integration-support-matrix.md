@@ -2,7 +2,7 @@
 
 更新日期：2026-03-12
 
-本文档以 `apps/api-gateway/src/api/enterprise.py` 的当前实现为准，描述企业微信、飞书、钉钉在智链OS中的真实支持状态。
+本文档以 `apps/api-gateway/src/api/enterprise.py` 的当前实现为准，描述企业微信、飞书、钉钉在屯象OS中的真实支持状态。
 
 ## 总览
 

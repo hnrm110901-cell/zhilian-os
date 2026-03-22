@@ -57,7 +57,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: var(--accent-bg, rgba(10,175,154,0.06));
+  background: var(--accent-bg, rgba(255,107,44,0.06));
 }
 
 .logoMark img {
@@ -108,13 +108,13 @@
 
 .domainTabActive {
   font-weight: 600;
-  color: var(--accent, #0AAF9A);
-  background: var(--accent-bg, rgba(10,175,154,0.06));
+  color: var(--accent, #FF6B2C);
+  background: var(--accent-bg, rgba(255,107,44,0.06));
 }
 
 .domainTabActive:hover {
-  color: var(--accent, #0AAF9A);
-  background: var(--accent-bg, rgba(10,175,154,0.06));
+  color: var(--accent, #FF6B2C);
+  background: var(--accent-bg, rgba(255,107,44,0.06));
 }
 
 /* ── Top Nav Right ── */
@@ -140,8 +140,8 @@
 }
 
 .searchTrigger:hover {
-  border-color: var(--accent, #0AAF9A);
-  box-shadow: 0 0 0 3px rgba(10,175,154,0.06);
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px rgba(255,107,44,0.06);
 }
 
 .searchKbd {
@@ -241,8 +241,8 @@
 }
 
 .sidebarSearch:focus-within {
-  border-color: var(--accent, #0AAF9A);
-  box-shadow: 0 0 0 3px rgba(10,175,154,0.06);
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px rgba(255,107,44,0.06);
   background: var(--surface, #FFFFFF);
 }
 
@@ -348,14 +348,14 @@
 }
 
 .sidebarItemActive {
-  color: var(--accent, #0AAF9A);
-  background: var(--accent-bg, rgba(10,175,154,0.06));
+  color: var(--accent, #FF6B2C);
+  background: var(--accent-bg, rgba(255,107,44,0.06));
   font-weight: 600;
 }
 
 .sidebarItemActive:hover {
-  background: var(--accent-bg, rgba(10,175,154,0.06));
-  color: var(--accent, #0AAF9A);
+  background: var(--accent-bg, rgba(255,107,44,0.06));
+  color: var(--accent, #FF6B2C);
 }
 
 .sidebarItemCollapsed {
@@ -387,8 +387,8 @@
 }
 
 .badgeBlue {
-  background: var(--accent-soft, rgba(10,175,154,0.07));
-  color: var(--accent, #0AAF9A);
+  background: var(--accent-soft, rgba(255,107,44,0.07));
+  color: var(--accent, #FF6B2C);
 }
 
 .badgeRed {
@@ -450,7 +450,7 @@
 
 .breadcrumb a:hover,
 .breadcrumbLink:hover {
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
 }
 
 .breadcrumbCurrent {

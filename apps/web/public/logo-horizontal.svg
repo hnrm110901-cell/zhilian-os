@@ -1,1 +1,18 @@
-<svg id="logo-horizontal" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0, 0)"><rect width="80" height="80" fill="#FF6B35" rx="18"/><path d="M25,45 C25,25 45,20 60,25 C75,30 85,50 75,70 C65,90 40,85 30,75 C20,65 25,55 35,50 C45,45 60,55 55,70" transform="scale(0.8) translate(12, 12)" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="50.4" r="3" fill="white"/></g><text x="100" y="55" font-family="PingFang SC, SF Pro Display, sans-serif" font-weight="bold" font-size="38" fill="#1D1D1F">屯象OS</text></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  屯象OS · 横排 Lockup
+  Ω Squircle + "屯象OS" 文字
+-->
+<svg width="320" height="80" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ω Icon (缩放至80x80) -->
+  <g transform="translate(0, 0)">
+    <rect fill="#FF6B2C" x="5" y="5" width="70" height="70" rx="15" ry="15"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" transform="translate(40, 40) scale(0.125) translate(-256, -256)">
+      <path d="M 160 320 L 160 280 Q 160 160 256 160 Q 352 160 352 280 L 352 320"/>
+      <path d="M 160 320 L 200 320"/>
+      <path d="M 312 320 L 352 320"/>
+    </g>
+  </g>
+  <!-- 品牌文字 -->
+  <text x="96" y="52" font-family="'Noto Sans SC', 'PingFang SC', 'SF Pro Display', sans-serif" font-weight="700" font-size="36" fill="#1D1D1F">屯象OS</text>
+</svg>

@@ -46,7 +46,7 @@ const STATUS_COLOR: Record<string, string> = {
   online:   '#1A7A52',
   offline:  '#C53030',
   degraded: '#C8923A',
-  upgrading:'#0AAF9A',
+  upgrading:'#FF6B2C',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -404,7 +404,7 @@ const EdgeHubNodesPage: React.FC = () => {
                       yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } },
                       series: [
                         { name: 'CPU%',  type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.cpuPct),  itemStyle: { color: '#C53030' }, lineStyle: { width: 1.5 }, showSymbol: false },
-                        { name: '内存%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.memPct),  itemStyle: { color: '#0AAF9A' }, lineStyle: { width: 1.5 }, showSymbol: false },
+                        { name: '内存%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.memPct),  itemStyle: { color: '#FF6B2C' }, lineStyle: { width: 1.5 }, showSymbol: false },
                         { name: '磁盘%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.diskPct), itemStyle: { color: '#1A7A52' }, lineStyle: { width: 1.5 }, showSymbol: false },
                       ],
                     }}

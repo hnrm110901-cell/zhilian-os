@@ -8,7 +8,7 @@
 
 | 形态 | 认证 | 基础路径 |
 |------|------|----------|
-| **合并形态**（智链OS 内） | JWT + 权限 `FCT_READ` / `FCT_WRITE` | `GET/POST/PATCH` 需带智链OS 登录 Token；路径前缀 `/api/v1/fct` |
+| **合并形态**（屯象OS 内） | JWT + 权限 `FCT_READ` / `FCT_WRITE` | `GET/POST/PATCH` 需带屯象OS 登录 Token；路径前缀 `/api/v1/fct` |
 | **独立形态** | 请求头 `X-API-Key: <FCT_API_KEY>` | 独立服务根路径下同一路径，如 `/api/v1/fct` 或 `/api/v1` |
 
 以下路径均相对于 FCT 前缀（如 `/api/v1/fct`）。

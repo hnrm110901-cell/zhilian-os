@@ -357,7 +357,7 @@ const WorkforcePage: React.FC = () => {
       label: '今日建议人数',
       value: forecast?.daily_peak_headcount ?? '—',
       unit: '人',
-      icon: <TeamOutlined style={{ color: '#0AAF9A' }} />,
+      icon: <TeamOutlined style={{ color: '#FF6B2C' }} />,
     },
     {
       label: '当前实际出勤',
@@ -594,7 +594,7 @@ const WorkforcePage: React.FC = () => {
       <AgentWorkspaceTemplate
         agentName="人力管理工作台"
         agentIcon="👥"
-        agentColor="#0AAF9A"
+        agentColor="#FF6B2C"
         description="客流预测 · 排班优化 · 人工成本控制 · 员工健康分析"
         status={loading ? 'idle' : 'running'}
         kpis={pageKpis}

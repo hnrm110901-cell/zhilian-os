@@ -49,7 +49,7 @@ const AGENT_META: Record<string, AgentMeta> = {
     description: '预测客流趋势，自动推荐最优排班方案，降低人力成本',
     route:       '/schedule',
     color:       '#e6f7ff',
-    accentHex:   '#0AAF9A',
+    accentHex:   '#FF6B2C',
     capabilities: ['客流预测', '班次推荐', '人力优化'],
   },
   inventory: {
@@ -183,7 +183,7 @@ function statusColor(status: string | null): string {
     case 'approved':  case 'executed':  return '#1A7A52';
     case 'rejected':                    return '#C53030';
     case 'modified':                    return '#C8923A';
-    case 'pending':                     return '#0AAF9A';
+    case 'pending':                     return '#FF6B2C';
     default:                            return '#8c8c8c';
   }
 }
@@ -258,7 +258,7 @@ const AgentHubPage: React.FC = () => {
       value: summary?.total_decisions ?? '—',
       unit: '次',
       iconBg: '#e6f7ff',
-      iconColor: '#0AAF9A',
+      iconColor: '#FF6B2C',
       icon: <ThunderboltOutlined />,
     },
     {
@@ -324,8 +324,8 @@ const AgentHubPage: React.FC = () => {
       type: 'line',
       smooth: true,
       data: trend.map(t => t.adoption_rate),
-      lineStyle: { color: '#0AAF9A', width: 2 },
-      itemStyle: { color: '#0AAF9A' },
+      lineStyle: { color: '#FF6B2C', width: 2 },
+      itemStyle: { color: '#FF6B2C' },
       areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
         { offset: 0, color: 'rgba(24,144,255,0.15)' },
         { offset: 1, color: 'rgba(24,144,255,0)' },
@@ -506,7 +506,7 @@ const AgentHubPage: React.FC = () => {
             <ZCard
               title={
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <RobotOutlined style={{ color: '#0AAF9A' }} />
+                  <RobotOutlined style={{ color: '#FF6B2C' }} />
                   <span>最近决策活动</span>
                 </div>
               }

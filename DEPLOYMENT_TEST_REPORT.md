@@ -1,4 +1,4 @@
-# 智链OS部署流程测试报告
+# 屯象OS部署流程测试报告
 # Zhilian OS Deployment Flow Test Report
 
 **测试日期**: 2026-02-22
@@ -128,7 +128,7 @@ curl -s -o /dev/null -w "%{http_code}" http://www.zlsjos.cn
 curl -s http://www.zlsjos.cn/api/v1/health
 # 结果: 无响应或重定向
 ```
-**结论**: 智链OS应用尚未部署（预期状态）
+**结论**: 屯象OS应用尚未部署（预期状态）
 
 ---
 
@@ -162,7 +162,7 @@ curl -s http://www.zlsjos.cn/api/v1/health
 
 ### ⚠ 待执行操作
 
-**智链OS应用尚未部署**，需要执行以下步骤：
+**屯象OS应用尚未部署**，需要执行以下步骤：
 
 ```bash
 # 步骤1: SSH连接到服务器

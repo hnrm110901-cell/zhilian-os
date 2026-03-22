@@ -49,7 +49,7 @@
 .statNum {
   font-size: 24px;
   font-weight: 700;
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .statLabel {
@@ -82,7 +82,7 @@
 }
 
 .tabActive {
-  color: #0AAF9A;
+  color: #FF6B2C;
   background: rgba(10, 175, 154, 0.06);
   font-weight: 600;
 }
@@ -151,7 +151,7 @@
 
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, #0AAF9A, #08C9B0);
+  background: linear-gradient(90deg, #FF6B2C, #08C9B0);
   border-radius: 3px;
   transition: width 0.3s ease;
 }
@@ -159,7 +159,7 @@
 .progressText {
   font-size: 12px;
   font-weight: 600;
-  color: #0AAF9A;
+  color: #FF6B2C;
   min-width: 36px;
   text-align: right;
 }
@@ -178,7 +178,7 @@
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(10, 175, 154, 0.08);
-  color: #0AAF9A;
+  color: #FF6B2C;
 }
 
 .certTag {

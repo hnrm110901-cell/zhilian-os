@@ -29,7 +29,7 @@
 /* Narrative */
 .narrativeCard {
   background: var(--bg-secondary, #f6f8fa);
-  border-left: 4px solid var(--accent, #0AAF9A);
+  border-left: 4px solid var(--accent, #FF6B2C);
 }
 .narrativeIcon { font-size: 16px; margin-right: 8px; }
 .narrativeText { font-size: 13px; color: var(--text-primary); line-height: 1.8; }
@@ -51,8 +51,8 @@
 }
 .tab:hover  { color: var(--text-primary); }
 .tabActive  {
-  color: var(--accent, #0AAF9A);
-  border-bottom-color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
   font-weight: 600;
 }
 

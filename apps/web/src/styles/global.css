@@ -28,7 +28,7 @@ body {
 
 /* ── Selection ── */
 ::selection {
-  background: rgba(10,175,154,0.15);
+  background: rgba(255,107,44,0.15);
   color: inherit;
 }
 
@@ -61,7 +61,7 @@ body {
 
 /* ── Focus Ring — Apple-style ── */
 :focus-visible {
-  outline: 2px solid var(--accent, #0AAF9A);
+  outline: 2px solid var(--accent, #FF6B2C);
   outline-offset: 2px;
   border-radius: var(--radius-sm, 8px);
 }
@@ -170,15 +170,15 @@ body {
 }
 
 .ant-btn-primary {
-  background: var(--accent, #0AAF9A) !important;
-  border-color: var(--accent, #0AAF9A) !important;
-  box-shadow: 0 2px 8px rgba(10,175,154,0.25) !important;
+  background: var(--accent, #FF6B2C) !important;
+  border-color: var(--accent, #FF6B2C) !important;
+  box-shadow: 0 2px 8px rgba(255,107,44,0.25) !important;
 }
 
 .ant-btn-primary:hover {
   background: var(--accent-hover, #099987) !important;
   border-color: var(--accent-hover, #099987) !important;
-  box-shadow: 0 4px 16px rgba(10,175,154,0.3) !important;
+  box-shadow: 0 4px 16px rgba(255,107,44,0.3) !important;
 }
 
 .ant-modal-content {
@@ -206,8 +206,8 @@ body {
 .ant-input-focused,
 .ant-select-focused .ant-select-selector,
 .ant-picker-focused {
-  border-color: var(--accent, #0AAF9A) !important;
-  box-shadow: 0 0 0 3px rgba(10,175,154,0.08) !important;
+  border-color: var(--accent, #FF6B2C) !important;
+  box-shadow: 0 0 0 3px rgba(255,107,44,0.08) !important;
 }
 
 .ant-tabs-tab {
@@ -265,7 +265,7 @@ body {
 }
 
 [data-theme='dark'] .ant-table-tbody > tr:hover > td {
-  background: rgba(10,175,154,0.04) !important;
+  background: rgba(255,107,44,0.04) !important;
 }
 
 [data-theme='dark'] .ant-progress-text {
@@ -277,8 +277,8 @@ body {
 }
 
 [data-theme='dark'] .ant-btn-primary {
-  background: #0AAF9A;
-  border-color: #0AAF9A;
+  background: #FF6B2C;
+  border-color: #FF6B2C;
 }
 
 [data-theme='dark'] .ant-btn-primary:hover {

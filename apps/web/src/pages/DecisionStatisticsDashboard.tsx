@@ -233,7 +233,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
               title="修改率"
               value={modificationRate.toFixed(1)}
               suffix="%"
-              valueStyle={{ color: '#0AAF9A' }}
+              valueStyle={{ color: '#FF6B2C' }}
             />
           </Card>
         </Col>
@@ -276,7 +276,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
                 <span style={{ width: 60 }}>已修改</span>
                 <Progress
                   percent={Math.round(modificationRate)}
-                  strokeColor="#0AAF9A"
+                  strokeColor="#FF6B2C"
                   style={{ flex: 1 }}
                 />
                 <span style={{ width: 40, textAlign: 'right' }}>{stats?.modified || 0}</span>

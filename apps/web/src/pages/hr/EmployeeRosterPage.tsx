@@ -36,9 +36,9 @@ const DetailTab: React.FC<{ label: string; active: boolean; onClick: () => void 
     onClick={onClick}
     style={{
       padding: '6px 16px', fontSize: 13, border: 'none', cursor: 'pointer',
-      background: active ? 'rgba(10,175,154,0.15)' : 'transparent',
-      color: active ? '#0AAF9A' : 'rgba(255,255,255,0.6)',
-      borderBottom: active ? '2px solid #0AAF9A' : '2px solid transparent',
+      background: active ? 'rgba(255,107,44,0.15)' : 'transparent',
+      color: active ? '#FF6B2C' : 'rgba(255,255,255,0.6)',
+      borderBottom: active ? '2px solid #FF6B2C' : '2px solid transparent',
     }}
   >{label}</button>
 );

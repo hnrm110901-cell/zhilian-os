@@ -301,7 +301,7 @@ const OrderPage: React.FC = () => {
               { title: '制作中', key: 'preparing', color: '#722ed1' },
               { title: '待上桌', key: 'ready', color: '#13c2c2' },
               { title: '已完成', key: 'completed_orders', color: '#1A7A52' },
-              { title: '今日营收', key: 'total_revenue', color: '#0AAF9A', prefix: '¥' },
+              { title: '今日营收', key: 'total_revenue', color: '#FF6B2C', prefix: '¥' },
             ].map(({ title, key, color, prefix }) => (
               <Col span={4} key={key}>
                 <Card size="small">
@@ -437,7 +437,7 @@ const OrderPage: React.FC = () => {
                 { title: '总订单数', value: statistics.total_orders },
                 { title: '已完成', value: statistics.completed_orders, color: '#1A7A52' },
                 { title: '已取消', value: statistics.cancelled_orders, color: '#C53030' },
-                { title: '总营收', value: `¥${Number(statistics.total_revenue || 0).toFixed(2)}`, color: '#0AAF9A' },
+                { title: '总营收', value: `¥${Number(statistics.total_revenue || 0).toFixed(2)}`, color: '#FF6B2C' },
                 { title: '均单价', value: `¥${Number(statistics.average_order_value || 0).toFixed(2)}` },
               ].map(({ title, value, color }) => (
                 <Col span={4} key={title}>

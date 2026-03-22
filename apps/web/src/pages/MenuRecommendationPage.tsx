@@ -38,7 +38,7 @@ interface RecommendationResponse {
 }
 
 const SCORE_FACTORS = [
-  { key: 'trend',      label: '趋势',    weight: '30%', color: '#0AAF9A' },
+  { key: 'trend',      label: '趋势',    weight: '30%', color: '#FF6B2C' },
   { key: 'margin',     label: '毛利',    weight: '25%', color: '#1A7A52' },
   { key: 'stock',      label: '库存',    weight: '20%', color: '#faad14' },
   { key: 'time_slot',  label: '时段',    weight: '15%', color: '#722ed1' },

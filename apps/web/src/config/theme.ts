@@ -1,6 +1,6 @@
 /**
  * 屯象OS · Ant Design 主题覆盖
- * v2 设计系统 — 深色主题 + Mint #0AAF9A
+ * 品牌色 Orange #FF6B2C — 品牌识别指南 v1.0
  */
 import { theme as antdTheme } from 'antd';
 import type { ThemeConfig } from 'antd';
@@ -10,7 +10,7 @@ const fontFamily = "'Inter', 'Noto Sans SC', 'PingFang SC', 'HarmonyOS Sans SC',
 // 亮色主题
 export const lightTheme: ThemeConfig = {
   token: {
-    colorPrimary:      '#0AAF9A',  // mint-500
+    colorPrimary:      '#FF6B2C',  // mint-500
     colorSuccess:      '#27AE60',
     colorWarning:      '#F2994A',
     colorError:        '#EB5757',
@@ -32,7 +32,7 @@ export const lightTheme: ThemeConfig = {
     },
     Menu: {
       darkItemBg: '#0B1A20',
-      darkItemSelectedBg: '#0AAF9A',
+      darkItemSelectedBg: '#FF6B2C',
     },
     Card: { borderRadiusLG: 12 },
     Button: { borderRadius: 8, controlHeight: 36 },
@@ -44,7 +44,7 @@ export const lightTheme: ThemeConfig = {
 // 暗色主题（默认）
 export const darkTheme: ThemeConfig = {
   token: {
-    colorPrimary:      '#0AAF9A',  // mint-500
+    colorPrimary:      '#FF6B2C',  // mint-500
     colorSuccess:      '#34D399',
     colorWarning:      '#FBBF24',
     colorError:        '#F87171',
@@ -68,7 +68,7 @@ export const darkTheme: ThemeConfig = {
     },
     Menu: {
       darkItemBg: '#0B1A20',
-      darkItemSelectedBg: '#0AAF9A',
+      darkItemSelectedBg: '#FF6B2C',
     },
     Card: { borderRadiusLG: 12 },
     Button: { borderRadius: 8, controlHeight: 36 },

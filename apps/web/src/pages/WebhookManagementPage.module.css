@@ -91,7 +91,7 @@
 .subUrl {
   font-size: 13px;
   font-family: 'JetBrains Mono', monospace;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
   word-break: break-all;
 }
 
@@ -159,7 +159,7 @@
 .eventCode {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
-  color: var(--accent, #0AAF9A);
+  color: var(--accent, #FF6B2C);
   flex-shrink: 0;
 }
 
@@ -198,7 +198,7 @@
 }
 
 .formInput:focus {
-  border-color: var(--accent, #0AAF9A);
+  border-color: var(--accent, #FF6B2C);
 }
 
 .formHint {

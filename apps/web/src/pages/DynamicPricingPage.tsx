@@ -41,7 +41,7 @@ const MASLOW_COLORS: Record<number, string> = {
   1: '#bfbfbf',
   2: '#91d5ff',
   3: '#1A7A52',
-  4: '#0AAF9A',
+  4: '#FF6B2C',
   5: '#722ed1',
 };
 

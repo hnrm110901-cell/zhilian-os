@@ -83,7 +83,7 @@ const SchedulerPage: React.FC = () => {
     <div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}><Card><Statistic title="计划任务总数" value={schedule.length} /></Card></Col>
-        <Col span={8}><Card><Statistic title="运行中" value={runningCount} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
+        <Col span={8}><Card><Statistic title="运行中" value={runningCount} valueStyle={{ color: '#FF6B2C' }} /></Card></Col>
         <Col span={8}><Card><Statistic title="已启用" value={pendingCount} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
       </Row>
 

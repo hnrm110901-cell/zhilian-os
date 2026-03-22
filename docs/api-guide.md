@@ -1,8 +1,8 @@
-# 智链OS API 使用指南
+# 屯象OS API 使用指南
 
 ## 概述
 
-智链OS API Gateway 提供了完整的RESTful API接口，用于管理中餐连锁品牌门店的智能运营系统。
+屯象OS API Gateway 提供了完整的RESTful API接口，用于管理中餐连锁品牌门店的智能运营系统。
 
 ## 基础信息
 

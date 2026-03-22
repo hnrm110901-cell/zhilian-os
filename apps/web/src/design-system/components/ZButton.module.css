@@ -26,10 +26,10 @@
 .primary {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(10,175,154,0.25);
+  box-shadow: 0 1px 3px rgba(255,107,44,0.25);
 }
 .primary:not(:disabled):hover {
-  box-shadow: 0 4px 14px rgba(10,175,154,0.3);
+  box-shadow: 0 4px 14px rgba(255,107,44,0.3);
   transform: translateY(-1px);
 }
 
@@ -37,7 +37,7 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-.secondary:not(:disabled):hover { background: rgba(10,175,154,0.12); }
+.secondary:not(:disabled):hover { background: rgba(255,107,44,0.12); }
 
 .ghost {
   background: transparent;

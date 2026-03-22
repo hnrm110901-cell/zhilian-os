@@ -106,7 +106,7 @@ const Dashboard: React.FC = () => {
           name: '目标线',
           data: kpiChartData.categories.map(() => 100),
           type: 'line',
-          itemStyle: { color: '#0AAF9A' },
+          itemStyle: { color: '#FF6B2C' },
           lineStyle: { type: 'dashed' },
         },
       ],

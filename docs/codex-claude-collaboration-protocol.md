@@ -1,4 +1,4 @@
-# Codex × Claude 协同开发协议（智链OS）
+# Codex × Claude 协同开发协议（屯象OS）
 
 更新时间：2026-03-08
 

@@ -279,7 +279,7 @@ const OpsMonitoringPage: React.FC = () => {
           {/* L1 设备层 */}
           <Col xs={24} sm={6}>
             <Card
-              title={<><DashboardOutlined style={{ color: '#0AAF9A' }} /> L1 设备层</>}
+              title={<><DashboardOutlined style={{ color: '#FF6B2C' }} /> L1 设备层</>}
               bodyStyle={{ padding: 16 }}
             >
               <Progress

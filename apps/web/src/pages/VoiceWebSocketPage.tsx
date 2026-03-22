@@ -128,7 +128,7 @@ const VoiceWebSocketPage: React.FC = () => {
     }
   };
 
-  const entryColor: Record<string, string> = { stt: '#0AAF9A', tts: '#1A7A52', dialog: '#722ed1', system: '#8c8c8c' };
+  const entryColor: Record<string, string> = { stt: '#FF6B2C', tts: '#1A7A52', dialog: '#722ed1', system: '#8c8c8c' };
   const entryLabel: Record<string, string> = { stt: 'STT', tts: 'TTS', dialog: '对话', system: '系统' };
 
   return (

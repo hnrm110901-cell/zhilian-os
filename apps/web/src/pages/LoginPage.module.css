@@ -70,7 +70,7 @@
 .brand {
   font-size: 26px;
   font-weight: 700;
-  color: #0AAF9A;
+  color: #FF6B2C;
   margin: 0 0 6px;
 }
 
@@ -116,7 +116,7 @@
 
 .tabActive {
   background: #FFFFFF;
-  color: #0AAF9A;
+  color: #FF6B2C;
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -138,12 +138,12 @@
 
 .tabContent :global(.ant-input-affix-wrapper:hover),
 .tabContent :global(.ant-input:hover) {
-  border-color: #0AAF9A !important;
+  border-color: #FF6B2C !important;
 }
 
 .tabContent :global(.ant-input-affix-wrapper-focused),
 .tabContent :global(.ant-input:focus) {
-  border-color: #0AAF9A !important;
+  border-color: #FF6B2C !important;
   box-shadow: 0 0 0 2px rgba(10, 175, 154, 0.12) !important;
 }
 
@@ -162,7 +162,7 @@
   height: 46px;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(135deg, #0AAF9A 0%, #078070 100%);
+  background: linear-gradient(135deg, #FF6B2C 0%, #078070 100%);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
@@ -221,7 +221,7 @@
 }
 
 .phoneInputRow:focus-within {
-  border-color: #0AAF9A;
+  border-color: #FF6B2C;
   box-shadow: 0 0 0 2px rgba(10, 175, 154, 0.12);
 }
 
@@ -273,7 +273,7 @@
 }
 
 .codeInput:focus {
-  border-color: #0AAF9A;
+  border-color: #FF6B2C;
   box-shadow: 0 0 0 2px rgba(10, 175, 154, 0.12);
 }
 
@@ -286,10 +286,10 @@
   flex-shrink: 0;
   width: 120px;
   height: 44px;
-  border: 1px solid #0AAF9A;
+  border: 1px solid #FF6B2C;
   border-radius: 8px;
   background: transparent;
-  color: #0AAF9A;
+  color: #FF6B2C;
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -352,10 +352,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 20px;
-  border: 1px solid #0AAF9A;
+  border: 1px solid #FF6B2C;
   border-radius: 8px;
   background: transparent;
-  color: #0AAF9A;
+  color: #FF6B2C;
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
@@ -520,7 +520,7 @@
 }
 
 .weworkConfigList a {
-  color: #0AAF9A;
+  color: #FF6B2C;
   text-decoration: underline;
 }
 
@@ -556,7 +556,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #0AAF9A;
+  background: #FF6B2C;
   color: #fff;
   font-size: 12px;
   font-weight: 700;

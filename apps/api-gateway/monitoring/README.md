@@ -2,7 +2,7 @@
 
 ## 概述
 
-智链OS使用Prometheus + Grafana + AlertManager构建完整的监控和告警系统。
+屯象OS使用Prometheus + Grafana + AlertManager构建完整的监控和告警系统。
 
 ## 架构
 

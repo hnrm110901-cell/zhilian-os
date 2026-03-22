@@ -71,7 +71,7 @@ const ForecastPage: React.FC = () => {
       xAxis: { type: 'category', data: [...history.map((d: any) => d.date), ...forecast.map((d: any) => d.date)] },
       yAxis: { type: 'value' },
       series: [
-        { name: '历史', type: 'line', data: history.map((d: any) => d.value), itemStyle: { color: '#0AAF9A' } },
+        { name: '历史', type: 'line', data: history.map((d: any) => d.value), itemStyle: { color: '#FF6B2C' } },
         { name: '预测', type: 'line', data: [...Array(history.length).fill(null), ...forecast.map((d: any) => d.value)], itemStyle: { color: '#C53030' }, lineStyle: { type: 'dashed' } },
       ],
     };

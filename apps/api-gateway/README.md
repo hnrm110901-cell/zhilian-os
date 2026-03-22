@@ -1,6 +1,6 @@
-# 智链OS API Gateway
+# 屯象OS API Gateway
 
-智链OS的API网关服务，提供统一的HTTP API接口访问所有智能体和业务功能。
+屯象OS的API网关服务，提供统一的HTTP API接口访问所有智能体和业务功能。
 
 ## 功能特性
 

@@ -15,7 +15,7 @@ interface ReviewItem {
 }
 
 const LEVEL_COLORS: Record<string, string> = {
-  S: '#0AAF9A', A: '#27AE60', B: '#2D9CDB', C: '#F2994A', D: '#EB5757',
+  S: '#FF6B2C', A: '#27AE60', B: '#2D9CDB', C: '#F2994A', D: '#EB5757',
 };
 
 const STATUS_LABELS: Record<string, string> = {

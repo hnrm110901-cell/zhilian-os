@@ -7,7 +7,7 @@
   background: var(--surface-hover); color: var(--text-tertiary);
   cursor: pointer; font-size: 13px;
 }
-.tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.tabActive { background: rgba(255,107,44,0.15); color: #FF6B2C; }
 
 /* 平台选择 */
 .platformPicker { display: flex; gap: 12px; margin-bottom: 20px; }
@@ -17,7 +17,7 @@
   text-align: center; transition: all 0.2s;
 }
 .platformCard:hover { border-color: var(--border); }
-.platformActive { border-color: #0AAF9A; background: rgba(10,175,154,0.08); }
+.platformActive { border-color: #FF6B2C; background: rgba(255,107,44,0.08); }
 .platformIcon { font-size: 32px; margin-bottom: 8px; }
 .platformName { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .platformDesc { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
@@ -48,11 +48,11 @@
   cursor: pointer; font-size: 13px; font-weight: 500;
 }
 .btn:hover { background: var(--surface-hover); }
-.btnPrimary { background: #0AAF9A; color: var(--bg); }
+.btnPrimary { background: #FF6B2C; color: var(--bg); }
 .btnPrimary:hover { background: #0CC4AD; }
 .btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btnSync { background: rgba(10,175,154,0.15); color: #0AAF9A; }
-.btnSync:hover { background: rgba(10,175,154,0.25); }
+.btnSync { background: rgba(255,107,44,0.15); color: #FF6B2C; }
+.btnSync:hover { background: rgba(255,107,44,0.25); }
 
 /* 状态卡 */
 .statusCard {
@@ -70,7 +70,7 @@
 .statusRunning { background: rgba(33,150,243,0.15); color: #2196F3; }
 .statsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .statItem { text-align: center; }
-.statNum { font-size: 20px; font-weight: 700; color: #0AAF9A; }
+.statNum { font-size: 20px; font-weight: 700; color: #FF6B2C; }
 .statLabel { font-size: 11px; color: var(--text-tertiary); }
 
 /* 测试结果 */

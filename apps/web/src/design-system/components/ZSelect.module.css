@@ -26,7 +26,7 @@
 .trigger:focus,
 .trigger.open {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(10,175,154,0.06);
+  box-shadow: 0 0 0 3px rgba(255,107,44,0.06);
 }
 
 .placeholder { color: var(--text-tertiary); }

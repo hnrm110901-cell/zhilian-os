@@ -18,7 +18,7 @@
 /* Severity left accent — subtle top bar instead of thick border */
 .high    { border-top: 2px solid #DC2626; }
 .medium  { border-top: 2px solid #D97706; }
-.low     { border-top: 2px solid #0AAF9A; }
+.low     { border-top: 2px solid #FF6B2C; }
 
 [data-theme='dark'] .high    { border-top-color: #F87171; }
 [data-theme='dark'] .medium  { border-top-color: #FBBF24; }

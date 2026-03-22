@@ -94,7 +94,7 @@ const healthColumns: ZTableColumn<any>[] = [
     render: (v: number, row: any) => {
       const pct = Math.min(100, Math.round(v || 0));
       const color = row.level === 'excellent' ? '#1A7A52'
-        : row.level === 'good'    ? '#0AAF9A'
+        : row.level === 'good'    ? '#FF6B2C'
         : row.level === 'warning' ? '#faad14'
         : '#C53030';
       return (

@@ -164,7 +164,7 @@ const GovDashboardPage: React.FC = () => {
       symbol: 'circle',
       symbolSize: 6,
       data: data.weekly_trend.map(w => w.adoption_rate),
-      itemStyle: { color: '#0AAF9A' },
+      itemStyle: { color: '#FF6B2C' },
       areaStyle: { color: 'rgba(22,119,255,0.08)' },
     }],
     grid: { left: 50, right: 20, top: 20, bottom: 30 },
@@ -183,7 +183,7 @@ const GovDashboardPage: React.FC = () => {
     series: [
       { name: '已采纳', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.approved), itemStyle: { color: '#1A7A52' } },
       { name: '已拒绝', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.rejected), itemStyle: { color: '#C53030' } },
-      { name: '已修改', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.modified), itemStyle: { color: '#0AAF9A' } },
+      { name: '已修改', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.modified), itemStyle: { color: '#FF6B2C' } },
       { name: '待决策', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.pending), itemStyle: { color: '#d9d9d9' } },
     ],
     grid: { left: 40, right: 20, top: 20, bottom: 50 },
@@ -257,7 +257,7 @@ const GovDashboardPage: React.FC = () => {
     <AgentWorkspaceTemplate
       agentName="AI 治理看板"
       agentIcon="🤖"
-      agentColor="#0AAF9A"
+      agentColor="#FF6B2C"
       description="决策采纳率 · 人工干预率 · Agent 健康度 · 信任分"
       status={(s?.pending_count ?? 0) > 10 ? 'warning' : loading ? 'idle' : 'running'}
       loading={loading}

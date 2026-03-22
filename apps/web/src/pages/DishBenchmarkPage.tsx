@@ -22,7 +22,7 @@ const { Option } = Select;
 // ── 配置 ──────────────────────────────────────────────────────────────────────
 const TIER_CONFIG: Record<string, { label: string; color: string; antColor: string; cls: string }> = {
   top:        { label: '标杆',   color: '#389e0d', antColor: 'success', cls: styles.tierTop },
-  above_avg:  { label: '良好',   color: '#0AAF9A', antColor: 'processing', cls: styles.tierAboveAvg },
+  above_avg:  { label: '良好',   color: '#FF6B2C', antColor: 'processing', cls: styles.tierAboveAvg },
   below_avg:  { label: '待改进', color: '#C8923A', antColor: 'warning', cls: styles.tierBelowAvg },
   laggard:    { label: '落后',   color: '#C53030', antColor: 'error', cls: styles.tierLaggard },
 };

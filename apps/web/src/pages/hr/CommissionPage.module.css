@@ -7,7 +7,7 @@
   background: var(--surface-hover); color: var(--text-tertiary);
   cursor: pointer; font-size: 13px;
 }
-.tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.tabActive { background: rgba(255,107,44,0.15); color: #FF6B2C; }
 .filterRow { display: flex; gap: 12px; margin-bottom: 16px; }
 .monthInput {
   padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
@@ -26,11 +26,11 @@
   padding: 10px 12px; color: var(--text-primary);
   border-bottom: 1px solid var(--surface-hover);
 }
-.amount { color: #0AAF9A; font-weight: 600; }
+.amount { color: #FF6B2C; font-weight: 600; }
 .empty { text-align: center; padding: 40px; color: var(--text-tertiary); }
 .badgeActive {
   display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
-  background: rgba(10,175,154,0.15); color: #0AAF9A;
+  background: rgba(255,107,44,0.15); color: #FF6B2C;
 }
 .badgeInactive {
   display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
