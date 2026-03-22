@@ -163,9 +163,18 @@ services/tx-agent/src/skills/（9 个技能 Agent）
 └── store_inspect/      — 门店巡检
 ```
 
+**tunxiang-os Agent 核心组件**（已实现）：
+- **base.py**（3.8KB）：`SkillAgent` 抽象基类 + `AgentResult` 数据类（含 confidence/constraints_passed/execution_ms）
+- **master.py**（4.7KB）：`MasterAgent` 编排器（register/dispatch/route_intent/multi_agent_execute）
+- **constraints.py**（5.2KB）：3 项约束检查（利润率≥15% / 食材24h过期 / 服务≤30分钟）
+- **memory_bus.py**（3.3KB）：Agent 间共享记忆总线（Finding + TTL 1h）
+- **decision_push.py**（4.4KB）：4 时段推送（08:00 晨会 / 12:00 损耗 / 17:30 备战 / 20:30 日结）
+- **9 个 Skill Agent**：每个 6~15KB，代码量充实
+
 **关键差异**：
 - zhilian-os 有 30 个 Agent（15 内置 + 15 独立包），覆盖面广但冗余
-- tunxiang-os 精简为 9 个 Skill Agent + 1 个 Master Agent，聚焦核心场景
+- tunxiang-os 精简为 9 个 Skill Agent + 1 个 Master Agent，架构更清晰
+- tunxiang-os 新增约束检查器（Constraint Checker）和记忆总线（Memory Bus），zhilian-os 缺少这些基础设施
 
 ---
 
@@ -185,7 +194,15 @@ services/tx-agent/src/skills/（9 个技能 Agent）
 | 微生活 | ✅ | ❌ |
 | Base 基类 | ✅ | ✅ |
 
-**结论**：tunxiang-os 目前仅实现了奥琦玮适配器，其余 9 个需要从 zhilian-os 迁移。
+**更正**：tunxiang-os 的 `shared/adapters/` 实际已实现完整的适配器注册体系：
+- **Base 基类**（5.1KB）：含 httpx 异步客户端、tenacity 重试、认证抽象
+- **Registry 注册中心**（7KB）：动态加载，按类型分 POS/预订/外卖/供应链/会员/财务 6 类
+- **品智 POS**（26.4KB）：MD5 签名认证，菜单/订单/财务全接口
+- **奥琦玮**（22.6KB + CRM 13.8KB）：API Key 认证，含 CRM 集成
+- **美团 SaaS**（17.6KB + 预订 2KB）：外卖 + 等位
+- 天财商龙、客如云、一订、饿了么、抖音、微生活、诺诺：已注册但实现程度不一
+
+**结论**：tunxiang-os 适配器体系比初步分析更完善，品智/奥琦玮/美团已有较完整实现。
 
 ---
 
@@ -241,4 +258,107 @@ services/tx-agent/src/skills/（9 个技能 Agent）
 
 ---
 
-*本报告基于 2026-03-22 两仓库 main 分支状态生成。*
+## 9. tunxiang-os 各微服务 API 明细
+
+### tx-trade（端口 8001）— 交易引擎
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/orders` | 创建订单 |
+| POST | `/orders/{id}/items` | 加菜 |
+| PATCH | `/orders/{id}/items/{item_id}` | 改数量 |
+| DELETE | `/orders/{id}/items/{item_id}` | 退菜 |
+| POST | `/orders/{id}/discount` | 打折 |
+| POST | `/orders/{id}/settle` | 结算 |
+| POST | `/orders/{id}/cancel` | 取消 |
+| GET | `/orders/{id}` | 查询订单 |
+| POST | `/orders/{id}/payments` | 支付 |
+| POST | `/orders/{id}/refund` | 退款 |
+| POST | `/orders/{id}/print/receipt` | 打印小票 |
+| POST | `/orders/{id}/print/kitchen` | 厨房打印 |
+
+### tx-supply（端口 8003）— 供应链
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/inventory` | 库存列表 |
+| POST | `/inventory/{id}/adjust` | 库存调整 |
+| GET | `/inventory/alerts` | 库存预警 |
+| GET/POST | `/procurement/plans` | 采购计划 |
+| POST | `/procurement/plans/{id}/approve` | 审批采购 |
+| GET | `/suppliers` | 供应商列表 |
+| GET | `/suppliers/{id}/rating` | 供应商评分 |
+| GET | `/suppliers/price-comparison` | 比价 |
+| GET | `/waste/top5` | Top5 损耗 |
+| GET | `/waste/rate` | 损耗率趋势 |
+| GET | `/demand/forecast` | 需求预测（7天+） |
+
+### tx-member（端口 8004）— 会员
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST | `/customers` | 客户 CRUD |
+| GET | `/customers/{id}` | Golden ID 360° 画像 |
+| GET | `/customers/{id}/orders` | 消费历史 |
+| GET | `/rfm/segments` | RFM 分层（S1-S5） |
+| GET | `/rfm/at-risk` | 流失风险客户 |
+| GET/POST | `/campaigns` | 营销活动 |
+| POST | `/campaigns/{id}/trigger` | 触发活动 |
+| GET | `/journeys` | 客户旅程 |
+| POST | `/customers/merge` | Golden ID 合并 |
+
+### tx-org（端口 8006）— 组织
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| CRUD | `/employees` | 员工管理 |
+| GET | `/employees/{id}/performance` | 绩效（含提成） |
+| GET | `/labor-cost` | 人力成本分析 |
+| POST | `/attendance/clock-in` | 打卡 |
+| GET | `/training/plans` | 培训计划 |
+| GET | `/turnover-risk` | 离职风险预测 |
+| GET | `/schedule` | 排班 |
+
+### tx-analytics（端口 8007）— 分析
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/stores/health` | 门店健康度（5 维评分） |
+| GET | `/stores/{id}/brief` | 叙事引擎概要 |
+| GET | `/kpi/alerts` | KPI 预警 |
+| GET | `/kpi/trend` | KPI 趋势（30天） |
+| GET | `/reports/daily` | 日报 |
+| GET | `/reports/weekly` | 周报 |
+| GET | `/decisions/top3` | AI Top3 建议 |
+| GET | `/scenario` | 场景识别 |
+| GET | `/cross-store/insights` | 跨店洞察 |
+| GET | `/bff/hq/{brand_id}` | 总部 BFF（30s 缓存） |
+| GET | `/bff/sm/{store_id}` | 店长 BFF |
+
+### tx-agent（端口 8008）— Agent OS
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/agents` | 已注册 Agent 列表 |
+| POST | `/dispatch` | 按 agent_id + action 调度 |
+
+### 门店健康度评分权重（tx-analytics）
+| 维度 | 权重 | 目标值 |
+|------|------|--------|
+| 营收完成率 | 30% | 日目标 100% |
+| 翻台率 | 20% | 2.0 次/小时 |
+| 成本率 | 25% | 预算偏差 ≤ 2% |
+| 投诉率 | 15% | 越低越好 |
+| 人效 | 10% | ≥ ¥500/人·小时 |
+
+---
+
+## 10. 测试覆盖对比
+
+| 维度 | zhilian-os | tunxiang-os |
+|------|-----------|-------------|
+| 总测试数 | 分散在各 packages | **173 tests passing** |
+| tx-agent 测试 | — | 76 tests |
+| tx-analytics 测试 | — | 40 tests |
+| tx-trade 测试 | — | 26 tests |
+| tx-supply 测试 | — | 21 tests |
+| 集成测试 | — | 10 tests |
+| 测试框架 | pytest + pytest-asyncio | pytest + pytest-asyncio（asyncio_mode=auto） |
+
+---
+
+*本报告基于 2026-03-22 两仓库 main 分支状态生成，含 tunxiang-os 服务层源码级分析。*
