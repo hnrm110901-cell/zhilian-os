@@ -38,21 +38,77 @@ GATEWAY_DIR = os.path.join(SCRIPT_DIR, "..")
 sys.path.insert(0, GATEWAY_DIR)
 
 
-async def main(start_date: date, end_date: date, brand_ids: list, output_dir: str):
+async def main(start_date: date, end_date: date, brand_ids: list, output_dir: str,
+               split_by_brand: bool = False):
     """生成报告主流程"""
     from src.core.database import get_db_session
-    from src.services.ops_analysis_report_service import OpsAnalysisReportService
+    from src.services.ops_analysis_report_service import (
+        OpsAnalysisReportService,
+        SEED_MERCHANTS,
+    )
 
     print(f"\n{'='*60}")
     print(f"  屯象OS · 多品牌运营分析报告生成器")
     print(f"  报告周期: {start_date} 至 {end_date}")
     print(f"  品牌范围: {'全部种子客户' if not brand_ids else ', '.join(brand_ids)}")
+    if split_by_brand:
+        print(f"  模式: 按品牌分文件输出")
     print(f"{'='*60}\n")
 
     os.makedirs(output_dir, exist_ok=True)
 
+    if split_by_brand:
+        # 按品牌分别生成独立报告
+        merchants = SEED_MERCHANTS
+        if brand_ids:
+            merchants = [m for m in SEED_MERCHANTS if m["brand_id"] in brand_ids]
+
+        async with get_db_session() as db:
+            for i, merchant in enumerate(merchants, 1):
+                bid = merchant["brand_id"]
+                brand_name = merchant["brand_name"]
+                # 文件名安全处理：用 brand_id 作为后缀
+                file_slug = bid.lower().replace("brd_", "")
+
+                print(f"[{i}/{len(merchants)}] 生成 {brand_name} 报告...")
+
+                report = await OpsAnalysisReportService.generate(
+                    db=db, start_date=start_date, end_date=end_date,
+                    brand_ids=[bid],
+                )
+
+                # JSON
+                json_path = os.path.join(
+                    output_dir,
+                    f"ops_analysis_{start_date}_{end_date}_{file_slug}.json",
+                )
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(report, f, ensure_ascii=False, indent=2, default=str)
+                print(f"    JSON: {json_path}")
+
+                # HTML
+                html = await OpsAnalysisReportService.generate_html(
+                    db=db, start_date=start_date, end_date=end_date,
+                    brand_ids=[bid],
+                )
+                html_path = os.path.join(
+                    output_dir,
+                    f"ops_analysis_{start_date}_{end_date}_{file_slug}.html",
+                )
+                with open(html_path, "w", encoding="utf-8") as f:
+                    f.write(html)
+                print(f"    HTML: {html_path}")
+
+                _print_brand_summary(report)
+
+        print(f"\n{'='*60}")
+        print(f"  {len(merchants)} 个品牌报告生成完成！")
+        print(f"  输出目录: {output_dir}")
+        print(f"{'='*60}\n")
+        return
+
+    # 合并模式（原有逻辑）
     async with get_db_session() as db:
-        # 生成JSON报告
         print("[1/3] 生成报告数据...")
         report = await OpsAnalysisReportService.generate(
             db=db,
@@ -61,16 +117,14 @@ async def main(start_date: date, end_date: date, brand_ids: list, output_dir: st
             brand_ids=brand_ids or None,
         )
 
-        # 保存JSON
         json_path = os.path.join(
             output_dir,
             f"ops_analysis_{start_date}_{end_date}.json",
         )
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2, default=str)
-        print(f"    ✓ JSON: {json_path}")
+        print(f"    JSON: {json_path}")
 
-        # 生成HTML报告
         print("[2/3] 生成HTML报告...")
         html = await OpsAnalysisReportService.generate_html(
             db=db,
@@ -84,33 +138,36 @@ async def main(start_date: date, end_date: date, brand_ids: list, output_dir: st
         )
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html)
-        print(f"    ✓ HTML: {html_path}")
+        print(f"    HTML: {html_path}")
 
-        # 打印摘要
         print("\n[3/3] 报告摘要:")
-        print(f"    报告周期: {report['period']}")
-        print(f"    品牌数量: {report['brand_count']}")
-        print()
-
-        for c in report.get("cross_brand_comparison", []):
-            status_icon = {"正常": "✅", "偏高": "⚠️", "超标": "❌"}.get(
-                c["cost_status"], "❓"
-            )
-            print(f"    【{c['brand_name']}】")
-            print(f"      营收: ¥{c['revenue_yuan']:,.0f}")
-            print(f"      订单: {c['orders']:,} 单")
-            print(f"      客单价: ¥{c['avg_ticket_yuan']:.0f}")
-            print(f"      成本率: {c['food_cost_pct']:.1f}% {status_icon}")
-            print(f"      损耗率: {c['waste_pct']:.1f}%")
-            print(f"      决策采纳: {c['decision_adoption_pct']:.0f}%")
-            print(f"      AI节省: ¥{c['saving_yuan']:,.0f}")
-            print()
+        _print_brand_summary(report)
 
     print(f"{'='*60}")
     print(f"  报告生成完成！")
     print(f"  HTML报告路径: {html_path}")
     print(f"  （用浏览器打开即可打印为PDF）")
     print(f"{'='*60}\n")
+
+
+def _print_brand_summary(report: dict):
+    """打印品牌报告摘要"""
+    print(f"    报告周期: {report['period']}")
+    print(f"    品牌数量: {report['brand_count']}")
+    print()
+    for c in report.get("cross_brand_comparison", []):
+        status_icon = {"正常": "✅", "偏高": "⚠️", "超标": "❌"}.get(
+            c["cost_status"], "❓"
+        )
+        print(f"    【{c['brand_name']}】")
+        print(f"      营收: ¥{c['revenue_yuan']:,.0f}")
+        print(f"      订单: {c['orders']:,} 单")
+        print(f"      客单价: ¥{c['avg_ticket_yuan']:.0f}")
+        print(f"      成本率: {c['food_cost_pct']:.1f}% {status_icon}")
+        print(f"      损耗率: {c['waste_pct']:.1f}%")
+        print(f"      决策采纳: {c['decision_adoption_pct']:.0f}%")
+        print(f"      AI节省: ¥{c['saving_yuan']:,.0f}")
+        print()
 
 
 if __name__ == "__main__":
@@ -133,6 +190,10 @@ if __name__ == "__main__":
         "--output-dir", default="./reports",
         help="输出目录 (默认: ./reports)"
     )
+    parser.add_argument(
+        "--split-by-brand", action="store_true",
+        help="按品牌分别生成独立报告文件"
+    )
 
     args = parser.parse_args()
 
@@ -147,4 +208,4 @@ if __name__ == "__main__":
         print("错误: 开始日期不能晚于结束日期")
         sys.exit(1)
 
-    asyncio.run(main(start, end, args.brand, args.output_dir))
+    asyncio.run(main(start, end, args.brand, args.output_dir, args.split_by_brand))

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>最黔线 · 运营分析报告</title>
+  <style>
+    @media print { @page { size: A4 landscape; margin: 12mm; } }
+    * { box-sizing: border-box; }
+    body { font-family: 'Noto Sans SC', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif; color: #333; margin: 0; padding: 24px; font-size: 13px; line-height: 1.6; background: #fafafa; }
+    h1 { font-size: 24px; color: #FF6B2C; margin-bottom: 4px; }
+    h2 { font-size: 18px; color: #1a1a1a; border-bottom: 3px solid #FF6B2C; padding-bottom: 6px; margin-top: 32px; }
+    h3 { font-size: 14px; color: #595959; margin-top: 20px; margin-bottom: 8px; }
+    .subtitle { color: #8c8c8c; margin: 0 0 20px 0; }
+    .cuisine-tag { background: #fff7e6; color: #fa8c16; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 8px; }
+    .store-tag { background: #e6f7ff; color: #1890ff; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 4px; }
+    .pos-tag { background: #f6ffed; color: #52c41a; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 4px; }
+    .badge-error { background: #fff2f0; color: #f5222d; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: normal; margin-left: 8px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0; }
+    .kpi-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 12px 16px; text-align: center; }
+    .kpi-label { font-size: 11px; color: #8c8c8c; margin-bottom: 4px; }
+    .kpi-value { font-size: 20px; font-weight: 700; color: #1a1a1a; }
+    .kpi-value small { font-size: 11px; color: #8c8c8c; font-weight: normal; }
+    .tbl { width: 100%; border-collapse: collapse; margin: 8px 0; background: #fff; }
+    .th { background: #FF6B2C; color: #fff; padding: 8px 12px; text-align: left; font-size: 12px; font-weight: 600; }
+    .td { padding: 6px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .brand-section { background: #fff; border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #e8e8e8; page-break-inside: avoid; }
+    .comparison-section { background: #fff; border-radius: 12px; padding: 24px; margin: 20px 0; border: 2px solid #FF6B2C; }
+    .footer { margin-top: 36px; text-align: center; color: #bfbfbf; font-size: 11px; }
+    .data-sources { margin-top: 16px; color: #8c8c8c; font-size: 11px; }
+    .data-sources li { margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <h1>屯象经营助手 · 最黔线运营分析报告</h1>
+  <p class="subtitle">2026-03-01 至 2026-03-20 · 生成于 2026-03-22 06:42</p>
+  
+  
+        <div class="brand-section">
+          <h2>最黔线
+            <span class="cuisine-tag">贵州菜</span>
+            <span class="store-tag">6家门店</span>
+            <span class="pos-tag">品智收银</span>
+          </h2>
+          <h3>核心经营指标</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-label">总营收</div><div class="kpi-value">¥2,840,624</div></div>
+            <div class="kpi-card"><div class="kpi-label">总订单</div><div class="kpi-value">43,989</div></div>
+            <div class="kpi-card"><div class="kpi-label">总客流</div><div class="kpi-value">31,195</div></div>
+            <div class="kpi-card"><div class="kpi-label">日均营收</div><div class="kpi-value">¥142,031</div></div>
+            <div class="kpi-card"><div class="kpi-label">客单价</div><div class="kpi-value">¥65</div></div>
+            <div class="kpi-card"><div class="kpi-label">周末日均</div><div class="kpi-value">¥171,102</div></div>
+            <div class="kpi-card"><div class="kpi-label">工作日日均</div><div class="kpi-value">¥132,341</div></div>
+            <div class="kpi-card"><div class="kpi-label">周末提升</div><div class="kpi-value">+29.3%</div></div>
+          </div>
+          <h3>成本分析</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-label">食材成本</div><div class="kpi-value">¥894,797</div></div>
+            <div class="kpi-card"><div class="kpi-label">食材成本率</div><div class="kpi-value" style="color:#52c41a;">31.5%<small>（目标 33%）</small></div></div>
+            <div class="kpi-card"><div class="kpi-label">损耗成本</div><div class="kpi-value">¥68,175</div></div>
+            <div class="kpi-card"><div class="kpi-label">损耗率</div><div class="kpi-value">2.4%<small>（目标 3%）</small></div></div>
+          </div>
+          <h3>AI决策执行</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-label">总决策数</div><div class="kpi-value">29</div></div>
+            <div class="kpi-card"><div class="kpi-label">已执行</div><div class="kpi-value">19</div></div>
+            <div class="kpi-card"><div class="kpi-label">采纳率</div><div class="kpi-value">66%</div></div>
+            <div class="kpi-card"><div class="kpi-label">节省金额</div><div class="kpi-value">¥31,368</div></div>
+          </div>
+          <h3>门店营收排名</h3>
+          <table class="tbl"><thead><tr><th class="th">排名</th><th class="th">门店</th><th class="th">订单量</th><th class="th">营收</th></tr></thead><tbody><tr><td class="td">1</td><td class="td">最黔线·万达广场店</td><td class="td num">8,000</td><td class="td num">¥520,000</td></tr><tr><td class="td">2</td><td class="td">最黔线·步行街店</td><td class="td num">7,384</td><td class="td num">¥480,000</td></tr><tr><td class="td">3</td><td class="td">最黔线·芙蓉中路店</td><td class="td num">7,076</td><td class="td num">¥460,000</td></tr><tr><td class="td">4</td><td class="td">最黔线·河西店</td><td class="td num">6,769</td><td class="td num">¥440,000</td></tr><tr><td class="td">5</td><td class="td">最黔线·星沙店</td><td class="td num">6,461</td><td class="td num">¥420,000</td></tr><tr><td class="td">6</td><td class="td">最黔线·望城店</td><td class="td num">6,153</td><td class="td num">¥400,000</td></tr></tbody></table>
+          <h3>日趋势明细</h3>
+          <table class="tbl"><thead><tr><th class="th">日期</th><th class="th">星期</th><th class="th">营收</th><th class="th">订单</th><th class="th">客流</th><th class="th">客单价</th></tr></thead><tbody><tr style="background:#fff7e6;"><td class="td">2026-03-01</td><td class="td">Sun🔴</td><td class="td num">¥168,563</td><td class="td num">2,524</td><td class="td num">1,733</td><td class="td num">¥67</td></tr><tr style="background:#fff;"><td class="td">2026-03-02</td><td class="td">Mon</td><td class="td num">¥145,248</td><td class="td num">2,202</td><td class="td num">1,512</td><td class="td num">¥66</td></tr><tr style="background:#fff;"><td class="td">2026-03-03</td><td class="td">Tue</td><td class="td num">¥149,641</td><td class="td num">2,383</td><td class="td num">1,740</td><td class="td num">¥63</td></tr><tr style="background:#fff;"><td class="td">2026-03-04</td><td class="td">Wed</td><td class="td num">¥149,907</td><td class="td num">2,338</td><td class="td num">1,688</td><td class="td num">¥64</td></tr><tr style="background:#fff;"><td class="td">2026-03-05</td><td class="td">Thu</td><td class="td num">¥124,972</td><td class="td num">1,936</td><td class="td num">1,361</td><td class="td num">¥65</td></tr><tr style="background:#fff;"><td class="td">2026-03-06</td><td class="td">Fri</td><td class="td num">¥126,449</td><td class="td num">1,990</td><td class="td num">1,317</td><td class="td num">¥64</td></tr><tr style="background:#fff7e6;"><td class="td">2026-03-07</td><td class="td">Sat🔴</td><td class="td num">¥166,064</td><td class="td num">2,646</td><td class="td num">1,764</td><td class="td num">¥63</td></tr><tr style="background:#fff7e6;"><td class="td">2026-03-08</td><td class="td">Sun🔴</td><td class="td num">¥178,759</td><td class="td num">2,664</td><td class="td num">1,993</td><td class="td num">¥67</td></tr><tr style="background:#fff;"><td class="td">2026-03-09</td><td class="td">Mon</td><td class="td num">¥127,054</td><td class="td num">2,000</td><td class="td num">1,493</td><td class="td num">¥64</td></tr><tr style="background:#fff;"><td class="td">2026-03-10</td><td class="td">Tue</td><td class="td num">¥126,018</td><td class="td num">1,939</td><td class="td num">1,393</td><td class="td num">¥65</td></tr><tr style="background:#fff;"><td class="td">2026-03-11</td><td class="td">Wed</td><td class="td num">¥130,214</td><td class="td num">1,903</td><td class="td num">1,343</td><td class="td num">¥68</td></tr><tr style="background:#fff;"><td class="td">2026-03-12</td><td class="td">Thu</td><td class="td num">¥149,015</td><td class="td num">2,256</td><td class="td num">1,508</td><td class="td num">¥66</td></tr><tr style="background:#fff;"><td class="td">2026-03-13</td><td class="td">Fri</td><td class="td num">¥121,529</td><td class="td num">1,889</td><td class="td num">1,387</td><td class="td num">¥64</td></tr><tr style="background:#fff7e6;"><td class="td">2026-03-14</td><td class="td">Sat🔴</td><td class="td num">¥166,837</td><td class="td num">2,561</td><td class="td num">1,910</td><td class="td num">¥65</td></tr><tr style="background:#fff7e6;"><td class="td">2026-03-15</td><td class="td">Sun🔴</td><td class="td num">¥175,286</td><td class="td num">2,804</td><td class="td num">2,072</td><td class="td num">¥63</td></tr><tr style="background:#fff;"><td class="td">2026-03-16</td><td class="td">Mon</td><td class="td num">¥125,164</td><td class="td num">1,891</td><td class="td num">1,338</td><td class="td num">¥66</td></tr><tr style="background:#fff;"><td class="td">2026-03-17</td><td class="td">Tue</td><td class="td num">¥127,311</td><td class="td num">2,005</td><td class="td num">1,403</td><td class="td num">¥63</td></tr><tr style="background:#fff;"><td class="td">2026-03-18</td><td class="td">Wed</td><td class="td num">¥131,945</td><td class="td num">2,103</td><td class="td num">1,485</td><td class="td num">¥63</td></tr><tr style="background:#fff;"><td class="td">2026-03-19</td><td class="td">Thu</td><td class="td num">¥132,379</td><td class="td num">2,079</td><td class="td num">1,466</td><td class="td num">¥64</td></tr><tr style="background:#fff;"><td class="td">2026-03-20</td><td class="td">Fri</td><td class="td num">¥118,269</td><td class="td num">1,876</td><td class="td num">1,289</td><td class="td num">¥63</td></tr></tbody></table>
+        </div>
+  <div class="data-sources"><strong>数据来源：</strong><ul><li>品智收银POS（订单/菜品/营收）</li><li>易订预订系统（预订/桌位/客史）</li><li>微生活会员平台（会员/积分/储值）</li><li>屯象OS内建供应链（采购/供应商评分）</li></ul></div>
+  <div class="footer">屯象经营助手 · v2.0 · 本报告由系统自动生成，数据来源于已对接的POS/预订/会员系统实时同步</div>
+</body>
+</html>
