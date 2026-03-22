@@ -1,0 +1,265 @@
+{
+  "report_title": "尝在一起 运营分析报告",
+  "period": "2026-03-01 至 2026-03-20",
+  "period_days": 20,
+  "start_date": "2026-03-01",
+  "end_date": "2026-03-20",
+  "generated_at": "2026-03-22T06:42:00.299691",
+  "brand_count": 1,
+  "cross_brand_comparison": [
+    {
+      "brand_name": "尝在一起",
+      "revenue_yuan": 1757087,
+      "orders": 22546,
+      "avg_ticket_yuan": 78,
+      "food_cost_pct": 33.2,
+      "waste_pct": 2.8,
+      "cost_status": "正常",
+      "decision_adoption_pct": 68.2,
+      "saving_yuan": 23438
+    }
+  ],
+  "brand_reports": [
+    {
+      "brand_id": "X",
+      "brand_name": "尝在一起",
+      "cuisine_type": "湘菜",
+      "pos_system": "品智收银",
+      "store_count": 3,
+      "kpi_summary": {
+        "total_revenue_yuan": 1757087,
+        "total_orders": 22546,
+        "total_customers": 15606,
+        "avg_daily_revenue_yuan": 87854,
+        "avg_ticket_yuan": 78,
+        "avg_weekend_revenue_yuan": 104082,
+        "avg_weekday_revenue_yuan": 82445,
+        "weekend_uplift_pct": 26.2
+      },
+      "cost_analysis": {
+        "revenue_yuan": 1757087,
+        "food_cost_yuan": 583353,
+        "food_cost_pct": 33.2,
+        "waste_cost_yuan": 49198,
+        "waste_pct": 2.8,
+        "target_food_cost_pct": 35,
+        "cost_status": "正常",
+        "target_waste_pct": 3
+      },
+      "decision_analysis": {
+        "total_decisions": 44,
+        "approved_decisions": 30,
+        "adoption_rate_pct": 68.2,
+        "total_saving_yuan": 23438
+      },
+      "store_ranking": [
+        {
+          "store_id": "S001",
+          "store_name": "尝在一起·文和友店",
+          "order_count": 7948,
+          "revenue_yuan": 620000
+        },
+        {
+          "store_id": "S002",
+          "store_name": "尝在一起·五一广场店",
+          "order_count": 7051,
+          "revenue_yuan": 550000
+        },
+        {
+          "store_id": "S003",
+          "store_name": "尝在一起·梅溪湖店",
+          "order_count": 6794,
+          "revenue_yuan": 530000
+        }
+      ],
+      "daily_trend": [
+        {
+          "date": "2026-03-01",
+          "weekday": "Sun",
+          "is_weekend": true,
+          "revenue_yuan": 109677,
+          "order_count": 1463,
+          "customer_count": 1083,
+          "avg_ticket_yuan": 75
+        },
+        {
+          "date": "2026-03-02",
+          "weekday": "Mon",
+          "is_weekend": false,
+          "revenue_yuan": 79623,
+          "order_count": 1040,
+          "customer_count": 684,
+          "avg_ticket_yuan": 77
+        },
+        {
+          "date": "2026-03-03",
+          "weekday": "Tue",
+          "is_weekend": false,
+          "revenue_yuan": 74258,
+          "order_count": 955,
+          "customer_count": 711,
+          "avg_ticket_yuan": 78
+        },
+        {
+          "date": "2026-03-04",
+          "weekday": "Wed",
+          "is_weekend": false,
+          "revenue_yuan": 74576,
+          "order_count": 924,
+          "customer_count": 606,
+          "avg_ticket_yuan": 81
+        },
+        {
+          "date": "2026-03-05",
+          "weekday": "Thu",
+          "is_weekend": false,
+          "revenue_yuan": 88826,
+          "order_count": 1185,
+          "customer_count": 790,
+          "avg_ticket_yuan": 75
+        },
+        {
+          "date": "2026-03-06",
+          "weekday": "Fri",
+          "is_weekend": false,
+          "revenue_yuan": 83007,
+          "order_count": 1073,
+          "customer_count": 779,
+          "avg_ticket_yuan": 77
+        },
+        {
+          "date": "2026-03-07",
+          "weekday": "Sat",
+          "is_weekend": true,
+          "revenue_yuan": 100566,
+          "order_count": 1320,
+          "customer_count": 900,
+          "avg_ticket_yuan": 76
+        },
+        {
+          "date": "2026-03-08",
+          "weekday": "Sun",
+          "is_weekend": true,
+          "revenue_yuan": 100319,
+          "order_count": 1263,
+          "customer_count": 940,
+          "avg_ticket_yuan": 79
+        },
+        {
+          "date": "2026-03-09",
+          "weekday": "Mon",
+          "is_weekend": false,
+          "revenue_yuan": 81582,
+          "order_count": 1021,
+          "customer_count": 691,
+          "avg_ticket_yuan": 80
+        },
+        {
+          "date": "2026-03-10",
+          "weekday": "Tue",
+          "is_weekend": false,
+          "revenue_yuan": 86189,
+          "order_count": 1139,
+          "customer_count": 805,
+          "avg_ticket_yuan": 76
+        },
+        {
+          "date": "2026-03-11",
+          "weekday": "Wed",
+          "is_weekend": false,
+          "revenue_yuan": 82613,
+          "order_count": 1061,
+          "customer_count": 716,
+          "avg_ticket_yuan": 78
+        },
+        {
+          "date": "2026-03-12",
+          "weekday": "Thu",
+          "is_weekend": false,
+          "revenue_yuan": 86528,
+          "order_count": 1162,
+          "customer_count": 774,
+          "avg_ticket_yuan": 74
+        },
+        {
+          "date": "2026-03-13",
+          "weekday": "Fri",
+          "is_weekend": false,
+          "revenue_yuan": 75832,
+          "order_count": 979,
+          "customer_count": 654,
+          "avg_ticket_yuan": 77
+        },
+        {
+          "date": "2026-03-14",
+          "weekday": "Sat",
+          "is_weekend": true,
+          "revenue_yuan": 108436,
+          "order_count": 1354,
+          "customer_count": 925,
+          "avg_ticket_yuan": 80
+        },
+        {
+          "date": "2026-03-15",
+          "weekday": "Sun",
+          "is_weekend": true,
+          "revenue_yuan": 101414,
+          "order_count": 1260,
+          "customer_count": 918,
+          "avg_ticket_yuan": 80
+        },
+        {
+          "date": "2026-03-16",
+          "weekday": "Mon",
+          "is_weekend": false,
+          "revenue_yuan": 90195,
+          "order_count": 1122,
+          "customer_count": 776,
+          "avg_ticket_yuan": 80
+        },
+        {
+          "date": "2026-03-17",
+          "weekday": "Tue",
+          "is_weekend": false,
+          "revenue_yuan": 86821,
+          "order_count": 1058,
+          "customer_count": 766,
+          "avg_ticket_yuan": 82
+        },
+        {
+          "date": "2026-03-18",
+          "weekday": "Wed",
+          "is_weekend": false,
+          "revenue_yuan": 80886,
+          "order_count": 1059,
+          "customer_count": 691,
+          "avg_ticket_yuan": 76
+        },
+        {
+          "date": "2026-03-19",
+          "weekday": "Thu",
+          "is_weekend": false,
+          "revenue_yuan": 76199,
+          "order_count": 947,
+          "customer_count": 637,
+          "avg_ticket_yuan": 80
+        },
+        {
+          "date": "2026-03-20",
+          "weekday": "Fri",
+          "is_weekend": false,
+          "revenue_yuan": 89540,
+          "order_count": 1161,
+          "customer_count": 760,
+          "avg_ticket_yuan": 77
+        }
+      ]
+    }
+  ],
+  "data_sources": [
+    "品智收银POS（订单/菜品/营收）",
+    "易订预订系统（预订/桌位/客史）",
+    "微生活会员平台（会员/积分/储值）",
+    "屯象OS内建供应链（采购/供应商评分）"
+  ]
+}

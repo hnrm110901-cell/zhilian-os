@@ -397,14 +397,16 @@ def _render_ops_analysis_html(report: Dict[str, Any]) -> str:
     """渲染多品牌运营分析报告为HTML"""
     period = report["period"]
     now = report["generated_at"][:16].replace("T", " ")
+    is_single_brand = report["brand_count"] == 1
 
-    # 跨品牌对比表格
+    # 跨品牌对比表格（单品牌模式不渲染）
     comparison_rows = ""
-    for c in report.get("cross_brand_comparison", []):
-        status_color = {"正常": "#52c41a", "偏高": "#faad14", "超标": "#f5222d"}.get(
-            c["cost_status"], "#333"
-        )
-        comparison_rows += f"""
+    if not is_single_brand:
+        for c in report.get("cross_brand_comparison", []):
+            status_color = {"正常": "#52c41a", "偏高": "#faad14", "超标": "#f5222d"}.get(
+                c["cost_status"], "#333"
+            )
+            comparison_rows += f"""
         <tr>
           <td class="td">{c['brand_name']}</td>
           <td class="td num">¥{c['revenue_yuan']:,.0f}</td>
@@ -579,12 +581,23 @@ def _render_ops_analysis_html(report: Dict[str, Any]) -> str:
         f"<li>{s}</li>" for s in report.get("data_sources", [])
     )
 
+    # 单品牌模式：标题含品牌名
+    if is_single_brand:
+        single_brand_name = report["brand_reports"][0].get("brand_name", "")
+        page_title = f"{single_brand_name} · 运营分析报告"
+        header_title = f"{BRAND_NAME} · {single_brand_name}运营分析报告"
+        subtitle_text = f"{period} · 生成于 {now}"
+    else:
+        page_title = f"{report['report_title']} ({period})"
+        header_title = f"{BRAND_NAME} · 种子客户运营分析报告"
+        subtitle_text = f"{period} · {report['brand_count']}个品牌 · 生成于 {now}"
+
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>{report['report_title']} ({period})</title>
+  <title>{page_title}</title>
   <style>
     @media print {{ @page {{ size: A4 landscape; margin: 12mm; }} }}
     * {{ box-sizing: border-box; }}
@@ -643,10 +656,10 @@ def _render_ops_analysis_html(report: Dict[str, Any]) -> str:
   </style>
 </head>
 <body>
-  <h1>{BRAND_NAME} · 种子客户运营分析报告</h1>
-  <p class="subtitle">{period} · {report['brand_count']}个品牌 · 生成于 {now}</p>
+  <h1>{header_title}</h1>
+  <p class="subtitle">{subtitle_text}</p>
 
-  <div class="comparison-section">
+  {"" if is_single_brand else f'''<div class="comparison-section">
     <h2 style="border-color:#FF6B2C;">跨品牌经营对比</h2>
     <table class="tbl">
       <thead>
@@ -663,7 +676,7 @@ def _render_ops_analysis_html(report: Dict[str, Any]) -> str:
       </thead>
       <tbody>{comparison_rows}</tbody>
     </table>
-  </div>
+  </div>'''}
 
   {brand_sections}
 

@@ -1,0 +1,277 @@
+{
+  "report_title": "尚宫厨 运营分析报告",
+  "period": "2026-03-01 至 2026-03-20",
+  "period_days": 20,
+  "start_date": "2026-03-01",
+  "end_date": "2026-03-20",
+  "generated_at": "2026-03-22T06:42:00.299691",
+  "brand_count": 1,
+  "cross_brand_comparison": [
+    {
+      "brand_name": "尚宫厨",
+      "revenue_yuan": 3422243,
+      "orders": 26716,
+      "avg_ticket_yuan": 128,
+      "food_cost_pct": 30.8,
+      "waste_pct": 1.9,
+      "cost_status": "正常",
+      "decision_adoption_pct": 76.7,
+      "saving_yuan": 26366
+    }
+  ],
+  "brand_reports": [
+    {
+      "brand_id": "X",
+      "brand_name": "尚宫厨",
+      "cuisine_type": "精品创新湘菜",
+      "pos_system": "品智收银",
+      "store_count": 5,
+      "kpi_summary": {
+        "total_revenue_yuan": 3422243,
+        "total_orders": 26716,
+        "total_customers": 18327,
+        "avg_daily_revenue_yuan": 171112,
+        "avg_ticket_yuan": 128,
+        "avg_weekend_revenue_yuan": 201220,
+        "avg_weekday_revenue_yuan": 161076,
+        "weekend_uplift_pct": 24.9
+      },
+      "cost_analysis": {
+        "revenue_yuan": 3422243,
+        "food_cost_yuan": 1054051,
+        "food_cost_pct": 30.8,
+        "waste_cost_yuan": 65023,
+        "waste_pct": 1.9,
+        "target_food_cost_pct": 32,
+        "cost_status": "正常",
+        "target_waste_pct": 2.5
+      },
+      "decision_analysis": {
+        "total_decisions": 30,
+        "approved_decisions": 23,
+        "adoption_rate_pct": 76.7,
+        "total_saving_yuan": 26366
+      },
+      "store_ranking": [
+        {
+          "store_id": "S001",
+          "store_name": "尚宫厨·IFS旗舰店",
+          "order_count": 5625,
+          "revenue_yuan": 720000
+        },
+        {
+          "store_id": "S002",
+          "store_name": "尚宫厨·德思勤店",
+          "order_count": 5312,
+          "revenue_yuan": 680000
+        },
+        {
+          "store_id": "S003",
+          "store_name": "尚宫厨·北辰三角洲店",
+          "order_count": 5078,
+          "revenue_yuan": 650000
+        },
+        {
+          "store_id": "S004",
+          "store_name": "尚宫厨·运达中心店",
+          "order_count": 4843,
+          "revenue_yuan": 620000
+        },
+        {
+          "store_id": "S005",
+          "store_name": "尚宫厨·保利店",
+          "order_count": 4687,
+          "revenue_yuan": 600000
+        }
+      ],
+      "daily_trend": [
+        {
+          "date": "2026-03-01",
+          "weekday": "Sun",
+          "is_weekend": true,
+          "revenue_yuan": 203314,
+          "order_count": 1598,
+          "customer_count": 1123,
+          "avg_ticket_yuan": 127
+        },
+        {
+          "date": "2026-03-02",
+          "weekday": "Mon",
+          "is_weekend": false,
+          "revenue_yuan": 160847,
+          "order_count": 1235,
+          "customer_count": 853,
+          "avg_ticket_yuan": 130
+        },
+        {
+          "date": "2026-03-03",
+          "weekday": "Tue",
+          "is_weekend": false,
+          "revenue_yuan": 143072,
+          "order_count": 1111,
+          "customer_count": 769,
+          "avg_ticket_yuan": 129
+        },
+        {
+          "date": "2026-03-04",
+          "weekday": "Wed",
+          "is_weekend": false,
+          "revenue_yuan": 154300,
+          "order_count": 1171,
+          "customer_count": 802,
+          "avg_ticket_yuan": 132
+        },
+        {
+          "date": "2026-03-05",
+          "weekday": "Thu",
+          "is_weekend": false,
+          "revenue_yuan": 156383,
+          "order_count": 1281,
+          "customer_count": 945,
+          "avg_ticket_yuan": 122
+        },
+        {
+          "date": "2026-03-06",
+          "weekday": "Fri",
+          "is_weekend": false,
+          "revenue_yuan": 149987,
+          "order_count": 1161,
+          "customer_count": 836,
+          "avg_ticket_yuan": 129
+        },
+        {
+          "date": "2026-03-07",
+          "weekday": "Sat",
+          "is_weekend": true,
+          "revenue_yuan": 194531,
+          "order_count": 1569,
+          "customer_count": 1132,
+          "avg_ticket_yuan": 124
+        },
+        {
+          "date": "2026-03-08",
+          "weekday": "Sun",
+          "is_weekend": true,
+          "revenue_yuan": 210497,
+          "order_count": 1681,
+          "customer_count": 1171,
+          "avg_ticket_yuan": 125
+        },
+        {
+          "date": "2026-03-09",
+          "weekday": "Mon",
+          "is_weekend": false,
+          "revenue_yuan": 169526,
+          "order_count": 1294,
+          "customer_count": 843,
+          "avg_ticket_yuan": 131
+        },
+        {
+          "date": "2026-03-10",
+          "weekday": "Tue",
+          "is_weekend": false,
+          "revenue_yuan": 177282,
+          "order_count": 1329,
+          "customer_count": 878,
+          "avg_ticket_yuan": 133
+        },
+        {
+          "date": "2026-03-11",
+          "weekday": "Wed",
+          "is_weekend": false,
+          "revenue_yuan": 173709,
+          "order_count": 1348,
+          "customer_count": 898,
+          "avg_ticket_yuan": 129
+        },
+        {
+          "date": "2026-03-12",
+          "weekday": "Thu",
+          "is_weekend": false,
+          "revenue_yuan": 180318,
+          "order_count": 1385,
+          "customer_count": 964,
+          "avg_ticket_yuan": 130
+        },
+        {
+          "date": "2026-03-13",
+          "weekday": "Fri",
+          "is_weekend": false,
+          "revenue_yuan": 164313,
+          "order_count": 1317,
+          "customer_count": 863,
+          "avg_ticket_yuan": 125
+        },
+        {
+          "date": "2026-03-14",
+          "weekday": "Sat",
+          "is_weekend": true,
+          "revenue_yuan": 203971,
+          "order_count": 1630,
+          "customer_count": 1114,
+          "avg_ticket_yuan": 125
+        },
+        {
+          "date": "2026-03-15",
+          "weekday": "Sun",
+          "is_weekend": true,
+          "revenue_yuan": 193786,
+          "order_count": 1518,
+          "customer_count": 1055,
+          "avg_ticket_yuan": 128
+        },
+        {
+          "date": "2026-03-16",
+          "weekday": "Mon",
+          "is_weekend": false,
+          "revenue_yuan": 160240,
+          "order_count": 1239,
+          "customer_count": 820,
+          "avg_ticket_yuan": 129
+        },
+        {
+          "date": "2026-03-17",
+          "weekday": "Tue",
+          "is_weekend": false,
+          "revenue_yuan": 171807,
+          "order_count": 1315,
+          "customer_count": 895,
+          "avg_ticket_yuan": 131
+        },
+        {
+          "date": "2026-03-18",
+          "weekday": "Wed",
+          "is_weekend": false,
+          "revenue_yuan": 144247,
+          "order_count": 1152,
+          "customer_count": 793,
+          "avg_ticket_yuan": 125
+        },
+        {
+          "date": "2026-03-19",
+          "weekday": "Thu",
+          "is_weekend": false,
+          "revenue_yuan": 164650,
+          "order_count": 1297,
+          "customer_count": 843,
+          "avg_ticket_yuan": 127
+        },
+        {
+          "date": "2026-03-20",
+          "weekday": "Fri",
+          "is_weekend": false,
+          "revenue_yuan": 145463,
+          "order_count": 1085,
+          "customer_count": 730,
+          "avg_ticket_yuan": 134
+        }
+      ]
+    }
+  ],
+  "data_sources": [
+    "品智收银POS（订单/菜品/营收）",
+    "易订预订系统（预订/桌位/客史）",
+    "微生活会员平台（会员/积分/储值）",
+    "屯象OS内建供应链（采购/供应商评分）"
+  ]
+}
