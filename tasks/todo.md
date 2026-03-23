@@ -722,3 +722,38 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 - 会员档案管理 API: GET /members/{store_id}/list（分页+搜索+多维过滤）+ PATCH /members/{store_id}/{customer_id}（更新 birth_date/wechat_openid/channel_source）
 - MemberSystemPage.tsx: 从 null stub 重建为完整会员档案表格（RFM tag、生命周期 tag、内联生日编辑、旅程触发）
 - test_member_profile_api.py: 13个测试（GET×7 + PATCH×6）
+
+---
+
+## Phase P1 — 数据融合引擎 + 知识库生成（2026-03-23）
+
+> 战略：屯象OS 定位餐饮行业 Palantir，面向复杂集团/多品牌/品质中大型餐饮
+> 两阶段目标：
+>   Phase 1 — 历史数据智能融合 → 知识库自动生成 → 接入即出经营体检报告
+>   Phase 2 — 影子模式验证 → 灰度切换 → SaaS 渐进替换（零停机）
+
+### Phase 1.1 — 数据融合引擎（Data Fusion Engine）
+
+- [ ] 数据模型 `models/fusion_task.py`：5张表（FusionProject/FusionTask/FusionEntityMap/FusionProvenance/FusionConflict）+ 5 Enum
+- [ ] Alembic 迁移 `z69_data_fusion_engine.py`（down_revision=z68_mission_journey）
+- [ ] 实体解析服务 `services/entity_resolver.py`：跨系统实体识别与合并（菜品/客户/供应商/食材）
+- [ ] 数据融合引擎 `services/data_fusion_engine.py`：多源采集编排 + 断点续传 + 进度追踪
+- [ ] 历史回填服务 `services/historical_backfill.py`：三通道批量回填（API/文件/DB镜像）
+- [ ] 时间线组装器 `services/timeline_assembler.py`：跨系统事件按时间轴对齐
+- [ ] 知识库生成管道 `services/knowledge_generator.py`：历史数据 → StoreMemory/CostTruth/RFM/人效基线
+- [ ] API路由 `api/data_fusion.py`：融合项目CRUD + 任务管理 + 进度查询 + 经营体检报告
+- [ ] 注册路由到 main.py
+
+### Phase 1.2 — 经营体检报告（接入即出报告，待 Phase 1.1 完成后）
+
+- [ ] 体检报告生成服务 `services/health_check_report.py`：营收/成本/菜品/会员/人效/供应商 6维分析
+- [ ] 前端迁移向导页面（引导商家完成数据接入）
+- [ ] 种子客户试跑验证
+
+### Phase 2.1 — 影子模式引擎（Shadow Mode，待 Phase 1 交付后）
+
+- [ ] 影子记账引擎：屯象OS与原SaaS双写对比
+- [ ] 一致性比对引擎：每日自动对账（订单/库存/金额差异）
+- [ ] 灰度切换控制器：按模块/门店/角色三维度渐进切换
+- [ ] 一键回退机制：< 30秒回退到上一状态
+- [ ] 功能平权模块：轻量POS/采购工作台/移动盘点（补齐操作层）

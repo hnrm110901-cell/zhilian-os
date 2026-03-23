@@ -1239,6 +1239,10 @@ app.include_router(hr_api.router, prefix="/api/v1/hr", tags=["HR"])
 from src.api.webhooks.wechat_attendance import router as wechat_attendance_router
 app.include_router(wechat_attendance_router, prefix="/api/v1", tags=["webhooks"])
 
+# Phase P1 — 数据融合引擎（历史数据智能融合 + 知识库生成 + 经营体检报告）
+from src.api.data_fusion import router as data_fusion_router
+app.include_router(data_fusion_router, tags=["data-fusion"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:

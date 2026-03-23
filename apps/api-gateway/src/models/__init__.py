@@ -45,6 +45,15 @@ from .banquet import (
 from .banquet_event_order import BanquetEventOrder, BEOStatus
 from .banquet_lifecycle import BanquetStage, BanquetStageHistory
 from .base import Base
+
+# Phase P1 — 数据融合引擎
+from .fusion_task import (
+    FusionProject,
+    FusionTask,
+    FusionEntityMap,
+    FusionProvenance,
+    FusionConflict,
+)
 from .bom import BOMItem, BOMTemplate
 from .channel_config import SalesChannelConfig
 from .competitor import CompetitorPrice, CompetitorStore
@@ -197,6 +206,12 @@ from .workforce import (
 
 __all__ = [
     "Base",
+    # Phase P1 — 数据融合引擎
+    "FusionProject",
+    "FusionTask",
+    "FusionEntityMap",
+    "FusionProvenance",
+    "FusionConflict",
     "User",
     "Store",
     "Employee",
