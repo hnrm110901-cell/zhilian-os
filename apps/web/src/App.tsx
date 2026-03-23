@@ -347,6 +347,9 @@ const SmDailySettlement = lazy(() => import('./pages/sm/DailySettlement'));
 const SmAbnormalTasks   = lazy(() => import('./pages/sm/AbnormalTasks'));
 const SmWeeklyReview    = lazy(() => import('./pages/sm/WeeklyReview'));
 const SmDailyFlow       = lazy(() => import('./pages/sm/DailyFlow'));
+const SmPosTerminal     = lazy(() => import('./pages/sm/PosTerminal'));
+const SmPurchaseWorkbench = lazy(() => import('./pages/sm/PurchaseWorkbench'));
+const SmMobileStocktake = lazy(() => import('./pages/sm/MobileStocktake'));
 const HqParetoAnalysis  = lazy(() => import('./pages/hq/ParetoAnalysis'));
 const HqFlowInspection  = lazy(() => import('./pages/hq/FlowInspection'));
 const HqDataFusionWizard = lazy(() => import('./pages/hq/DataFusionWizard'));
@@ -1123,6 +1126,10 @@ const AppContent: React.FC = () => {
                   <Route path="daily-flow"      element={<SmDailyFlow />} />
                   <Route path="marketing-tasks" element={<SmMarketingTasks />} />
                   <Route path="health-index"          element={<SmStoreHealthIndex />} />
+                  {/* Phase 2.2 — 功能平权：收银/采购/盘点 */}
+                  <Route path="pos"        element={<SmPosTerminal />} />
+                  <Route path="purchase"   element={<SmPurchaseWorkbench />} />
+                  <Route path="stocktake"  element={<SmMobileStocktake />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}

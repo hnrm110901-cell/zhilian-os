@@ -12,6 +12,9 @@ const NAV_ITEMS = [
   { to: '/sm/decisions',          label: 'AI决策', icon: '🤖' },
   { to: '/sm/members',            label: '识客',   icon: '👤' },
   { to: '/sm/marketing-tasks',    label: '营销',   icon: '📣' },
+  { to: '/sm/pos',               label: '收银',   icon: '💳' },
+  { to: '/sm/purchase',          label: '采购',   icon: '📦' },
+  { to: '/sm/stocktake',         label: '盘点',   icon: '📝' },
   { to: '/sm/profile',            label: '我的',   icon: '🙍' },
 ];
 

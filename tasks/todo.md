@@ -770,8 +770,16 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 - [x] 前端路由注册 App.tsx + 导航菜单 HQLayout.tsx
 - [x] 影子模式驾驶舱 `pages/hq/ShadowModeDashboard.tsx`
 
+### Phase 2.2 前端页面 — 全部完成 ✅（2026-03-23）
+
+- [x] 40个单元测试全部通过（`tests/test_pos_purchase_stocktake.py`）
+- [x] POS收银界面 `pages/sm/PosTerminal.tsx`（开单/加菜/折扣/结账/作废，移动端）
+- [x] 采购工作台 `pages/sm/PurchaseWorkbench.tsx`（创建PO/提交/确认/收货/对账，移动端）
+- [x] 移动盘点 `pages/sm/MobileStocktake.tsx`（全盘/分类盘/抽盘/差异/审批，移动端）
+- [x] 注册路由 App.tsx + 导航菜单 StoreManagerLayout.tsx
+
 ### 待做（下一阶段）
 
-- [ ] Phase 2.2 前端页面：POS收银界面 / 采购工作台界面 / 移动盘点界面
 - [ ] 种子客户试跑（尝在一起品智POS数据接入后执行）
 - [ ] Phase 2.3：实体解析器接入Neo4j本体图（OntologyAdapter集成）
+- [ ] Phase 2.3：POS收银数据实时同步到影子模式引擎
