@@ -1247,6 +1247,14 @@ app.include_router(data_fusion_router, tags=["data-fusion"])
 from src.api.shadow_mode import router as shadow_mode_router
 app.include_router(shadow_mode_router, tags=["shadow-mode"])
 
+# Phase P2.2 — 功能平权（轻量POS + 采购工作台 + 移动盘点）
+from src.api.pos_terminal import router as pos_terminal_router
+app.include_router(pos_terminal_router, tags=["pos-terminal"])
+from src.api.purchase_workbench import router as purchase_workbench_router
+app.include_router(purchase_workbench_router, tags=["purchase-workbench"])
+from src.api.mobile_stocktake import router as mobile_stocktake_router
+app.include_router(mobile_stocktake_router, tags=["mobile-stocktake"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:

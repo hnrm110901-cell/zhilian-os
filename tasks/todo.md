@@ -760,8 +760,18 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 - [x] 注册路由到 main.py
 - [x] 30个单元测试全部通过（`tests/test_shadow_mode.py`）
 
-### Phase 2.2 — 功能平权（待规划）
+### Phase 2.2 — 功能平权 — 全部完成 ✅（2026-03-23）
 
-- [ ] 轻量POS模块（iPad/手机收银）
-- [ ] 采购工作台（供应商→下单→收货→对账）
-- [ ] 移动盘点（扫码+语音）
+- [x] 轻量POS收银 `services/pos_terminal_service.py`：开单/加菜/折扣/结账/作废
+- [x] 采购工作台 `services/purchase_workbench_service.py`：创建PO/提交/供应商确认/收货/对账
+- [x] 移动盘点 `services/mobile_stocktake_service.py`：创建盘点/逐条计数/批量/差异报告/审批
+- [x] API路由 `api/pos_terminal.py` + `api/purchase_workbench.py` + `api/mobile_stocktake.py`
+- [x] 注册路由到 main.py
+- [x] 前端路由注册 App.tsx + 导航菜单 HQLayout.tsx
+- [x] 影子模式驾驶舱 `pages/hq/ShadowModeDashboard.tsx`
+
+### 待做（下一阶段）
+
+- [ ] Phase 2.2 前端页面：POS收银界面 / 采购工作台界面 / 移动盘点界面
+- [ ] 种子客户试跑（尝在一起品智POS数据接入后执行）
+- [ ] Phase 2.3：实体解析器接入Neo4j本体图（OntologyAdapter集成）
