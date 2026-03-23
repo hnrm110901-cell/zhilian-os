@@ -732,28 +732,36 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 >   Phase 1 — 历史数据智能融合 → 知识库自动生成 → 接入即出经营体检报告
 >   Phase 2 — 影子模式验证 → 灰度切换 → SaaS 渐进替换（零停机）
 
-### Phase 1.1 — 数据融合引擎（Data Fusion Engine）
+### Phase 1.1 — 数据融合引擎（Data Fusion Engine）— 全部完成 ✅（2026-03-23）
 
-- [ ] 数据模型 `models/fusion_task.py`：5张表（FusionProject/FusionTask/FusionEntityMap/FusionProvenance/FusionConflict）+ 5 Enum
-- [ ] Alembic 迁移 `z69_data_fusion_engine.py`（down_revision=z68_mission_journey）
-- [ ] 实体解析服务 `services/entity_resolver.py`：跨系统实体识别与合并（菜品/客户/供应商/食材）
-- [ ] 数据融合引擎 `services/data_fusion_engine.py`：多源采集编排 + 断点续传 + 进度追踪
-- [ ] 历史回填服务 `services/historical_backfill.py`：三通道批量回填（API/文件/DB镜像）
-- [ ] 时间线组装器 `services/timeline_assembler.py`：跨系统事件按时间轴对齐
-- [ ] 知识库生成管道 `services/knowledge_generator.py`：历史数据 → StoreMemory/CostTruth/RFM/人效基线
-- [ ] API路由 `api/data_fusion.py`：融合项目CRUD + 任务管理 + 进度查询 + 经营体检报告
-- [ ] 注册路由到 main.py
+- [x] 数据模型 `models/fusion_task.py`：5张表 + 5 Enum
+- [x] Alembic 迁移 `z69_data_fusion_engine.py`（down_revision=z68_mission_journey）
+- [x] 实体解析服务 `services/entity_resolver.py`：跨系统实体识别与合并
+- [x] 数据融合引擎 `services/data_fusion_engine.py`：多源采集编排 + 断点续传
+- [x] 历史回填服务 `services/historical_backfill.py`：三通道批量回填（API/CSV/DB镜像）
+- [x] 时间线组装器 `services/timeline_assembler.py`：跨系统事件时间轴对齐
+- [x] 知识库生成管道 `services/knowledge_generator.py`：6维经营体检报告
+- [x] API路由 `api/data_fusion.py`：8个端点 + 总部BFF
+- [x] 注册路由到 main.py
+- [x] 60个单元测试全部通过（`tests/test_data_fusion.py`）
 
-### Phase 1.2 — 经营体检报告（接入即出报告，待 Phase 1.1 完成后）
+### Phase 1.2 — 经营体检报告 + 前端向导 — 全部完成 ✅（2026-03-23）
 
-- [ ] 体检报告生成服务 `services/health_check_report.py`：营收/成本/菜品/会员/人效/供应商 6维分析
-- [ ] 前端迁移向导页面（引导商家完成数据接入）
-- [ ] 种子客户试跑验证
+- [x] 体检报告生成器集成在 `knowledge_generator.py`：营收/成本/菜品/会员/人效/供应商6维
+- [x] 前端迁移向导页面 `pages/hq/DataFusionWizard.tsx`：4步向导 + 10个SaaS系统选择
+- [ ] 种子客户试跑验证（待尝在一起品智POS数据接入后执行）
 
-### Phase 2.1 — 影子模式引擎（Shadow Mode，待 Phase 1 交付后）
+### Phase 2.1 — 影子模式 + 灰度切换 — 全部完成 ✅（2026-03-23）
 
-- [ ] 影子记账引擎：屯象OS与原SaaS双写对比
-- [ ] 一致性比对引擎：每日自动对账（订单/库存/金额差异）
-- [ ] 灰度切换控制器：按模块/门店/角色三维度渐进切换
-- [ ] 一键回退机制：< 30秒回退到上一状态
-- [ ] 功能平权模块：轻量POS/采购工作台/移动盘点（补齐操作层）
+- [x] 数据模型 `models/shadow_mode.py`：5张表（ShadowSession/Record/ConsistencyReport/CutoverState/Event）+ 5 Enum
+- [x] Alembic 迁移 `z70_shadow_mode_cutover.py`（down_revision=z69）
+- [x] 影子模式引擎 `services/shadow_mode_engine.py`：影子记账 + 一致性比对 + 灰度切换控制器
+- [x] API路由 `api/shadow_mode.py`：10个端点 + 总部BFF
+- [x] 注册路由到 main.py
+- [x] 30个单元测试全部通过（`tests/test_shadow_mode.py`）
+
+### Phase 2.2 — 功能平权（待规划）
+
+- [ ] 轻量POS模块（iPad/手机收银）
+- [ ] 采购工作台（供应商→下单→收货→对账）
+- [ ] 移动盘点（扫码+语音）

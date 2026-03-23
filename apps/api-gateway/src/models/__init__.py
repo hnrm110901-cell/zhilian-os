@@ -54,6 +54,15 @@ from .fusion_task import (
     FusionProvenance,
     FusionConflict,
 )
+
+# Phase P2.1 — 影子模式 + 灰度切换
+from .shadow_mode import (
+    ShadowSession,
+    ShadowRecord,
+    ConsistencyReport,
+    CutoverState,
+    CutoverEvent,
+)
 from .bom import BOMItem, BOMTemplate
 from .channel_config import SalesChannelConfig
 from .competitor import CompetitorPrice, CompetitorStore
@@ -212,6 +221,12 @@ __all__ = [
     "FusionEntityMap",
     "FusionProvenance",
     "FusionConflict",
+    # Phase P2.1 — 影子模式 + 灰度切换
+    "ShadowSession",
+    "ShadowRecord",
+    "ConsistencyReport",
+    "CutoverState",
+    "CutoverEvent",
     "User",
     "Store",
     "Employee",

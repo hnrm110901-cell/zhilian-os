@@ -1243,6 +1243,10 @@ app.include_router(wechat_attendance_router, prefix="/api/v1", tags=["webhooks"]
 from src.api.data_fusion import router as data_fusion_router
 app.include_router(data_fusion_router, tags=["data-fusion"])
 
+# Phase P2.1 — 影子模式 + 灰度切换（SaaS渐进替换安全网）
+from src.api.shadow_mode import router as shadow_mode_router
+app.include_router(shadow_mode_router, tags=["shadow-mode"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:
