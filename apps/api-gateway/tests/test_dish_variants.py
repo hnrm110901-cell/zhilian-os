@@ -55,8 +55,63 @@ SPEC_ID_2 = uuid.uuid4()
 SPEC_ID_3 = uuid.uuid4()
 
 
-def _make_method(**overrides) -> DishMethodVariant:
-    """构造 DishMethodVariant 实例"""
+class _MethodStub:
+    """轻量 DishMethodVariant 替身，绕过 SQLAlchemy instrumentation"""
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            self.__dict__[k] = v
+
+    @property
+    def extra_cost_yuan(self) -> float:
+        return round(self.__dict__["extra_cost_fen"] / 100, 2)
+
+    def __repr__(self):
+        return (
+            f"<DishMethodVariant(dish_id={self.dish_id}, "
+            f"method={self.method_name}, station={self.kitchen_station})>"
+        )
+
+
+class _SpecStub:
+    """轻量 DishSpecification 替身，绕过 SQLAlchemy instrumentation"""
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            self.__dict__[k] = v
+
+    @property
+    def price_yuan(self) -> float:
+        return round(self.__dict__["price_fen"] / 100, 2)
+
+    @property
+    def cost_yuan(self):
+        cf = self.__dict__.get("cost_fen")
+        if cf is None:
+            return None
+        return round(cf / 100, 2)
+
+    @property
+    def profit_margin(self):
+        cf = self.__dict__.get("cost_fen")
+        pf = self.__dict__.get("price_fen", 0)
+        if cf is None or pf <= 0:
+            return None
+        return round((pf - cf) / pf * 100, 2)
+
+    @property
+    def bom_multiplier(self):
+        return self.__dict__["bom_multiplier"]
+
+    def __repr__(self):
+        return (
+            f"<DishSpecification(dish_id={self.dish_id}, "
+            f"spec={self.spec_name}, price={self.price_fen}分)>"
+        )
+
+
+def _make_method(**overrides) -> _MethodStub:
+    """构造做法变体替身"""
     defaults = dict(
         id=uuid.uuid4(),
         dish_id=DISH_ID,
@@ -71,14 +126,11 @@ def _make_method(**overrides) -> DishMethodVariant:
         description="清蒸保留原味，推荐鲜活海鲜",
     )
     defaults.update(overrides)
-    m = DishMethodVariant.__new__(DishMethodVariant)
-    for k, v in defaults.items():
-        object.__setattr__(m, k, v)
-    return m
+    return _MethodStub(**defaults)
 
 
-def _make_spec(**overrides) -> DishSpecification:
-    """构造 DishSpecification 实例"""
+def _make_spec(**overrides) -> _SpecStub:
+    """构造规格替身"""
     defaults = dict(
         id=uuid.uuid4(),
         dish_id=DISH_ID,
@@ -93,10 +145,7 @@ def _make_spec(**overrides) -> DishSpecification:
         display_order=0,
     )
     defaults.update(overrides)
-    s = DishSpecification.__new__(DishSpecification)
-    for k, v in defaults.items():
-        object.__setattr__(s, k, v)
-    return s
+    return _SpecStub(**defaults)
 
 
 # ═══════════════════════════════════════════════════════════
