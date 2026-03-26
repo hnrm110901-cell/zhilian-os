@@ -1262,6 +1262,14 @@ app.include_router(mobile_stocktake_router, tags=["mobile-stocktake"])
 from src.api import aquarium as aquarium_api
 app.include_router(aquarium_api.router, tags=["aquarium"])
 
+# 统一POS收银引擎（平替天财商龙）
+from src.api import unified_pos
+app.include_router(unified_pos.router, tags=["unified-pos"])
+
+# 奥琦玮POS Webhook实时推送
+from src.api import aoqiwei_webhook
+app.include_router(aoqiwei_webhook.router, tags=["aoqiwei-webhook"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:

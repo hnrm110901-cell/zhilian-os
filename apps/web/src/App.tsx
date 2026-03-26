@@ -49,6 +49,10 @@ const MemberSystemPage = lazy(() => import('./pages/MemberSystemPage'));
 const KPIDashboardPage = lazy(() => import('./pages/KPIDashboardPage'));
 const Customer360Page = lazy(() => import('./pages/Customer360Page'));
 const POSPage = lazy(() => import('./pages/POSPage'));
+const UnifiedPOSPage = lazy(() => import('./pages/pos/UnifiedPOSPage'));
+const KDSDisplayPage = lazy(() => import('./pages/pos/KDSDisplayPage'));
+const MultiDeviceOrderPage = lazy(() => import('./pages/pos/MultiDeviceOrderPage'));
+const SeafoodDisplayPage = lazy(() => import('./pages/pos/SeafoodDisplayPage'));
 const QualityManagementPage = lazy(() => import('./pages/QualityManagementPage'));
 const CompliancePage = lazy(() => import('./pages/CompliancePage'));
 const AIEvolutionPage = lazy(() => import('./pages/AIEvolutionPage'));
@@ -1052,6 +1056,10 @@ const AppContent: React.FC = () => {
                   <Route index element={<OpsHomePage />} />
                   {/* 数据接入 */}
                   <Route path="pos" element={<POSPage />} />
+                  <Route path="pos/unified" element={<UnifiedPOSPage />} />
+                  <Route path="pos/kds" element={<KDSDisplayPage />} />
+                  <Route path="pos/multi-device" element={<MultiDeviceOrderPage />} />
+                  <Route path="pos/seafood-display" element={<SeafoodDisplayPage />} />
                   <Route path="menu-import" element={<MenuImportPage />} />
                   <Route path="bom-import" element={<BomImportPage />} />
                   <Route path="channels" element={<ChannelDataPage />} />

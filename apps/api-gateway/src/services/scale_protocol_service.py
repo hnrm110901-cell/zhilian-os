@@ -26,8 +26,12 @@ import structlog
 
 logger = structlog.get_logger()
 
-# HMAC 密钥，从环境变量读取；未配置时启动阶段应由上层保障
-_HMAC_SECRET = os.getenv("SCALE_HMAC_SECRET", "zhilian-scale-default-key")
+# HMAC 密钥，从环境变量读取；未配置时生成随机密钥（仅限开发环境，生产必须配置）
+_HMAC_SECRET = os.getenv("SCALE_HMAC_SECRET", "")
+if not _HMAC_SECRET:
+    import secrets as _secrets
+    _HMAC_SECRET = _secrets.token_hex(32)
+    logger.warning("SCALE_HMAC_SECRET 未配置，已生成随机密钥（仅限开发环境）")
 
 
 # ── 枚举 ─────────────────────────────────────────────────────────────────────
