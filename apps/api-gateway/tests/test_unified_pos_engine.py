@@ -15,23 +15,38 @@
 
 import os
 import sys
+import types
+import importlib.util
 import pytest
 
-# 确保能导入 src 下的模块
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+# 动态加载（绕过 services/__init__.py 导入问题）
+src = os.path.join(os.path.dirname(__file__), "..", "src")
+sys.path.insert(0, src)
+services_pkg = types.ModuleType("services")
+services_pkg.__path__ = [os.path.join(src, "services")]
+if "services" not in sys.modules:
+    sys.modules["services"] = services_pkg
 
-from services.unified_pos_engine import (
-    UnifiedPOSEngine,
-    OrderItemSpec,
-    PricingMode,
-    ConsumptionScene,
-    DeviceType,
-    PaymentMethod,
-    PaymentEntry,
-    CouponApplication,
-    KitchenStation,
-    OrderPhase,
-)
+def _load(name):
+    path = os.path.join(src, "services", f"{name}.py")
+    spec = importlib.util.spec_from_file_location(f"services.{name}", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[f"services.{name}"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+_pos_mod = _load("unified_pos_engine")
+
+UnifiedPOSEngine = _pos_mod.UnifiedPOSEngine
+OrderItemSpec = _pos_mod.OrderItemSpec
+PricingMode = _pos_mod.PricingMode
+ConsumptionScene = _pos_mod.ConsumptionScene
+DeviceType = _pos_mod.DeviceType
+PaymentMethod = _pos_mod.PaymentMethod
+PaymentEntry = _pos_mod.PaymentEntry
+CouponApplication = _pos_mod.CouponApplication
+KitchenStation = _pos_mod.KitchenStation
+OrderPhase = _pos_mod.OrderPhase
 
 
 # ── 工具 ─────────────────────────────────────────────────────────────────────
