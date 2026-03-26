@@ -422,6 +422,16 @@ class TestRefundService:
         assert result["has_anomaly"] is True
         assert any(a["type"] == "退款次数过多" for a in result["anomalies"])
 
+    def test_create_refund_rejects_zero_amount(self):
+        svc = self._make_svc()
+        with pytest.raises(ValueError, match="退款金额必须大于0"):
+            svc.create_refund_request("S001", "ORD-Z", RefundType.FULL, RefundReason.OTHER, 5000, 0)
+
+    def test_nonexistent_refund_raises(self):
+        svc = self._make_svc()
+        with pytest.raises(ValueError, match="不存在"):
+            svc.approve("nonexistent-id", "MGR01")
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # RushPromotionService 测试
@@ -542,3 +552,8 @@ class TestRushPromotionService:
         assert len(active) == 2
         # S002 的菜不在结果中
         assert all(r.store_id == "S001" for r in active)
+
+    def test_nonexistent_rush_raises(self):
+        svc = self._make_svc()
+        with pytest.raises(ValueError, match="不存在"):
+            svc.cancel_rush("nonexistent-id")
