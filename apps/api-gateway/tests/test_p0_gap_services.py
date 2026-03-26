@@ -149,6 +149,19 @@ class TestCashierShiftService:
         assert receipt["variance_type"] == "无差异"
         assert "现金" in receipt["payment_summary"]
 
+    def test_record_transaction_rejects_closed_shift(self):
+        svc = self._make_svc()
+        shift = svc.open_shift("S001", "C01", "张三", "REG-1")
+        svc.close_shift(shift.shift_id, CashDrawerCount())
+        assert svc.record_transaction(shift.shift_id, "cash", 100) is False
+
+    def test_close_already_closed_raises(self):
+        svc = self._make_svc()
+        shift = svc.open_shift("S001", "C01", "张三", "REG-1")
+        svc.close_shift(shift.shift_id, CashDrawerCount())
+        with pytest.raises(ValueError, match="状态不允许关班"):
+            svc.close_shift(shift.shift_id, CashDrawerCount())
+
     def test_cash_drawer_count_total(self):
         dc = CashDrawerCount(yuan_100=2, yuan_50=1, yuan_20=3, yuan_1=5, jiao_5=2)
         # 20000 + 5000 + 6000 + 500 + 100 = 31600分
@@ -252,6 +265,30 @@ class TestCreditAccountService:
         assert stmt["total_charge_fen"] == 20000
         assert stmt["total_payment_fen"] == 10000
         assert len(stmt["transactions"]) == 2
+
+    def test_get_overdue_accounts(self):
+        svc = self._make_svc()
+        acc = svc.create_account("S001", "李四", 100000)
+        svc.charge_to_account(acc.account_id, 50000)
+        # 手动设置最后挂账时间为60天前，模拟逾期
+        acc.last_charge_at = datetime.now(timezone.utc) - timedelta(days=60)
+        acc.last_payment_at = None
+        overdue = svc.get_overdue_accounts(overdue_days=30)
+        assert len(overdue) == 1
+        assert overdue[0]["account_id"] == acc.account_id
+        assert overdue[0]["overdue_days"] >= 30
+
+    def test_nonexistent_account_raises(self):
+        svc = self._make_svc()
+        with pytest.raises(ValueError, match="不存在"):
+            svc.get_balance("nonexistent-id")
+
+    def test_charge_closed_account_raises(self):
+        svc = self._make_svc()
+        acc = svc.create_account("S001", "李四", 100000)
+        acc.status = AccountStatus.CLOSED
+        with pytest.raises(ValueError, match="账户已关闭"):
+            svc.charge_to_account(acc.account_id, 1000)
 
 
 # ═══════════════════════════════════════════════════════════════════════
