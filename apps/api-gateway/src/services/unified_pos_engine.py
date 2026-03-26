@@ -235,6 +235,27 @@ class UnifiedPOSEngine:
         self.db = db_session
         self._order_cache: Dict[str, Dict[str, Any]] = {}
 
+    # 影子同步最大重试次数，超过后标记需人工同步
+    SHADOW_MAX_RETRIES = 3
+
+    def _record_shadow_failure(self, order: Dict[str, Any], error: str) -> None:
+        """记录影子同步失败，累加重试计数，超过阈值标记需人工同步"""
+        order["shadow_sync_status"] = "failed"
+        order["shadow_sync_error"] = error
+        retry_count = order.get("shadow_retry_count", 0) + 1
+        order["shadow_retry_count"] = retry_count
+        if retry_count >= self.SHADOW_MAX_RETRIES:
+            order["shadow_requires_manual_sync"] = True
+            logger.error(
+                "影子同步多次失败，需人工介入",
+                order_id=order.get("order_id"),
+                retry_count=retry_count,
+            )
+        else:
+            order["shadow_requires_manual_sync"] = order.get(
+                "shadow_requires_manual_sync", False
+            )
+
     # ── 开单 ──────────────────────────────────────────────────────────────────
 
     async def create_order(
@@ -331,8 +352,7 @@ class UnifiedPOSEngine:
                 order["shadow_sync_status"] = "synced"
             except Exception as e:
                 logger.warning("影子同步创建订单失败", error=str(e), order_id=order_id)
-                order["shadow_sync_status"] = "failed"
-                order["shadow_sync_error"] = str(e)
+                self._record_shadow_failure(order, str(e))
 
         logger.info(
             "订单已创建",
@@ -380,6 +400,7 @@ class UnifiedPOSEngine:
                 )
             except Exception as e:
                 logger.warning("影子同步加菜失败", error=str(e))
+                self._record_shadow_failure(order, str(e))
 
         return order
 
@@ -511,6 +532,14 @@ class UnifiedPOSEngine:
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
 
+        # 影子同步多次失败的订单，记录警告但不阻断结账
+        if order.get("shadow_requires_manual_sync"):
+            logger.warning(
+                "结账订单存在未同步的影子数据，需人工同步",
+                order_id=order_id,
+                shadow_retry_count=order.get("shadow_retry_count", 0),
+            )
+
         total_paid_fen = sum(p.amount_fen for p in payments)
         total_due_fen = order["total_fen"]
 
@@ -571,6 +600,7 @@ class UnifiedPOSEngine:
                 )
             except Exception as e:
                 logger.warning("影子同步结账失败", error=str(e))
+                self._record_shadow_failure(order, str(e))
 
         # 更新订单状态
         settle_time = datetime.utcnow()
@@ -684,6 +714,7 @@ class UnifiedPOSEngine:
                 )
             except Exception as e:
                 logger.warning("影子同步厨打失败", error=str(e))
+                self._record_shadow_failure(order, str(e))
 
         order["phase"] = OrderPhase.CONFIRMED.value
         order["kitchen_tickets"] = tickets

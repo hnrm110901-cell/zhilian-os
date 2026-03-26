@@ -548,7 +548,7 @@ class ScaleProtocolService:
 
     # ── 设备状态 ──────────────────────────────────────────────────────────
 
-    async def get_scale_status(self, scale_id: str) -> Dict[str, Any]:
+    async def get_scale_status(self, scale_id: str) -> Optional[Dict[str, Any]]:
         """
         获取秤设备状态
 
@@ -556,11 +556,11 @@ class ScaleProtocolService:
             scale_id: 设备ID
 
         Returns:
-            设备状态信息
+            设备状态信息，设备不存在时返回 None
         """
         device = self._devices.get(scale_id)
         if device is None:
-            raise ValueError(f"秤设备未注册: {scale_id}")
+            return None
 
         return {
             "scale_id": device.scale_id,
