@@ -75,6 +75,8 @@ from .decision_log import DecisionLog, DecisionOutcome, DecisionStatus, Decision
 from .dianping_review import DianpingReview
 from .dish import Dish, DishCategory, DishIngredient
 from .dish_channel import DishChannelConfig
+from .dish_method_variant import DishMethodVariant
+from .dish_specification import DishSpecification
 from .dish_master import BrandMenu, DishMaster, StoreMenu
 
 # Month 1 (P0) — 外部集成模型
@@ -284,6 +286,8 @@ __all__ = [
     "DishCategory",
     "Dish",
     "DishIngredient",
+    "DishMethodVariant",
+    "DishSpecification",
     "BOMTemplate",
     "BOMItem",
     "DishMaster",
@@ -803,4 +807,19 @@ from .mission_journey import (
     GrowthNarrative,
     JourneyMilestone,
     JourneyStats,
+)
+
+# ── 活海鲜养殖管理 ──
+from .aquarium import (
+    AquariumTank,
+    AquariumWaterMetric,
+    LiveSeafoodBatch,
+    SeafoodMortalityLog,
+    AquariumInspection,
+    TankStatus,
+    TankType,
+    MetricSource,
+    MortalityReason,
+    MortalityDisposal,
+    InspectionResult,
 )

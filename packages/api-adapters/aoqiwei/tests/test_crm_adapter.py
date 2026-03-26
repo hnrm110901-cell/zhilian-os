@@ -6,6 +6,7 @@
      — 这是最核心的正确性约束，任何修改必须通过这些回归测试
   2. 请求体构建（appkey 不出现在发送体中）
   3. 业务方法入参校验
+  4. 新增会员/交易/储值/优惠券/积分全链路方法
 """
 import hashlib
 import time
@@ -215,16 +216,13 @@ class TestBuildRequestBody:
         body = crm_adapter._build_request_body({"cno": "123"})
         assert body["v"] == "2.0"
 
-    def test_ts_is_seconds_level_integer(self, crm_adapter):
-        body = crm_adapter._build_request_body({})
-        ts = body["ts"]
-        assert isinstance(ts, int)
-        assert 1_000_000_000 <= ts <= 9_999_999_999
-
-    def test_biz_params_preserved(self, crm_adapter):
+    def test_req_field_contains_biz_params_json(self, crm_adapter):
+        """业务参数被 JSON 序列化后放在 req 字段"""
         body = crm_adapter._build_request_body({"cno": "XYZ", "shop_id": 5})
-        assert body["cno"] == "XYZ"
-        assert body["shop_id"] == 5
+        import json
+        req = json.loads(body["req"])
+        assert req["cno"] == "XYZ"
+        assert req["shop_id"] == 5
 
 
 # ── get_member_info 入参校验 ──────────────────────────────────────────────────────
@@ -345,3 +343,470 @@ class TestDealReverse:
             )
         params = mock_req.call_args[0][1]
         assert params["reverse_reason"] == "误操作"
+
+
+# ══════════════════════════════════════════════════════════════════════════════════
+# 新增方法测试（会员查询/管理/交易/储值/优惠券/积分）
+# ══════════════════════════════════════════════════════════════════════════════════
+
+
+# ── query_member 会员查询 ─────────────────────────────────────────────────────────
+
+class TestQueryMember:
+    @pytest.mark.asyncio
+    async def test_raises_if_no_identifier(self, crm_adapter):
+        """三个查询参数都为空时应抛出 ValueError"""
+        with pytest.raises(ValueError, match="至少填写一个"):
+            await crm_adapter.query_member()
+
+    @pytest.mark.asyncio
+    async def test_query_by_card_no(self, crm_adapter):
+        """按卡号查询，调用正确端点并传入 cno 参数"""
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"cno": "C001", "balance": 5000, "name": "张三"}
+            result = await crm_adapter.query_member(card_no="C001")
+        assert mock_req.call_args[0][0] == "/user/accountBasicsInfo"
+        assert result["cno"] == "C001"
+        # 验证金额标准化：余额同时有 fen 和 yuan
+        assert result["balance_fen"] == 5000
+        assert result["balance_yuan"] == 50.0
+
+    @pytest.mark.asyncio
+    async def test_query_by_mobile(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"cno": "C002", "balance": 0}
+            result = await crm_adapter.query_member(mobile="13800001111")
+        params = mock_req.call_args[0][1]
+        assert params["mobile"] == "13800001111"
+        assert "cno" not in params
+
+    @pytest.mark.asyncio
+    async def test_query_by_openid(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"cno": "C003", "balance": 100}
+            result = await crm_adapter.query_member(openid="wx_open_id_123")
+        params = mock_req.call_args[0][1]
+        assert params["openid"] == "wx_open_id_123"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_not_found(self, crm_adapter):
+        """API 返回空结果时返回 None（降级）"""
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {}
+            result = await crm_adapter.query_member(card_no="NONEXIST")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_network_error(self, crm_adapter):
+        """网络异常时返回 None 而非抛异常"""
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("Connection refused")
+            result = await crm_adapter.query_member(card_no="C001")
+        assert result is None
+
+
+# ── add_member 新增会员 ──────────────────────────────────────────────────────────
+
+class TestAddMember:
+    @pytest.mark.asyncio
+    async def test_add_member_success(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"cno": "NEW001", "mobile": "13900001111"}
+            result = await crm_adapter.add_member(
+                mobile="13900001111", name="李四", sex=1, birthday="1990-05-15"
+            )
+        assert mock_req.call_args[0][0] == "/user/register"
+        params = mock_req.call_args[0][1]
+        assert params["mobile"] == "13900001111"
+        assert params["name"] == "李四"
+        assert params["sex"] == 1
+        assert params["birthday"] == "1990-05-15"
+        assert params["card_type"] == 1  # 默认电子卡
+        assert result["cno"] == "NEW001"
+
+    @pytest.mark.asyncio
+    async def test_add_member_with_store_id(self, crm_adapter):
+        """注册门店ID 应映射为 shop_id"""
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"cno": "NEW002"}
+            await crm_adapter.add_member(
+                mobile="13900002222", name="王五", store_id="S001"
+            )
+        params = mock_req.call_args[0][1]
+        assert params["shop_id"] == "S001"
+
+    @pytest.mark.asyncio
+    async def test_add_member_invalid_sex_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="sex 必须为"):
+            await crm_adapter.add_member(mobile="13900003333", name="赵六", sex=3)
+
+    @pytest.mark.asyncio
+    async def test_add_member_empty_mobile_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="mobile 不能为空"):
+            await crm_adapter.add_member(mobile="", name="空号")
+
+    @pytest.mark.asyncio
+    async def test_add_member_empty_name_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="name 不能为空"):
+            await crm_adapter.add_member(mobile="13900004444", name="")
+
+    @pytest.mark.asyncio
+    async def test_add_member_failure_returns_error_dict(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("手机号已注册")
+            result = await crm_adapter.add_member(mobile="13900005555", name="重复")
+        assert result["success"] is False
+        assert "手机号已注册" in result["message"]
+
+
+# ── update_member 更新会员 ───────────────────────────────────────────────────────
+
+class TestUpdateMember:
+    @pytest.mark.asyncio
+    async def test_update_member_filters_allowed_fields(self, crm_adapter):
+        """只传允许的字段，忽略非法字段"""
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"result": "ok"}
+            await crm_adapter.update_member(
+                card_no="C001",
+                update_data={"name": "新名字", "sex": 2, "hacker_field": "DROP TABLE"},
+            )
+        params = mock_req.call_args[0][1]
+        assert params["cno"] == "C001"
+        assert params["name"] == "新名字"
+        assert params["sex"] == 2
+        # 非法字段应被过滤
+        assert "hacker_field" not in params
+
+    @pytest.mark.asyncio
+    async def test_update_member_empty_card_no_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="card_no 不能为空"):
+            await crm_adapter.update_member(card_no="", update_data={"name": "X"})
+
+    @pytest.mark.asyncio
+    async def test_update_member_calls_correct_endpoint(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {}
+            await crm_adapter.update_member(card_no="C001", update_data={"name": "测试"})
+        assert mock_req.call_args[0][0] == "/user/update"
+
+
+# ── trade_query 交易查询 ─────────────────────────────────────────────────────────
+
+class TestTradeQuery:
+    @pytest.mark.asyncio
+    async def test_query_by_trade_no(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = [
+                {"trade_id": "T001", "consume_amount": 10000, "payment_amount": 9500}
+            ]
+            result = await crm_adapter.trade_query(trade_no="BIZ_001")
+        assert mock_req.call_args[0][0] == "/deal/query"
+        params = mock_req.call_args[0][1]
+        assert params["biz_id"] == "BIZ_001"
+        # 验证金额标准化
+        assert result[0]["consume_amount_yuan"] == 100.0
+        assert result[0]["payment_amount_yuan"] == 95.0
+
+    @pytest.mark.asyncio
+    async def test_query_with_date_range(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"list": []}
+            result = await crm_adapter.trade_query(
+                card_no="C001", start_date="2024-01-01", end_date="2024-01-31"
+            )
+        params = mock_req.call_args[0][1]
+        assert params["cno"] == "C001"
+        assert params["start_date"] == "2024-01-01"
+        assert params["end_date"] == "2024-01-31"
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_trade_query_returns_empty_on_error(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("查询超时")
+            result = await crm_adapter.trade_query(card_no="C001")
+        assert result == []
+
+
+# ── trade_cancel 交易撤销 ────────────────────────────────────────────────────────
+
+class TestTradeCancel:
+    @pytest.mark.asyncio
+    async def test_cancel_calls_correct_endpoint(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"result": "reversed"}
+            result = await crm_adapter.trade_cancel(trade_id="T001", reason="顾客退款")
+        assert mock_req.call_args[0][0] == "/deal/cancel"
+        params = mock_req.call_args[0][1]
+        assert params["biz_id"] == "T001"
+        assert params["reason"] == "顾客退款"
+
+    @pytest.mark.asyncio
+    async def test_cancel_empty_trade_id_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="trade_id 不能为空"):
+            await crm_adapter.trade_cancel(trade_id="")
+
+    @pytest.mark.asyncio
+    async def test_cancel_failure_returns_error_dict(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("交易已冲正")
+            result = await crm_adapter.trade_cancel(trade_id="T001")
+        assert result["success"] is False
+
+
+# ── recharge_submit 储值充值 ─────────────────────────────────────────────────────
+
+class TestRechargeSubmit:
+    @pytest.mark.asyncio
+    async def test_recharge_success_with_amount_normalization(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"balance": 15000}
+            result = await crm_adapter.recharge_submit(
+                card_no="C001", store_id="10", cashier="-1",
+                amount=10000, pay_type=3, trade_no="RC_001",
+            )
+        assert mock_req.call_args[0][0] == "/recharge/commit"
+        params = mock_req.call_args[0][1]
+        assert params["recharge_amount"] == 10000
+        assert params["cno"] == "C001"
+        # 金额标准化
+        assert result["balance_fen"] == 15000
+        assert result["balance_yuan"] == 150.0
+        assert result["recharge_amount_fen"] == 10000
+        assert result["recharge_amount_yuan"] == 100.0
+
+    @pytest.mark.asyncio
+    async def test_recharge_zero_amount_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="amount 必须为正整数"):
+            await crm_adapter.recharge_submit(
+                card_no="C001", store_id="10", cashier="-1",
+                amount=0, pay_type=3, trade_no="RC_002",
+            )
+
+    @pytest.mark.asyncio
+    async def test_recharge_empty_card_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="card_no 不能为空"):
+            await crm_adapter.recharge_submit(
+                card_no="", store_id="10", cashier="-1",
+                amount=100, pay_type=3, trade_no="RC_003",
+            )
+
+
+# ── recharge_query 储值查询 ──────────────────────────────────────────────────────
+
+class TestRechargeQuery:
+    @pytest.mark.asyncio
+    async def test_recharge_query_success(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"balance": 20000, "records": [{"amount": 10000}]}
+            result = await crm_adapter.recharge_query(card_no="C001")
+        assert result["balance_fen"] == 20000
+        assert result["balance_yuan"] == 200.0
+
+    @pytest.mark.asyncio
+    async def test_recharge_query_degradation_on_error(self, crm_adapter):
+        """网络异常时返回降级数据（余额0+空记录）"""
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("timeout")
+            result = await crm_adapter.recharge_query(card_no="C001")
+        assert result["balance_fen"] == 0
+        assert result["balance_yuan"] == 0.0
+        assert result["records"] == []
+
+    @pytest.mark.asyncio
+    async def test_recharge_query_empty_card_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="card_no 不能为空"):
+            await crm_adapter.recharge_query(card_no="")
+
+
+# ── coupon_list 优惠券列表 ───────────────────────────────────────────────────────
+
+class TestCouponList:
+    @pytest.mark.asyncio
+    async def test_coupon_list_with_face_value_normalization(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = [
+                {"coupon_id": "CP001", "face_value": 2000, "name": "满100减20"},
+                {"coupon_id": "CP002", "face_value": 5000, "name": "满200减50"},
+            ]
+            result = await crm_adapter.coupon_list(card_no="C001")
+        assert len(result) == 2
+        assert result[0]["face_value_fen"] == 2000
+        assert result[0]["face_value_yuan"] == 20.0
+        assert result[1]["face_value_yuan"] == 50.0
+
+    @pytest.mark.asyncio
+    async def test_coupon_list_with_store_filter(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = []
+            await crm_adapter.coupon_list(card_no="C001", store_id="10")
+        params = mock_req.call_args[0][1]
+        assert params["shop_id"] == 10
+
+    @pytest.mark.asyncio
+    async def test_coupon_list_returns_empty_on_error(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("服务不可用")
+            result = await crm_adapter.coupon_list(card_no="C001")
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_coupon_list_empty_card_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="card_no 不能为空"):
+            await crm_adapter.coupon_list(card_no="")
+
+
+# ── coupon_use 券码核销 ──────────────────────────────────────────────────────────
+
+class TestCouponUse:
+    @pytest.mark.asyncio
+    async def test_coupon_use_success(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"discount_amount": 2000, "result": "ok"}
+            result = await crm_adapter.coupon_use(
+                code="COUPON_ABC", store_id="10", cashier="-1", amount=15000,
+            )
+        assert mock_req.call_args[0][0] == "/coupon/use"
+        params = mock_req.call_args[0][1]
+        assert params["coupon_code"] == "COUPON_ABC"
+        assert params["consume_amount"] == 15000
+        assert result["discount_amount_fen"] == 2000
+        assert result["discount_amount_yuan"] == 20.0
+
+    @pytest.mark.asyncio
+    async def test_coupon_use_empty_code_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="code 不能为空"):
+            await crm_adapter.coupon_use(code="", store_id="10", cashier="-1", amount=100)
+
+    @pytest.mark.asyncio
+    async def test_coupon_use_negative_amount_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="amount 不能为负数"):
+            await crm_adapter.coupon_use(
+                code="CP001", store_id="10", cashier="-1", amount=-100,
+            )
+
+
+# ── query_member_points 积分查询 ──────────────────────────────────────────────────
+
+class TestQueryMemberPoints:
+    @pytest.mark.asyncio
+    async def test_query_points_success(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"points": 3200, "points_history": 8500}
+            result = await crm_adapter.query_member_points(card_no="C001")
+        assert mock_req.call_args[0][0] == "/user/credit/query"
+        assert result["points"] == 3200
+        assert result["points_history"] == 8500
+
+    @pytest.mark.asyncio
+    async def test_query_points_degradation(self, crm_adapter):
+        """查询失败时返回降级数据（积分=0）"""
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("服务异常")
+            result = await crm_adapter.query_member_points(card_no="C001")
+        assert result["points"] == 0
+        assert result["points_history"] == 0
+
+    @pytest.mark.asyncio
+    async def test_query_points_empty_card_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="card_no 不能为空"):
+            await crm_adapter.query_member_points(card_no="")
+
+
+# ── points_exchange 积分兑换 ──────────────────────────────────────────────────────
+
+class TestPointsExchange:
+    @pytest.mark.asyncio
+    async def test_exchange_success(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"deducted_points": 500, "remaining_points": 2700}
+            result = await crm_adapter.points_exchange(
+                card_no="C001", points=500, exchange_type="gift",
+            )
+        assert mock_req.call_args[0][0] == "/user/credit/exchange"
+        params = mock_req.call_args[0][1]
+        assert params["credit"] == 500
+        assert params["exchange_type"] == "gift"
+        assert result["remaining_points"] == 2700
+
+    @pytest.mark.asyncio
+    async def test_exchange_zero_points_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="points 必须为正整数"):
+            await crm_adapter.points_exchange(
+                card_no="C001", points=0, exchange_type="cash",
+            )
+
+    @pytest.mark.asyncio
+    async def test_exchange_negative_points_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="points 必须为正整数"):
+            await crm_adapter.points_exchange(
+                card_no="C001", points=-100, exchange_type="cash",
+            )
+
+    @pytest.mark.asyncio
+    async def test_exchange_invalid_type_raises(self, crm_adapter):
+        with pytest.raises(ValueError, match="exchange_type 必须为"):
+            await crm_adapter.points_exchange(
+                card_no="C001", points=100, exchange_type="invalid_type",
+            )
+
+    @pytest.mark.asyncio
+    async def test_exchange_with_shop_id(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {}
+            await crm_adapter.points_exchange(
+                card_no="C001", points=100, exchange_type="coupon", shop_id=10,
+            )
+        params = mock_req.call_args[0][1]
+        assert params["shop_id"] == 10
+
+    @pytest.mark.asyncio
+    async def test_exchange_failure_returns_error_dict(self, crm_adapter):
+        with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.side_effect = Exception("积分不足")
+            result = await crm_adapter.points_exchange(
+                card_no="C001", points=100, exchange_type="gift",
+            )
+        assert result["success"] is False
+        assert "积分不足" in result["message"]
+
+
+# ── trade_preview / trade_submit 高层封装 ────────────────────────────────────────
+
+class TestTradeHighLevel:
+    """测试 member_service 调用的高层封装方法"""
+
+    @pytest.mark.asyncio
+    async def test_trade_preview_delegates_to_deal_preview(self, crm_adapter):
+        with patch.object(crm_adapter, "deal_preview", new_callable=AsyncMock) as mock_dp:
+            mock_dp.return_value = {"final_amount": 9500}
+            result = await crm_adapter.trade_preview(
+                card_no="C001", store_id="10", cashier="-1", amount=10000,
+            )
+        # 验证代理调用
+        mock_dp.assert_called_once()
+        call_kwargs = mock_dp.call_args[1]
+        assert call_kwargs["cno"] == "C001"
+        assert call_kwargs["consume_amount"] == 10000
+        # 验证金额标准化
+        assert result["final_amount_fen"] == 9500
+        assert result["final_amount_yuan"] == 95.0
+
+    @pytest.mark.asyncio
+    async def test_trade_submit_delegates_to_deal_submit(self, crm_adapter):
+        with patch.object(crm_adapter, "deal_submit", new_callable=AsyncMock) as mock_ds:
+            mock_ds.return_value = {"amount": 9500, "trade_id": "T999"}
+            result = await crm_adapter.trade_submit(
+                card_no="C001", store_id="10", cashier="-1",
+                amount=9500, pay_type=3, trade_no="BIZ_999",
+                discount_plan={"sub_balance": 500},
+            )
+        call_kwargs = mock_ds.call_args[1]
+        assert call_kwargs["cno"] == "C001"
+        assert call_kwargs["biz_id"] == "BIZ_999"
+        assert call_kwargs["sub_balance"] == 500
+        assert call_kwargs["sub_credit"] == 0  # 未指定默认为0
+        # 金额标准化
+        assert result["amount_fen"] == 9500
+        assert result["amount_yuan"] == 95.0

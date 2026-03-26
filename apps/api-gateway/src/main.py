@@ -29,6 +29,7 @@ from src.api import pos_sync
 from src.api import roles as roles_api
 from src.api import merchants
 from src.api import prep_suggestion, soldout, agent_configs
+from src.api import dish_variants
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue, meituan_reservation
@@ -646,6 +647,8 @@ app.include_router(pos_sync.router, tags=["pos-sync"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliation"])
 app.include_router(dishes.router, prefix="/api/v1", tags=["dishes"])
+app.include_router(dish_variants.router, prefix="/api/v1", tags=["dish-variants"])
+app.include_router(dish_variants.update_router, tags=["dish-variants"])
 app.include_router(dish_master.router, tags=["dish-master"])
 app.include_router(benchmark.router, prefix="/api/v1", tags=["benchmark"])
 
@@ -1254,6 +1257,10 @@ from src.api.purchase_workbench import router as purchase_workbench_router
 app.include_router(purchase_workbench_router, tags=["purchase-workbench"])
 from src.api.mobile_stocktake import router as mobile_stocktake_router
 app.include_router(mobile_stocktake_router, tags=["mobile-stocktake"])
+
+# 活海鲜养殖管理（徐记海鲜鱼缸管理）
+from src.api import aquarium as aquarium_api
+app.include_router(aquarium_api.router, tags=["aquarium"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
