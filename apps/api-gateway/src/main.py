@@ -1259,6 +1259,18 @@ from src.api.receiving_inspection import router as receiving_inspection_router
 app.include_router(inter_store_transfer_router)
 app.include_router(receiving_inspection_router)
 
+# ── Phase 3a: 外卖统一接单面板（美团/饿了么/抖音聚合）────────────────
+from src.api.takeaway_unified import router as takeaway_unified_router
+app.include_router(takeaway_unified_router)
+
+# ── Phase 3b: 加盟商管理（合同/提成/门户）────────────────────────────
+from src.api.franchise import router as franchise_router
+app.include_router(franchise_router)
+
+# ── Phase 4: 财务真实聚合引擎+金蝶凭证同步────────────────────────────
+from src.api.finance_analytics import router as finance_analytics_router
+app.include_router(finance_analytics_router)
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:
