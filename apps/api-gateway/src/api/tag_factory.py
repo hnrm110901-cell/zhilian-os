@@ -59,7 +59,7 @@ class ConditionSchema(BaseModel):
 
 
 class CreateRuleRequest(BaseModel):
-    tag_name: str = Field(..., min_length=1, max_length=100, description="标签名称，如"高价值客户"")
+    tag_name: str = Field(..., min_length=1, max_length=100, description='标签名称，如"高价值客户"')
     tag_code: str = Field(..., min_length=1, max_length=50, description="标签代码，如 high_value（唯一）")
     conditions: List[ConditionSchema] = Field(..., description="规则条件列表")
     logic: str = Field(default="AND", description="条件组合逻辑：AND 或 OR")

@@ -81,12 +81,14 @@ def upgrade() -> None:
 
     # ── RLS 行级安全（使用 app.current_tenant，与项目其他表一致） ──────
     op.execute("ALTER TABLE takeaway_platform_configs ENABLE ROW LEVEL SECURITY")
+    op.execute("ALTER TABLE takeaway_platform_configs FORCE ROW LEVEL SECURITY")
     op.execute(
         """
         CREATE POLICY takeaway_platform_configs_tenant_isolation
         ON takeaway_platform_configs
         USING (
-            store_id::text = current_setting('app.current_tenant', true)
+            current_setting('app.current_tenant', TRUE) IS NOT NULL
+            AND store_id::text = current_setting('app.current_tenant', TRUE)
         )
         """
     )

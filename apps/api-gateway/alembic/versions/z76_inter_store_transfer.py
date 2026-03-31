@@ -115,7 +115,9 @@ def upgrade() -> None:
     # 3. RLS 策略（允许调拨双方门店访问）
     # ------------------------------------------------------------------ #
     op.execute("ALTER TABLE inter_store_transfer_requests ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE inter_store_transfer_requests FORCE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE inter_store_transfer_items ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE inter_store_transfer_items FORCE ROW LEVEL SECURITY;")
 
     # 调拨申请：from_store 或 to_store 均可访问
     op.execute("""

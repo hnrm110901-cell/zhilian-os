@@ -63,13 +63,16 @@ def upgrade() -> None:
     )
 
     # RLS：只能读写本租户的快照（与项目其他表保持一致，使用 app.current_tenant）
+    op.execute("ALTER TABLE finance_daily_snapshots ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE finance_daily_snapshots FORCE ROW LEVEL SECURITY;")
     op.execute(
         """
-        ALTER TABLE finance_daily_snapshots ENABLE ROW LEVEL SECURITY;
-
         CREATE POLICY finance_daily_snapshots_tenant_isolation
             ON finance_daily_snapshots
-            USING (store_id = current_setting('app.current_tenant', true));
+            USING (
+                current_setting('app.current_tenant', TRUE) IS NOT NULL
+                AND store_id::text = current_setting('app.current_tenant', TRUE)
+            );
         """
     )
 

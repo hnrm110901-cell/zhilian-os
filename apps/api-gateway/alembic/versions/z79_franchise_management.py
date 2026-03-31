@@ -38,6 +38,7 @@ def upgrade() -> None:
 
     # RLS：品牌方可以看自己品牌的所有加盟商
     op.execute("ALTER TABLE franchisees ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE franchisees FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY brand_isolation_franchisees
         ON franchisees
@@ -83,6 +84,7 @@ def upgrade() -> None:
 
     # RLS：品牌方可以看自己品牌的所有合同
     op.execute("ALTER TABLE franchise_contracts ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE franchise_contracts FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY brand_isolation_franchise_contracts
         ON franchise_contracts
@@ -128,12 +130,14 @@ def upgrade() -> None:
 
     # RLS：按 store_id 隔离（加盟商通过门户只能看自己门店的提成）
     op.execute("ALTER TABLE franchise_royalties ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE franchise_royalties FORCE ROW LEVEL SECURITY;")
     op.execute("""
         CREATE POLICY store_isolation_franchise_royalties
         ON franchise_royalties
         FOR ALL
         USING (
-            store_id::text = current_setting('app.current_tenant', TRUE)
+            current_setting('app.current_tenant', TRUE) IS NOT NULL
+            AND store_id::text = current_setting('app.current_tenant', TRUE)
         );
     """)
 

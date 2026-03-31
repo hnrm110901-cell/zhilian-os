@@ -134,15 +134,19 @@ def upgrade() -> None:
     # 4. RLS 策略（按 store_id）
     # ------------------------------------------------------------------ #
     op.execute("ALTER TABLE purchase_receivings ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE purchase_receivings FORCE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE purchase_receiving_items ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE purchase_receiving_items FORCE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE receiving_disputes ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE receiving_disputes FORCE ROW LEVEL SECURITY;")
 
     op.execute("""
         CREATE POLICY pr_store_policy
         ON purchase_receivings
         FOR ALL
         USING (
-            store_id::text = current_setting('app.current_tenant', TRUE)
+            current_setting('app.current_tenant', TRUE) IS NOT NULL
+            AND store_id::text = current_setting('app.current_tenant', TRUE)
         );
     """)
 
