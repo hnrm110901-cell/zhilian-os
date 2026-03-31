@@ -13,7 +13,7 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, exc as sa_exc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -205,7 +205,7 @@ async def get_mobile_dashboard(
         today_stats["orders"] = len(orders)
         today_stats["revenue"] = sum(order.get("realPrice", 0) for order in orders)
         today_stats["customers"] = sum(order.get("people", 0) for order in orders)
-    except Exception as e:
+    except (ConnectionError, TimeoutError, ValueError, KeyError) as e:
         logger.warning("获取今日订单数据失败", error=str(e))
 
     dashboard = MobileDashboard(
@@ -377,7 +377,7 @@ async def get_nearby_stores(
         }
 
     except Exception as e:
-        logger.error("查询附近门店失败", error=str(e))
+        logger.error("查询附近门店失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"查询附近门店失败: {str(e)}")
 
 
@@ -416,7 +416,7 @@ async def get_quick_stats(
                     "staff_on_duty": 0,  # 需要从员工排班系统获取
                 }
             )
-        except Exception as e:
+        except (ConnectionError, TimeoutError, ValueError, KeyError) as e:
             logger.warning("获取店长统计数据失败", error=str(e))
             stats.update(
                 {
@@ -450,7 +450,7 @@ async def get_quick_stats(
                     "completed_today": len(completed_orders),
                 }
             )
-        except Exception as e:
+        except (ConnectionError, TimeoutError, ValueError, KeyError) as e:
             logger.warning("获取服务员统计数据失败", error=str(e))
             stats.update(
                 {
@@ -482,7 +482,7 @@ async def get_quick_stats(
                     "completed_today": len(completed_orders),
                 }
             )
-        except Exception as e:
+        except (ConnectionError, TimeoutError, ValueError, KeyError) as e:
             logger.warning("获取厨师统计数据失败", error=str(e))
             stats.update(
                 {
@@ -507,7 +507,7 @@ async def get_quick_stats(
                     "today_transactions": 0,  # 需要从库存交易记录获取
                 }
             )
-        except Exception as e:
+        except (ImportError, ConnectionError, TimeoutError, ValueError) as e:
             logger.warning("获取库管统计数据失败", error=str(e))
             stats.update(
                 {
@@ -594,7 +594,7 @@ async def get_today_orders(
         }
 
     except Exception as e:
-        logger.error("获取今日订单失败", error=str(e))
+        logger.error("获取今日订单失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取今日订单失败: {str(e)}")
 
 
@@ -625,7 +625,7 @@ async def get_member_info(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error("查询会员信息失败", error=str(e))
+        logger.error("查询会员信息失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"查询会员信息失败: {str(e)}")
 
 
@@ -652,7 +652,7 @@ async def get_menu_categories(
         return {"categories": simplified_categories}
 
     except Exception as e:
-        logger.error("获取菜单类别失败", error=str(e))
+        logger.error("获取菜单类别失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取菜单类别失败: {str(e)}")
 
 
@@ -684,7 +684,7 @@ async def get_menu_dishes(
         return {"dishes": filtered_dishes}
 
     except Exception as e:
-        logger.error("获取菜品列表失败", error=str(e))
+        logger.error("获取菜品列表失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取菜品列表失败: {str(e)}")
 
 
@@ -711,7 +711,7 @@ async def get_tables(
         return {"tables": simplified_tables}
 
     except Exception as e:
-        logger.error("获取桌台列表失败", error=str(e))
+        logger.error("获取桌台列表失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取桌台列表失败: {str(e)}")
 
 
@@ -758,7 +758,7 @@ def _count_attachments(task: Task) -> int:
         data = json.loads(task.attachments)
         if isinstance(data, list):
             return len(data)
-    except Exception:
+    except (json.JSONDecodeError, ValueError, TypeError):
         return 1
     return 0
 
@@ -848,7 +848,7 @@ async def _fetch_edge_hub_status(store_id: str, db: AsyncSession) -> Optional[Mo
             p1_alert_count=p1_open,
             last_heartbeat=hub.last_heartbeat.isoformat() if hub and hub.last_heartbeat else None,
         )
-    except Exception:
+    except sa_exc.SQLAlchemyError:
         return None
 
 
@@ -1070,7 +1070,7 @@ async def mobile_task_submit(
             existing = json.loads(task.attachments) if task.attachments else []
             if not isinstance(existing, list):
                 existing = []
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError):
             existing = []
         existing.extend(payload.evidence_files)
         task.attachments = json.dumps(existing, ensure_ascii=False)
@@ -1103,7 +1103,7 @@ async def mobile_task_upload_evidence(
         existing = json.loads(task.attachments) if task.attachments else []
         if not isinstance(existing, list):
             existing = []
-    except Exception:
+    except (json.JSONDecodeError, ValueError, TypeError):
         existing = []
     existing.append(filename)
     task.attachments = json.dumps(existing, ensure_ascii=False)

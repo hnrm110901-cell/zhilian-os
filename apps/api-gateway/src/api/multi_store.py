@@ -7,6 +7,7 @@ from typing import List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import exc as sa_exc
 from pydantic import BaseModel, Field
 
 from ..core.dependencies import get_current_active_user
@@ -91,7 +92,7 @@ async def create_store(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error("创建门店失败", error=str(e))
+        logger.error("创建门店失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"创建门店失败: {str(e)}")
 
 
@@ -146,7 +147,7 @@ async def get_stores(
             "offset": offset,
         }
     except Exception as e:
-        logger.error("获取门店列表失败", error=str(e))
+        logger.error("获取门店列表失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取门店列表失败: {str(e)}")
 
 
@@ -198,7 +199,7 @@ async def compare_stores(
             "end_date": request.end_date,
         }
     except Exception as e:
-        logger.error("门店对比失败", error=str(e))
+        logger.error("门店对比失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"门店对比失败: {str(e)}")
 
 
@@ -215,7 +216,7 @@ async def get_regional_summary(
         summary = await store_service.get_regional_summary()
         return summary
     except Exception as e:
-        logger.error("获取区域汇总失败", error=str(e))
+        logger.error("获取区域汇总失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取区域汇总失败: {str(e)}")
 
 
@@ -269,7 +270,7 @@ async def get_regional_summary_compat(
             )
         return {"regions": regions}
     except Exception as e:
-        logger.error("获取区域汇总失败(compat)", error=str(e))
+        logger.error("获取区域汇总失败(compat)", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取区域汇总失败: {str(e)}")
 
 
@@ -288,7 +289,7 @@ async def get_performance_ranking(
         ranking = await store_service.get_performance_ranking(metric, limit)
         return {"metric": metric, "ranking": ranking}
     except Exception as e:
-        logger.error("获取业绩排名失败", error=str(e))
+        logger.error("获取业绩排名失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取业绩排名失败: {str(e)}")
 
 
@@ -311,7 +312,7 @@ async def get_performance_ranking_compat(
             )
         return {"metric": metric, "ranking": normalized}
     except Exception as e:
-        logger.error("获取业绩排名失败(compat)", error=str(e))
+        logger.error("获取业绩排名失败(compat)", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取业绩排名失败: {str(e)}")
 
 
@@ -331,7 +332,7 @@ async def get_store_count(
         count = await store_service.get_store_count(region=region, status=status_enum)
         return {"count": count, "region": region, "status": status}
     except Exception as e:
-        logger.error("获取门店数量失败", error=str(e))
+        logger.error("获取门店数量失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取门店数量失败: {str(e)}")
 
 
@@ -355,7 +356,7 @@ async def get_store_stats(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("获取门店统计失败", error=str(e))
+        logger.error("获取门店统计失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取门店统计失败: {str(e)}")
 
 
@@ -399,7 +400,7 @@ async def get_store(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("获取门店详情失败", error=str(e))
+        logger.error("获取门店详情失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取门店详情失败: {str(e)}")
 
 
@@ -428,7 +429,7 @@ async def update_store(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("更新门店信息失败", error=str(e))
+        logger.error("更新门店信息失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"更新门店信息失败: {str(e)}")
 
 
@@ -455,7 +456,7 @@ async def delete_store(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("删除门店失败", error=str(e))
+        logger.error("删除门店失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"删除门店失败: {str(e)}")
 
 
@@ -530,7 +531,7 @@ async def get_cross_store_staff_availability(
             )
         return {"date": date, "stores": result}
     except Exception as e:
-        logger.error("获取跨店可用员工失败", error=str(e))
+        logger.error("获取跨店可用员工失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -567,7 +568,7 @@ async def hq_config_broadcast(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("配置下发失败", error=str(e))
+        logger.error("配置下发失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

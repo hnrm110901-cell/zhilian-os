@@ -9,14 +9,18 @@ Consolidated API endpoints for:
 - Internationalization
 """
 
+import structlog
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
+
+logger = structlog.get_logger()
 from src.services.industry_solutions import IndustrySolutionsService, IndustryType, TemplateType
 from src.services.internationalization import Currency, InternationalizationService, Language
 from src.services.open_api_platform import DeveloperTier, OpenAPIPlatform, PluginCategory, PluginStatus
@@ -75,7 +79,13 @@ async def register_developer(request: RegisterDeveloperRequest, db: AsyncSession
             "api_secret": developer.api_secret,
             "rate_limit": developer.rate_limit,
         }
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("register_developer_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("register_developer_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -100,7 +110,13 @@ async def submit_plugin(request: SubmitPluginRequest, db: AsyncSession = Depends
             "status": plugin.status.value,
             "revenue_share": plugin.revenue_share,
         }
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("submit_plugin_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("submit_plugin_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -130,7 +146,11 @@ async def get_marketplace_plugins(
                 for p in plugins
             ],
         }
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("get_marketplace_plugins_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("get_marketplace_plugins_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -173,7 +193,11 @@ async def get_industry_solution(industry_type: IndustryTypeEnum, db: AsyncSessio
         }
     except HTTPException:
         raise
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("get_industry_solution_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("get_industry_solution_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -185,7 +209,11 @@ async def apply_industry_solution(store_id: str, industry_type: IndustryTypeEnum
         result = service.apply_solution(store_id=store_id, industry_type=IndustryType(industry_type.value))
 
         return {"success": True, **result}
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("apply_industry_solution_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("apply_industry_solution_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -253,7 +281,11 @@ async def list_suppliers(category: Optional[str] = None, db: AsyncSession = Depe
                 for s in suppliers
             ],
         }
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("list_suppliers_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("list_suppliers_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -274,7 +306,11 @@ async def register_supplier(request: RegisterSupplierRequest, db: AsyncSession =
             notes=request.notes,
         )
         return {"success": True, "supplier_id": supplier.id, "code": supplier.code}
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("register_supplier_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("register_supplier_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -318,7 +354,11 @@ async def update_supplier(
         return {"success": True, "supplier_id": supplier.id}
     except HTTPException:
         raise
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("update_supplier_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("update_supplier_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -341,7 +381,11 @@ async def deactivate_supplier(
         return {"success": True, "message": "供应商已停用"}
     except HTTPException:
         raise
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("deactivate_supplier_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("deactivate_supplier_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -376,7 +420,11 @@ async def evaluate_supplier(
         }
     except HTTPException:
         raise
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("evaluate_supplier_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("evaluate_supplier_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -390,7 +438,11 @@ async def get_supplier_performance_api(
         service = SupplyChainIntegration(db)
         perf = await service.get_supplier_performance(supplier_id)
         return {"success": True, "performance": perf}
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("get_supplier_performance_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("get_supplier_performance_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -406,7 +458,11 @@ async def request_quotes(request: RequestQuotesRequest, db: AsyncSession = Depen
             supplier_ids=request.supplier_ids,
         )
         return {"success": True, "total_quotes": len(quotes), "quotes": quotes}
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("request_quotes_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("request_quotes_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -417,7 +473,10 @@ async def compare_quotes(request: CompareQuotesRequest, db: AsyncSession = Depen
         service = SupplyChainIntegration(db)
         comparison = service.compare_quotes(request.quotes)
         return {"success": True, **comparison}
+    except (ValueError, KeyError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error("compare_quotes_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -435,7 +494,11 @@ async def create_order(request: CreateOrderRequest, db: AsyncSession = Depends(g
             notes=request.notes,
         )
         return {"success": True, "order_id": order.id, "order_number": order.order_number, "status": order.status}
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("create_order_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("create_order_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -466,7 +529,11 @@ async def list_orders(
                 for o in orders
             ],
         }
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("list_orders_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("list_orders_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -479,7 +546,11 @@ async def update_order_status(order_id: str, request: UpdateOrderStatusRequest, 
         return {"success": True, "order_id": order.id, "status": order.status}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except sa_exc.SQLAlchemyError as e:
+        logger.error("update_order_status_db_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="数据库操作失败")
     except Exception as e:
+        logger.error("update_order_status_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -518,6 +589,7 @@ async def get_supported_languages(db: AsyncSession = Depends(get_db)):
 
         return {"success": True, "languages": languages}
     except Exception as e:
+        logger.error("get_supported_languages_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -530,6 +602,7 @@ async def get_supported_currencies(db: AsyncSession = Depends(get_db)):
 
         return {"success": True, "currencies": currencies}
     except Exception as e:
+        logger.error("get_supported_currencies_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -551,7 +624,10 @@ async def convert_currency(
             "converted_amount": converted,
             "converted_currency": to_currency.value,
         }
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error("convert_currency_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
