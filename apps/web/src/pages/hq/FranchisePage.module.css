@@ -1,0 +1,188 @@
+.page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.asOf {
+  font-size: 12px;
+  color: #999;
+}
+
+/* KPI 卡片行 */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpiCard {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.kpiHighlight {
+  border-color: #ff4d4f;
+  background: #fff2f0;
+}
+
+.kpiLabel {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.kpiHighlight .kpiValue {
+  color: #ff4d4f;
+}
+
+.kpiSub {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* 分区 */
+.section {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 16px;
+}
+
+/* 到期预警列表 */
+.warningList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.warningItem {
+  display: flex;
+  gap: 24px;
+  padding: 10px 12px;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.contractNo {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.storeId {
+  color: #555;
+}
+
+.expiryDate {
+  color: #fa8c16;
+  font-weight: 500;
+}
+
+/* 加盟商表格 */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  padding: 8px 12px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  color: #666;
+  font-weight: 500;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f5f5f5;
+  color: #333;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* 状态徽章 */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badgeActive {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+}
+
+.badgeSuspended {
+  background: #fffbe6;
+  color: #faad14;
+  border: 1px solid #ffe58f;
+}
+
+.badgeTerminated {
+  background: #f5f5f5;
+  color: #999;
+  border: 1px solid #e0e0e0;
+}
+
+.loading {
+  padding: 48px;
+  text-align: center;
+  color: #999;
+}
+
+.error {
+  padding: 24px;
+  color: #ff4d4f;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+}
+
+.empty {
+  text-align: center;
+  padding: 32px;
+  color: #bbb;
+  font-size: 13px;
+}
