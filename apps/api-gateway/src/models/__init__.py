@@ -435,6 +435,9 @@ __all__ = [
     "ConfigKey",
     "OrgPermission",
     "OrgPermissionLevel",
+    # Phase 1 — 集团层级数据模型
+    "GroupTenant",
+    "BrandConsumerProfile",
     # HR domain models (z54)
     "Person",
     "EmploymentAssignment",
@@ -476,6 +479,9 @@ from .fct_advanced import (
 # Data Dictionary models — 数据字典补齐
 from .organization import Group, Brand, Region
 from .ingredient_master import IngredientMaster
+# Phase 1 — 集团层级数据模型
+from .group_tenant import GroupTenant
+from .brand_consumer_profile import BrandConsumerProfile
 from .inventory_ext import InventoryBatch, InventoryCount
 from .purchase_order_item import PurchaseOrderItem
 from .daily_summary import DailyRevenueSummary, DailyWasteSummary, DailyPnlSummary

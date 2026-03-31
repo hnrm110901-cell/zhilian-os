@@ -170,3 +170,24 @@ const resp = await apiClient.get('/api/v1/bff/sm/...');
 | BFF 端点角色前缀 | 小写2字母 | `sm`, `chef`, `floor`, `hq` |
 | 页面路径 | 角色前缀/页面 | `pages/sm/Home.tsx` |
 | Layout 文件 | `{Role}Layout.tsx` | `StoreManagerLayout.tsx` |
+
+---
+
+## 🔒 审计修复期特别约束（2026-03 至 2026-06）
+
+> 基于 v6 代码审计结果，以下约束在修复期间强制执行。
+
+### 异常处理
+- 修改 `except Exception` 时，必须替换为具体异常类型（参考 `src/core/exceptions.py` 层级）
+- 新代码禁止使用 `except Exception`（最外层兜底除外，且必须加 `exc_info=True`）
+- 新增 POS 适配器代码必须附带 ≥3 个测试用例
+
+### 安全
+- 禁止在 `config/merchants/` 目录下提交任何文件
+- 所有模型调用必须通过 `ModelRouter`（`src/core/model_router.py`），不直接调用 API
+- 数据库新表必须包含 `tenant_id` + RLS 策略（使用 `app.current_tenant`，禁止 NULL 绕过）
+
+### 提交前检查
+- `git-secrets` 扫描通过
+- 涉及的 P1 模块 pytest 通过
+- 无新增 broad except（用 ruff S 规则检查）
