@@ -906,3 +906,106 @@ async def get_dish_rd_dashboard(
         "launched_count": status_counts.get(DishStatusEnum.LAUNCHED, 0),
         "as_of": datetime.utcnow().isoformat(),
     }
+
+
+# ─── 新品经营预见书 / 多 Agent 协商 ───────────────────────────────────────
+
+
+class SimulateRequest(BaseModel):
+    """厨房压力 + 蚕食 + Pareto 模拟请求"""
+    dish_name: str = Field(..., description="新品名称")
+    store_id: str = Field(..., description="门店ID")
+    sop_stations: list = Field(default_factory=lambda: [
+        {"name": "备料", "base_seconds": 120, "variance": 0.2},
+        {"name": "炒制", "base_seconds": 180, "variance": 0.15},
+        {"name": "摆盘", "base_seconds": 60, "variance": 0.1},
+    ], description="SOP工站列表")
+    flavor_tags: list = Field(default_factory=list, description="风味标签")
+    price_fen: int = Field(0, description="售价（分）")
+    category: str = Field("", description="品类")
+    projected_daily_sales: float = Field(20.0, description="预计日均销量")
+
+
+class NegotiateRequest(BaseModel):
+    """多 Agent 协商请求"""
+    recipe_version_id: str = Field(..., description="配方版本ID")
+
+
+@router.post("/brands/{brand_id}/dishes/{dish_id}/agent/simulate", summary="新品经营预见书")
+async def run_simulation(
+    brand_id: str,
+    dish_id: str,
+    req: SimulateRequest,
+    _: User = Depends(get_current_user),
+):
+    """运行厨房压力模拟 + 菜单蚕食分析 + Pareto 多目标优化"""
+    from src.services.dish_rd_simulation import dish_rd_simulation, DishSOP
+
+    sop = DishSOP(
+        dish_name=req.dish_name,
+        stations=[{
+            "name": s.get("name", "工站"),
+            "base_seconds": s.get("base_seconds", 120),
+            "variance": s.get("variance", 0.15),
+        } for s in req.sop_stations],
+    )
+
+    report = await dish_rd_simulation.generate_forecast_report(
+        store_id=req.store_id,
+        dish_name=req.dish_name,
+        sop=sop,
+        flavor_tags=req.flavor_tags,
+        price_fen=req.price_fen,
+        category=req.category,
+        projected_daily_sales=req.projected_daily_sales,
+    )
+    return {
+        "dish_id": dish_id,
+        "brand_id": brand_id,
+        "report_id": report.report_id,
+        "stress": report.stress.__dict__ if report.stress else None,
+        "cannibalization": report.cannibalization.__dict__ if report.cannibalization else None,
+        "pareto": report.pareto.__dict__ if report.pareto else None,
+        "综合建议": report.summary,
+    }
+
+
+@router.post("/brands/{brand_id}/dishes/{dish_id}/agent/negotiate", summary="多Agent协商评审")
+async def run_negotiation(
+    brand_id: str,
+    dish_id: str,
+    req: NegotiateRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """启动四视角（研发/财务/供应链/运营）协商流程，输出综合评审结论"""
+    from src.services.dish_rd_negotiation import dish_rd_negotiation
+
+    result = await dish_rd_negotiation.negotiate(
+        db=db,
+        dish_id=dish_id,
+        brand_id=brand_id,
+        recipe_version_id=req.recipe_version_id,
+    )
+    return {
+        "dish_id": dish_id,
+        "brand_id": brand_id,
+        "verdict": result.final_verdict,
+        "weighted_score": result.weighted_score,
+        "conditions": result.conditions,
+        "rounds": [
+            {
+                "round": r.round_number,
+                "perspectives": {
+                    name: {
+                        "score": p.score,
+                        "dimension_scores": p.dimension_scores,
+                        "justification": p.justification,
+                        "risk_flags": p.risk_flags,
+                    }
+                    for name, p in r.perspectives.items()
+                },
+            }
+            for r in result.rounds
+        ],
+    }

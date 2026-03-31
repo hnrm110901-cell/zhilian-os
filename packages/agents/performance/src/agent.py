@@ -27,6 +27,15 @@ core_path = Path(__file__).resolve().parent.parent.parent.parent.parent / "apps"
 sys.path.insert(0, str(core_path))
 from base_agent import BaseAgent, AgentResponse  # noqa: E402
 
+# 加载 OrgHierarchyService（api-gateway/src/services）
+_svc_path = Path(__file__).resolve().parent.parent.parent.parent.parent / "apps" / "api-gateway" / "src"
+if str(_svc_path) not in sys.path:
+    sys.path.insert(0, str(_svc_path))
+try:
+    from services.org_hierarchy_service import OrgHierarchyService  # noqa: E402
+except ImportError:
+    OrgHierarchyService = None  # type: ignore[assignment,misc]
+
 logger = structlog.get_logger()
 
 # ── 岗位配置 ──────────────────────────────────────────────────────────────────
@@ -278,12 +287,12 @@ COMMISSION_RULES: Dict[str, List[Dict[str, Any]]] = {
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
 
-def _achievement(value: float, target: float, metric_id: str) -> float:
-    """计算达成率，最高 2.0，避免除零。越低越好的指标取反向。"""
+def _achievement(value: float, target: float, metric_id: str, cap: float = 2.0) -> float:
+    """计算达成率，最高 cap（默认2.0），避免除零。越低越好的指标取反向。"""
     if target == 0:
         return 0.0
     rate = (target / value) if metric_id in LOWER_IS_BETTER else (value / target)
-    return min(round(rate, 4), 2.0)
+    return min(round(rate, 4), cap)
 
 
 def _compute_rule_amount(
@@ -457,6 +466,38 @@ class PerformanceAgent(BaseAgent):
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         try:
+            # ── 动态配置解析 ──────────────────────────────────────────────
+            store_id = params.get("store_id", self.store_id)
+            db = params.get("db")
+            dyn_cfg: Dict[str, Any] = {}
+            if db is not None and OrgHierarchyService is not None:
+                try:
+                    svc = OrgHierarchyService(db)
+                    dyn_cfg["store_kpi_weights"] = await svc.resolve(
+                        store_id, "store_kpi_weights",
+                        default={"revenue": 0.25, "profit": 0.25, "labor": 0.15,
+                                 "satisfaction": 0.15, "waste": 0.20}
+                    )
+                    dyn_cfg["table_turnover_baseline"] = await svc.resolve(
+                        store_id, "baseline_table_turnover", default=3.0
+                    )
+                    dyn_cfg["piece_rate_tiers"] = await svc.resolve(
+                        store_id, "piece_rate_tiers",
+                        default=[
+                            {"max_orders": 100, "rate": 1.0},
+                            {"max_orders": 300, "rate": 1.5},
+                            {"max_orders": None, "rate": 2.0},
+                        ]
+                    )
+                    dyn_cfg["kpi_achievement_cap"] = await svc.resolve(
+                        store_id, "kpi_achievement_max_cap", default=2.0
+                    )
+                except Exception as _cfg_err:
+                    logger.warning("performance_dyn_cfg_failed", error=str(_cfg_err))
+            # 将动态配置注入 params，供子方法读取
+            params = {**params, "_dyn_cfg": dyn_cfg}
+            # ────────────────────────────────────────────────────────────
+
             if action == "get_role_config":
                 return AgentResponse(success=True, data=self._get_role_config(params))
             if action == "calculate_performance":
@@ -522,13 +563,21 @@ class PerformanceAgent(BaseAgent):
         role    = ROLE_CONFIG[role_id]
         mv      = params.get("metric_values", {}) or {}
         period  = params.get("period", datetime.now().strftime("%Y-%m"))
+        dyn_cfg = params.get("_dyn_cfg", {})
+
+        # 动态翻台基准（仅在 store_manager/shift_manager 的 turnover 指标中生效）
+        table_turnover_baseline = dyn_cfg.get("table_turnover_baseline", DEFAULT_TARGETS.get("turnover", 3.0))
+        dynamic_targets = {**DEFAULT_TARGETS, "turnover": table_turnover_baseline}
+
+        # KPI达成率上限
+        kpi_cap = dyn_cfg.get("kpi_achievement_cap", 2.0)
 
         items: List[Dict[str, Any]] = []
         for m in role["metrics"]:
             mid    = m["id"]
             value  = mv.get(mid)
-            target = DEFAULT_TARGETS.get(mid)
-            ach    = _achievement(value, target, mid) if (value is not None and target is not None) else None
+            target = dynamic_targets.get(mid)
+            ach    = _achievement(value, target, mid, cap=kpi_cap) if (value is not None and target is not None) else None
             items.append({
                 "metric_id":        mid,
                 "metric_name":      m["name"],
@@ -568,8 +617,14 @@ class PerformanceAgent(BaseAgent):
         if not role_id or role_id not in ROLE_CONFIG:
             return {"success": False, "error": f"无效 role_id: {role_id}"}
 
-        mv     = params.get("metric_values", {}) or {}
-        period = params.get("period", datetime.now().strftime("%Y-%m"))
+        mv      = params.get("metric_values", {}) or {}
+        period  = params.get("period", datetime.now().strftime("%Y-%m"))
+        dyn_cfg = params.get("_dyn_cfg", {})
+
+        # 动态翻台基准 & KPI上限
+        table_turnover_baseline = dyn_cfg.get("table_turnover_baseline", DEFAULT_TARGETS.get("turnover", 3.0))
+        dynamic_targets = {**DEFAULT_TARGETS, "turnover": table_turnover_baseline}
+        kpi_cap = dyn_cfg.get("kpi_achievement_cap", 2.0)
 
         # 先算达成率
         role = ROLE_CONFIG[role_id]
@@ -577,9 +632,9 @@ class PerformanceAgent(BaseAgent):
         for m in role["metrics"]:
             mid = m["id"]
             v   = mv.get(mid)
-            t   = DEFAULT_TARGETS.get(mid)
+            t   = dynamic_targets.get(mid)
             if v is not None and t is not None:
-                achievements[mid] = _achievement(v, t, mid)
+                achievements[mid] = _achievement(v, t, mid, cap=kpi_cap)
 
         scored = [
             achievements[m["id"]] * m["weight"]
@@ -591,7 +646,22 @@ class PerformanceAgent(BaseAgent):
             round(sum(scored) / sum(w_scored), 4) if w_scored else None
         )
 
-        rules         = COMMISSION_RULES.get(role_id, [])
+        # 动态计件提成分段（外卖专员 delivery）
+        piece_rate_tiers = dyn_cfg.get("piece_rate_tiers")
+        rules = COMMISSION_RULES.get(role_id, [])
+        if piece_rate_tiers and role_id == "delivery":
+            rules = []
+            for rule in COMMISSION_RULES.get(role_id, []):
+                if rule.get("type") == "tiered_count" and rule.get("metric") == "order_count":
+                    # 将动态分段转换为原始 tiers 格式 [(max_orders, rate_fen), ...]
+                    converted_tiers = []
+                    for tier in piece_rate_tiers:
+                        max_o = tier.get("max_orders") or 9999
+                        rate_fen = int(tier.get("rate", 1.0) * 100)
+                        converted_tiers.append((max_o, rate_fen))
+                    rule = {**rule, "tiers": converted_tiers}
+                rules.append(rule)
+
         rule_results  = []
         total_fen     = 0
 

@@ -1,0 +1,216 @@
+/* ConfigManagementPage.module.css */
+
+.container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 标题栏 ── */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── 主体布局 ── */
+
+.mainContent {
+  align-items: flex-start;
+}
+
+/* ── 组织树卡片 ── */
+
+.treeCard {
+  position: sticky;
+  top: 16px;
+  min-height: 400px;
+}
+
+.treeLoading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+.orgTree {
+  font-size: 13px;
+}
+
+/* ── 配置详情卡片 ── */
+
+.detailCard {
+  min-height: 400px;
+}
+
+.configLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+}
+
+/* ── 配置项列表 ── */
+
+.configList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.configRow {
+  border-bottom: 1px solid var(--border-default, #f0f0f0);
+  padding: 12px 4px;
+  transition: background 0.12s;
+}
+
+.configRow:last-child {
+  border-bottom: none;
+}
+
+.configRow:hover {
+  background: var(--bg-subtle, #fafafa);
+  border-radius: 6px;
+}
+
+.configRowMain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── 配置键名 ── */
+
+.configKey {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.configLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  white-space: nowrap;
+}
+
+.configKeyCode {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 配置值 ── */
+
+.configValue {
+  flex: 0 0 160px;
+  font-size: 14px;
+}
+
+.valueLocal {
+  color: var(--text-primary, #111827);
+  font-weight: 600;
+}
+
+.valueInherited {
+  color: var(--text-secondary, #6b7280);
+}
+
+.valueEmpty {
+  color: var(--text-tertiary, #9ca3af);
+  font-style: italic;
+}
+
+.valueUnit {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 400;
+}
+
+/* ── 来源标签 ── */
+
+.configSource {
+  flex: 0 0 160px;
+}
+
+.inheritTag {
+  font-size: 11px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.localTag {
+  font-size: 11px;
+}
+
+/* ── 操作按钮 ── */
+
+.configActions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ── 响应式 ── */
+
+@media (max-width: 1024px) {
+  .configKey {
+    flex: 0 0 180px;
+  }
+
+  .configValue {
+    flex: 0 0 120px;
+  }
+
+  .configSource {
+    flex: 0 0 140px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .configRowMain {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .configKey,
+  .configValue,
+  .configSource {
+    flex: none;
+    width: 100%;
+  }
+
+  .configActions {
+    margin-left: 0;
+    width: 100%;
+  }
+}

@@ -456,6 +456,8 @@ class OrderAgent(BaseAgent):
         demand_level: str = "normal",
         party_size: int = 2,
         request_time: Optional[str] = None,
+        db: Optional[Any] = None,
+        store_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         动态定价策略（MVP）：
@@ -466,11 +468,33 @@ class OrderAgent(BaseAgent):
         if base_price <= 0:
             return {"success": False, "message": "基础价格必须大于0"}
 
-        demand_factor_map = {
-            "low": float(os.getenv("ORDER_PRICING_FACTOR_LOW", "0.95")),
-            "normal": float(os.getenv("ORDER_PRICING_FACTOR_NORMAL", "1.00")),
-            "high": float(os.getenv("ORDER_PRICING_FACTOR_HIGH", "1.08")),
-        }
+        # 动态定价系数：优先从门店级配置读取，降级使用环境变量默认值
+        if db and store_id:
+            try:
+                from src.services.org_hierarchy_service import OrgHierarchyService
+                svc = OrgHierarchyService(db)
+                pricing_factors = await svc.resolve(
+                    store_id,
+                    "dynamic_pricing_factors",
+                    default=None,
+                )
+            except Exception:
+                pricing_factors = None
+        else:
+            pricing_factors = None
+
+        if pricing_factors:
+            demand_factor_map = {
+                "low": float(pricing_factors.get("low", os.getenv("ORDER_PRICING_FACTOR_LOW", "0.95"))),
+                "normal": float(pricing_factors.get("normal", os.getenv("ORDER_PRICING_FACTOR_NORMAL", "1.00"))),
+                "high": float(pricing_factors.get("high", os.getenv("ORDER_PRICING_FACTOR_HIGH", "1.08"))),
+            }
+        else:
+            demand_factor_map = {
+                "low": float(os.getenv("ORDER_PRICING_FACTOR_LOW", "0.95")),
+                "normal": float(os.getenv("ORDER_PRICING_FACTOR_NORMAL", "1.00")),
+                "high": float(os.getenv("ORDER_PRICING_FACTOR_HIGH", "1.08")),
+            }
         demand_factor = demand_factor_map.get(demand_level, demand_factor_map["normal"])
 
         group_factor = float(os.getenv("ORDER_PRICING_GROUP_FACTOR", "1.03")) if party_size >= 6 else 1.0
@@ -974,19 +998,56 @@ class OrderAgent(BaseAgent):
         order: Dict[str, Any],
         member_id: Optional[str] = None,
         coupon_codes: Optional[List[str]] = None,
+        db: Optional[Any] = None,
+        store_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         计算账单
 
         Args:
             order: 订单数据（由调用方从DB查询后传入；订单不存在时调用方应提前返回错误）
+            db: 数据库会话（可选），用于读取门店级动态配置
+            store_id: 门店ID（可选），与 db 配合读取门店级动态配置
         """
         logger.info("计算账单", order_id=order_id, member_id=member_id, coupons=coupon_codes)
 
         total_amount = order["total_amount"]
-        member_discount_rate = float(os.getenv("ORDER_MEMBER_DISCOUNT_RATE", "0.1")) if member_id else 0
+
+        # 会员折扣率和优惠券额度：优先从门店级配置读取，降级使用环境变量默认值
+        if member_id and db and store_id:
+            try:
+                from src.services.org_hierarchy_service import OrgHierarchyService
+                svc = OrgHierarchyService(db)
+                member_discount_rate = await svc.resolve(
+                    store_id, "member_discount_rate", default=0.10
+                )
+                member_discount_rate = float(member_discount_rate)
+            except Exception:
+                member_discount_rate = float(os.getenv("ORDER_MEMBER_DISCOUNT_RATE", "0.1"))
+        elif member_id:
+            member_discount_rate = float(os.getenv("ORDER_MEMBER_DISCOUNT_RATE", "0.1"))
+        else:
+            member_discount_rate = 0.0
+
         member_discount = round(total_amount * member_discount_rate, 2)
-        coupon_discount = float(os.getenv("ORDER_COUPON_DISCOUNT", "10.0")) * len(coupon_codes) if coupon_codes else 0
+
+        if coupon_codes:
+            if db and store_id:
+                try:
+                    from src.services.org_hierarchy_service import OrgHierarchyService
+                    svc = OrgHierarchyService(db)
+                    coupon_unit = await svc.resolve(
+                        store_id, "coupon_discount_amount", default=10.0
+                    )
+                    coupon_unit = float(coupon_unit)
+                except Exception:
+                    coupon_unit = float(os.getenv("ORDER_COUPON_DISCOUNT", "10.0"))
+            else:
+                coupon_unit = float(os.getenv("ORDER_COUPON_DISCOUNT", "10.0"))
+            coupon_discount = coupon_unit * len(coupon_codes)
+        else:
+            coupon_discount = 0.0
+
         final_amount = max(0.0, total_amount - member_discount - coupon_discount)
 
         bill = {

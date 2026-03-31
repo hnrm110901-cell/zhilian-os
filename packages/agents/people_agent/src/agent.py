@@ -29,6 +29,8 @@ from src.models.people_agent import (
     PeopleStaffingDecision,
     PeopleAgentLog,
 )
+from src.services.org_hierarchy_service import OrgHierarchyService
+from src.models.org_config import ConfigKey
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +40,8 @@ _LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "anthropic")
 
 # ── KPI配置 ──────────────────────────────────────────────────────────────────
 
-# 各岗位KPI配置：{kpi_key: (weight, target_value, higher_is_better)}
-ROLE_KPI_CONFIG: Dict[str, List[Dict[str, Any]]] = {
+# 各岗位KPI配置默认值：{kpi_key: (weight, target_value, higher_is_better)}
+DEFAULT_ROLE_KPI_CONFIG: Dict[str, List[Dict[str, Any]]] = {
     "store_manager": [
         {"key": "revenue_achievement", "weight": 0.25, "target": 1.0, "higher": True},
         {"key": "profit_margin",       "weight": 0.25, "target": 0.20, "higher": True},
@@ -71,14 +73,32 @@ ROLE_KPI_CONFIG: Dict[str, List[Dict[str, Any]]] = {
     ],
 }
 
-# 绩效等级阈值（overall_score 0-100）
-PERF_RATING_THRESHOLDS = [
+# 绩效等级阈值默认值（overall_score 0-100）
+DEFAULT_PERF_RATING_THRESHOLDS = [
     (90.0, "outstanding"),
     (80.0, "exceeds"),
     (65.0, "meets"),
     (50.0, "below"),
     (0.0,  "unsatisfactory"),
 ]
+
+async def _resolve_kpi_config(db: AsyncSession, store_id: str, role: str) -> list:
+    """解析指定门店+岗位的KPI配置，优先从OrgConfig读取，回退到默认值"""
+    svc = OrgHierarchyService(db)
+    custom = await svc.resolve(store_id, ConfigKey.ROLE_KPI_CONFIG, default=None)
+    if custom and role in custom:
+        return custom[role]
+    return DEFAULT_ROLE_KPI_CONFIG.get(role, DEFAULT_ROLE_KPI_CONFIG["default"])
+
+
+async def _resolve_perf_thresholds(db: AsyncSession, store_id: str) -> list:
+    """解析指定门店的绩效等级阈值，优先从OrgConfig读取，回退到默认值"""
+    svc = OrgHierarchyService(db)
+    custom = await svc.resolve(store_id, ConfigKey.PERF_RATING_THRESHOLDS, default=None)
+    if custom:
+        return [(item[0], item[1]) for item in custom]
+    return DEFAULT_PERF_RATING_THRESHOLDS
+
 
 # 排班建议模板（按人力成本率偏差）
 SHIFT_SUGGESTIONS: Dict[str, List[str]] = {
@@ -125,9 +145,14 @@ def compute_kpi_achievement(actual: float, target: float, higher_is_better: bool
     return round(raw, 4)
 
 
-def compute_performance_score(kpi_values: Dict[str, float], role: str) -> tuple[float, List[Dict]]:
+def compute_performance_score(
+    kpi_values: Dict[str, float],
+    role: str,
+    role_kpi_config: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+) -> tuple[float, List[Dict]]:
     """计算员工绩效综合分（0-100）及各KPI详情"""
-    config = ROLE_KPI_CONFIG.get(role, ROLE_KPI_CONFIG["default"])
+    cfg_source = role_kpi_config if role_kpi_config is not None else DEFAULT_ROLE_KPI_CONFIG
+    config = cfg_source.get(role, cfg_source.get("default", DEFAULT_ROLE_KPI_CONFIG["default"]))
     if not kpi_values:
         return 50.0, []
 
@@ -154,9 +179,13 @@ def compute_performance_score(kpi_values: Dict[str, float], role: str) -> tuple[
     return round(weighted_score, 1), items
 
 
-def classify_performance_rating(score: float) -> str:
+def classify_performance_rating(
+    score: float,
+    perf_rating_thresholds: Optional[List] = None,
+) -> str:
     """绩效评级：outstanding/exceeds/meets/below/unsatisfactory"""
-    for threshold, rating in PERF_RATING_THRESHOLDS:
+    thresholds = perf_rating_thresholds if perf_rating_thresholds is not None else DEFAULT_PERF_RATING_THRESHOLDS
+    for threshold, rating in thresholds:
         if score >= threshold:
             return rating
     return "unsatisfactory"
@@ -200,11 +229,16 @@ def compute_optimization_potential(
     return round(revenue_yuan * excess_ratio / 100, 2)
 
 
-def classify_attendance_severity(alert_type: str, count_in_period: int = 1) -> str:
+def classify_attendance_severity(
+    alert_type: str,
+    count_in_period: int = 1,
+    absent_critical_count: int = 3,
+    early_leave_warning_count: int = 2,
+) -> str:
     """考勤预警严重度"""
-    if alert_type == "absent" or count_in_period >= 3:
+    if alert_type == "absent" or count_in_period >= absent_critical_count:
         return "critical"
-    if alert_type in ("early_leave", "overtime") or count_in_period >= 2:
+    if alert_type in ("early_leave", "overtime") or count_in_period >= early_leave_warning_count:
         return "warning"
     return "info"
 
@@ -338,8 +372,15 @@ class PerformanceScoreAgent:
         db: Optional[AsyncSession] = None,
         save: bool = True,
     ) -> Dict[str, Any]:
-        overall_score, kpi_items = compute_performance_score(kpi_values, role)
-        rating = classify_performance_rating(overall_score)
+        # 动态读取KPI配置和绩效阈值
+        if db:
+            resolved_kpi_config = {role: await _resolve_kpi_config(db, store_id, role)}
+            resolved_thresholds = await _resolve_perf_thresholds(db, store_id)
+        else:
+            resolved_kpi_config = None
+            resolved_thresholds = None
+        overall_score, kpi_items = compute_performance_score(kpi_values, role, role_kpi_config=resolved_kpi_config)
+        rating = classify_performance_rating(overall_score, perf_rating_thresholds=resolved_thresholds)
         base_commission, bonus = compute_commission(overall_score, base_salary, role)
         total_commission = base_commission + bonus
 
@@ -490,7 +531,15 @@ class AttendanceWarnAgent:
         db: Optional[AsyncSession] = None,
         save: bool = True,
     ) -> Dict[str, Any]:
-        severity = classify_attendance_severity(alert_type, count_in_period)
+        # 动态读取考勤告警阈值
+        if db:
+            svc = OrgHierarchyService(db)
+            absent_critical = await svc.resolve(store_id, ConfigKey.ATTENDANCE_ABSENT_CRITICAL_COUNT, default=3)
+            early_leave_warning = await svc.resolve(store_id, ConfigKey.ATTENDANCE_EARLY_LEAVE_WARNING_COUNT, default=2)
+        else:
+            absent_critical = 3
+            early_leave_warning = 2
+        severity = classify_attendance_severity(alert_type, count_in_period, absent_critical, early_leave_warning)
 
         action_map = {
             "late":        "联系员工确认到岗，超15分钟按规定处理",

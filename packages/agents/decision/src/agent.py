@@ -190,6 +190,37 @@ class DecisionAgent(BaseAgent):
         }
         self._db_engine = None
         self.logger = logger.bind(agent="decision", store_id=store_id)
+        # 运行时可配置参数（默认值从环境变量读取，可通过 apply_org_config 覆盖）
+        self._trend_increase_threshold: float = float(os.getenv("DECISION_TREND_INCREASE_THRESHOLD", "0.15"))
+        self._weekend_premium_mild: float = 1.2
+        self._weekend_premium_strong: float = 1.5
+        self._cost_structure: dict = {"food": 0.35, "labor": 0.25, "overhead": 0.15}
+
+    async def apply_org_config(self, db) -> None:
+        """从 OrgHierarchyService 加载门店级配置，覆盖默认值。
+        在创建 Agent 后、第一次业务调用前调用此方法。"""
+        try:
+            from src.services.org_hierarchy_service import OrgHierarchyService
+            svc = OrgHierarchyService(db)
+            # KPI 目标
+            kpi_override = await svc.resolve(self.store_id, "decision_kpi_targets", default=None)
+            if isinstance(kpi_override, dict):
+                self.kpi_targets.update(kpi_override)
+            # 趋势告警阈值
+            inc = await svc.resolve(self.store_id, "revenue_trend_increase", default=None)
+            if inc is not None:
+                self._trend_increase_threshold = float(inc)
+            # 周末溢价系数
+            wp = await svc.resolve(self.store_id, "weekend_premium_alert_thresholds", default=None)
+            if isinstance(wp, dict):
+                self._weekend_premium_mild = float(wp.get("mild", self._weekend_premium_mild))
+                self._weekend_premium_strong = float(wp.get("strong", self._weekend_premium_strong))
+            # 成本结构分解
+            cs = await svc.resolve(self.store_id, "cost_breakdown_structure", default=None)
+            if isinstance(cs, dict):
+                self._cost_structure = cs
+        except Exception:
+            pass  # 配置加载失败时保持默认值，不影响正常运行
 
     def get_supported_actions(self) -> List[str]:
         """获取支持的操作列表"""
@@ -502,9 +533,9 @@ class DecisionAgent(BaseAgent):
 
         if abs(change_rate) < float(os.getenv("DECISION_TREND_STABLE_THRESHOLD", "0.05")):
             return TrendDirection.STABLE
-        elif change_rate > float(os.getenv("DECISION_TREND_INCREASE_THRESHOLD", "0.15")):
+        elif change_rate > self._trend_increase_threshold:
             return TrendDirection.INCREASING
-        elif change_rate < -float(os.getenv("DECISION_TREND_INCREASE_THRESHOLD", "0.15")):
+        elif change_rate < -self._trend_increase_threshold:
             return TrendDirection.DECREASING
         elif abs(change_rate) > float(os.getenv("DECISION_TREND_VOLATILE_THRESHOLD", "0.10")):
             return TrendDirection.VOLATILE
@@ -678,10 +709,12 @@ class DecisionAgent(BaseAgent):
                     weekend_rate = rate
                 else:
                     weekday_rate = rate
+            mild_threshold = self._weekend_premium_mild
+            strong_threshold = self._weekend_premium_strong
             if (
                 weekend_rate is not None
                 and weekday_rate is not None
-                and weekend_rate > weekday_rate * 1.2
+                and weekend_rate > weekday_rate * mild_threshold
             ):
                 insights.append(BusinessInsight(
                     insight_id=f"INSIGHT_INVENTORY_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -692,7 +725,7 @@ class DecisionAgent(BaseAgent):
                         "建议优化周末采购与备餐计划"
                     ),
                     category="inventory",
-                    impact_level="high" if weekend_rate > weekday_rate * 1.5 else "medium",
+                    impact_level="high" if weekend_rate > weekday_rate * strong_threshold else "medium",
                     data_points=[
                         {"label": "周末损耗率", "value": round(weekend_rate, 4)},
                         {"label": "平日损耗率", "value": round(weekday_rate, 4)},
@@ -1040,13 +1073,16 @@ class DecisionAgent(BaseAgent):
 
     async def _optimize_cost_allocation(self) -> ResourceOptimization:
         """优化成本配置"""
+        food_pct = self._cost_structure.get("food", 0.35)
+        labor_pct = self._cost_structure.get("labor", 0.25)
+        overhead_pct = self._cost_structure.get("overhead", 0.15)
         optimization: ResourceOptimization = {
             "optimization_id": f"OPT_COST_{datetime.now().strftime('%Y%m%d%H%M%S')}",
             "resource_type": "cost",
             "current_allocation": {
-                "food_cost_ratio": 0.35,
-                "labor_cost_ratio": 0.25,
-                "overhead_ratio": 0.15
+                "food_cost_ratio": food_pct,
+                "labor_cost_ratio": labor_pct,
+                "overhead_ratio": overhead_pct
             },
             "recommended_allocation": {
                 "food_cost_ratio": 0.32,

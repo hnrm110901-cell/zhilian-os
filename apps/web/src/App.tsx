@@ -173,6 +173,7 @@ const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
 const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
 const MerchantManagementPage = lazy(() => import('./pages/MerchantManagementPage'));
+const ConfigManagementPage = lazy(() => import('./pages/ConfigManagementPage'));
 const MerchantListPage = lazy(() => import('./pages/platform/MerchantListPage'));
 const MerchantDetailPage = lazy(() => import('./pages/platform/MerchantDetailPage'));
 // Phase P1 — 预订Agent: 渠道中台 + 客户风控
@@ -1055,6 +1056,7 @@ const AppContent: React.FC = () => {
                   <Route path="store-tpl" element={<StoreTemplatePage />} />
                   <Route path="agent-train" element={<AgentTrainingPage />} />
                   <Route path="isolation" element={<DataIsolationPage />} />
+                  <Route path="config-management" element={<ConfigManagementPage />} />
                   {/* 设备运维 */}
                   <Route path="edge-nodes" element={<EdgeNodeManagementPage />} />
                   <Route path="iot" element={<IoTDevicesPage />} />

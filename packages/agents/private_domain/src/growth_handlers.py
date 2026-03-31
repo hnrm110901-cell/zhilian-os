@@ -10,6 +10,13 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from src.services.org_hierarchy_service import OrgHierarchyService
+    from sqlalchemy.ext.asyncio import AsyncSession
+    _ORG_HIERARCHY_AVAILABLE = True
+except ImportError:
+    _ORG_HIERARCHY_AVAILABLE = False
+
 GROWTH_ACTIONS = [
     "user_portrait",
     "funnel_optimize",
@@ -70,11 +77,13 @@ def _query_db(sql: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
 
-async def run_growth_action(action: str, params: Dict[str, Any], store_id: str = "") -> Dict[str, Any]:
+async def run_growth_action(action: str, params: Dict[str, Any], store_id: str = "", db: Optional[Any] = None) -> Dict[str, Any]:
     """根据 action 分发到对应 handler，返回 data 字典（供 AgentResponse.data 使用）。"""
     p = dict(params) if params else {}
     if store_id:
         p["store_id"] = store_id
+    if db is not None:
+        p["_db"] = db
     if action not in GROWTH_ACTIONS:
         return {"error": f"未知 action: {action}", "supported": GROWTH_ACTIONS}
     ok, err = _validate_params(action, p)
@@ -185,6 +194,26 @@ async def _realtime_metrics(params: Dict[str, Any]) -> Dict[str, Any]:
     store_ids = params.get("store_ids") or []
     store_id = params.get("store_id") or ""
     ctx = params.get("context") or {}
+    db = params.get("_db")
+
+    # 读取动态配置：时区和时段映射
+    if db is not None and store_id and _ORG_HIERARCHY_AVAILABLE:
+        svc = OrgHierarchyService(db)
+        timezone = await svc.resolve(store_id, "store_timezone", default="Asia/Shanghai")
+        mealtime_segments = await svc.resolve(store_id, "mealtime_segments", default=[
+            {"name": "早", "start": 6, "end": 11},
+            {"name": "午", "start": 11, "end": 14},
+            {"name": "下午茶", "start": 14, "end": 17},
+            {"name": "晚", "start": 17, "end": 21},
+        ])
+    else:
+        timezone = "Asia/Shanghai"
+        mealtime_segments = [
+            {"name": "早", "start": 6, "end": 11},
+            {"name": "午", "start": 11, "end": 14},
+            {"name": "下午茶", "start": 14, "end": 17},
+            {"name": "晚", "start": 17, "end": 21},
+        ]
 
     rows = _query_db(
         """
@@ -203,8 +232,11 @@ async def _realtime_metrics(params: Dict[str, Any]) -> Dict[str, Any]:
     if rows:
         r = rows[0]
         peak_hour = r["hour"]
-        period_map = {range(6, 11): "早餐", range(11, 14): "午餐", range(14, 17): "下午茶", range(17, 21): "晚餐"}
-        peak_period = next((v for k, v in period_map.items() if peak_hour in k), f"{peak_hour}时")
+        # 根据动态时段映射判断峰值时段名称
+        peak_period = next(
+            (seg["name"] for seg in mealtime_segments if seg["start"] <= peak_hour < seg["end"]),
+            f"{peak_hour}时",
+        )
         metrics = {"today_orders": r["order_count"], "today_revenue": float(r["revenue"]), "peak_hour": peak_hour}
         summary = f"今日已产生 {r['order_count']} 笔订单，营收 {float(r['revenue']):.0f} 元，峰值时段为{peak_period}。"
     else:
@@ -413,6 +445,8 @@ async def _social_content_draft(params: Dict[str, Any]) -> Dict[str, Any]:
     platform = params.get("platform") or "wechat"
     theme = params.get("theme") or "新品上市"
     vars_ = params.get("vars") or {}
+    store_id = params.get("store_id") or ""
+    db = params.get("_db")
 
     tpl = COGNITIVE_FRIENDLY_TEMPLATES.get(theme)
     if tpl is None:
@@ -422,12 +456,25 @@ async def _social_content_draft(params: Dict[str, Any]) -> Dict[str, Any]:
 
     draft = _render_template(tpl, vars_)
 
+    # 读取动态配置，按主题覆盖 publish_tip
+    publish_tip = tpl["publish_tip"]
+    if db is not None and store_id and _ORG_HIERARCHY_AVAILABLE:
+        svc = OrgHierarchyService(db)
+        if theme == "新品上市":
+            publish_hours = await svc.resolve(store_id, "content_publish_hours", default=[11, 18])
+            lunch_publish_hour = publish_hours[0] if publish_hours else 11
+            dinner_publish_hour = publish_hours[1] if len(publish_hours) > 1 else 18
+            publish_tip = f"建议午间 {lunch_publish_hour:02d}:00 或晚间 {dinner_publish_hour:02d}:00 发布，避开推送高峰"
+        elif theme == "节假日促销":
+            holiday_advance_days = await svc.resolve(store_id, "holiday_promotion_advance_days", default=3)
+            publish_tip = f"节前{holiday_advance_days}天发布效果最佳，节当天不发（已决策）"
+
     data = {
         "draft": draft,
         "platform": platform,
         "theme": theme,
         "principle": tpl["principle"],
-        "publish_tip": tpl["publish_tip"],
+        "publish_tip": publish_tip,
         "forbidden": tpl["forbidden"],
     }
     return _with_store_id(data, params)

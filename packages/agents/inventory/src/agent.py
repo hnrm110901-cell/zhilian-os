@@ -25,6 +25,15 @@ sys.path.insert(0, str(core_path))
 
 from base_agent import BaseAgent, AgentResponse
 
+# 加载 OrgHierarchyService（api-gateway/src/services）
+_svc_path = Path(__file__).resolve().parent.parent.parent.parent.parent / "apps" / "api-gateway" / "src"
+if str(_svc_path) not in sys.path:
+    sys.path.insert(0, str(_svc_path))
+try:
+    from services.org_hierarchy_service import OrgHierarchyService  # noqa: E402
+except ImportError:
+    OrgHierarchyService = None  # type: ignore[assignment,misc]
+
 logger = structlog.get_logger()
 
 
@@ -182,6 +191,33 @@ class InventoryAgent(BaseAgent):
         Returns:
             AgentResponse: 统一的响应格式
         """
+        # ── 动态配置解析 ──────────────────────────────────────────────
+        db = params.get("db")
+        if db is not None and OrgHierarchyService is not None:
+            try:
+                svc = OrgHierarchyService(db)
+                low_stock_ratio = await svc.resolve(
+                    self.store_id, "inventory_low_stock_ratio", default=0.30
+                )
+                critical_ratio = await svc.resolve(
+                    self.store_id, "inventory_critical_ratio", default=0.10
+                )
+                expiring_days = await svc.resolve(
+                    self.store_id, "inventory_expiring_days", default=7
+                )
+                urgent_days = await svc.resolve(
+                    self.store_id, "inventory_urgent_days", default=3
+                )
+                self.alert_thresholds = {
+                    "low_stock_ratio":       float(low_stock_ratio),
+                    "critical_stock_ratio":  float(critical_ratio),
+                    "expiring_soon_days":    int(expiring_days),
+                    "expiring_urgent_days":  int(urgent_days),
+                }
+            except Exception as _cfg_err:
+                self.logger.warning("inventory_dyn_cfg_failed", error=str(_cfg_err))
+        # ────────────────────────────────────────────────────────────
+
         try:
             if action == "monitor_inventory":
                 result = await self.monitor_inventory(

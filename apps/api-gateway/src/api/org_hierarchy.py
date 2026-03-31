@@ -115,3 +115,183 @@ async def get_org_snapshot(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return snapshot.to_dict()
+
+
+# ── 批量配置管理接口（运维交付团队） ─────────────────────────────────────────
+
+
+class BulkConfigRequest(BaseModel):
+    configs: list[SetConfigRequest]  # 复用已有的 SetConfigRequest
+
+
+@router.post("/nodes/{node_id}/config/bulk", status_code=200)
+async def bulk_set_config(
+    node_id: str, req: BulkConfigRequest, db: AsyncSession = Depends(get_db)
+):
+    """批量设置多个配置项，原子操作（全成功或全失败）"""
+    svc = OrgHierarchyService(db)
+    node = await svc.get_node(node_id)
+    if not node:
+        raise HTTPException(404, f"节点不存在: {node_id}")
+    results = []
+    for item in req.configs:
+        cfg = await svc.set_config(
+            node_id=node_id, key=item.key, value=item.value,
+            value_type=item.value_type, is_override=item.is_override,
+        )
+        results.append({"key": cfg.config_key, "effective_value": cfg.typed_value()})
+    await db.commit()
+    return {"updated": len(results), "configs": results}
+
+
+@router.post("/nodes/{node_id}/config/copy-from/{source_id}", status_code=200)
+async def copy_config_from(
+    node_id: str, source_id: str,
+    overwrite: bool = True,
+    db: AsyncSession = Depends(get_db)
+):
+    """从 source_id 节点复制所有配置到 node_id（不含继承，只复制直接设置的配置）"""
+    svc = OrgHierarchyService(db)
+    target = await svc.get_node(node_id)
+    source = await svc.get_node(source_id)
+    if not target:
+        raise HTTPException(404, f"目标节点不存在: {node_id}")
+    if not source:
+        raise HTTPException(404, f"源节点不存在: {source_id}")
+
+    from src.models.org_config import OrgConfig
+    from sqlalchemy import select
+    result = await db.execute(
+        select(OrgConfig).where(OrgConfig.org_node_id == source_id)
+    )
+    source_configs = result.scalars().all()
+
+    copied = 0
+    for src_cfg in source_configs:
+        # 如果 overwrite=False，跳过目标节点已存在的 key
+        if not overwrite:
+            existing = await db.execute(
+                select(OrgConfig).where(
+                    OrgConfig.org_node_id == node_id,
+                    OrgConfig.config_key == src_cfg.config_key
+                )
+            )
+            if existing.scalar_one_or_none():
+                continue
+        await svc.set_config(
+            node_id=node_id, key=src_cfg.config_key,
+            value=src_cfg.config_value, value_type=src_cfg.value_type,
+            is_override=True,
+        )
+        copied += 1
+    await db.commit()
+    return {"copied": copied, "source": source_id, "target": node_id}
+
+
+@router.delete("/nodes/{node_id}/config/{key}", status_code=200)
+async def delete_config(
+    node_id: str, key: str, db: AsyncSession = Depends(get_db)
+):
+    """删除节点的直接配置项，使其回退到父节点继承值"""
+    from src.models.org_config import OrgConfig
+    from sqlalchemy import select, delete
+
+    result = await db.execute(
+        select(OrgConfig).where(
+            OrgConfig.org_node_id == node_id,
+            OrgConfig.config_key == key
+        )
+    )
+    cfg = result.scalar_one_or_none()
+    if not cfg:
+        raise HTTPException(404, f"配置项不存在: {key}")
+
+    await db.execute(
+        delete(OrgConfig).where(
+            OrgConfig.org_node_id == node_id,
+            OrgConfig.config_key == key
+        )
+    )
+    await db.commit()
+
+    # 返回删除后的继承值
+    svc = OrgHierarchyService(db)
+    inherited_value = await svc.resolve(node_id, key, default=None)
+    return {"deleted_key": key, "now_inherits": inherited_value}
+
+
+@router.get("/nodes/{node_id}/config/diff")
+async def get_config_diff(node_id: str, db: AsyncSession = Depends(get_db)):
+    """返回本节点与父节点继承值的差异（仅展示本节点有直接配置的项）"""
+    from src.models.org_config import OrgConfig
+    from sqlalchemy import select
+
+    svc = OrgHierarchyService(db)
+    node = await svc.get_node(node_id)
+    if not node:
+        raise HTTPException(404, f"节点不存在: {node_id}")
+
+    # 本节点直接设置的配置
+    result = await db.execute(
+        select(OrgConfig).where(OrgConfig.org_node_id == node_id)
+    )
+    direct_configs = result.scalars().all()
+
+    diffs = []
+    for cfg in direct_configs:
+        # 查父节点继承值（resolver 从父节点往上查）
+        parent_id = node.parent_id
+        parent_value = None
+        if parent_id:
+            parent_value = await svc.resolve(parent_id, cfg.config_key, default=None)
+
+        diffs.append({
+            "key": cfg.config_key,
+            "this_node_value": cfg.typed_value(),
+            "parent_inherits": parent_value,
+            "is_override": cfg.is_override,
+            "value_type": cfg.value_type,
+            "description": cfg.description,
+        })
+
+    return {
+        "node_id": node_id,
+        "node_name": node.name,
+        "direct_config_count": len(diffs),
+        "diffs": diffs,
+    }
+
+
+@router.post("/nodes/{node_id}/config/reset", status_code=200)
+async def reset_all_configs(
+    node_id: str,
+    confirm: bool = False,
+    db: AsyncSession = Depends(get_db)
+):
+    """删除节点所有直接配置，使其完全从父节点继承（危险操作，需 confirm=true）"""
+    if not confirm:
+        raise HTTPException(400, "危险操作：需要传入 confirm=true 参数确认")
+
+    from src.models.org_config import OrgConfig
+    from sqlalchemy import delete, select, func
+
+    # 先统计数量
+    count_result = await db.execute(
+        select(func.count()).where(OrgConfig.org_node_id == node_id)
+    )
+    count = count_result.scalar()
+
+    await db.execute(
+        delete(OrgConfig).where(OrgConfig.org_node_id == node_id)
+    )
+    await db.commit()
+    return {"reset": count, "node_id": node_id, "message": "所有直接配置已清除，现在完全继承父节点"}
+
+
+@router.get("/config/keys")
+async def list_config_keys():
+    """列出系统支持的所有配置 key 及其默认值说明"""
+    from src.models.org_config import ConfigKey
+    keys = {k: v for k, v in vars(ConfigKey).items()
+            if not k.startswith("_") and isinstance(v, str)}
+    return {"config_keys": keys, "total": len(keys)}

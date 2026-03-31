@@ -80,10 +80,11 @@ const NAV_SECTIONS: NavSection[] = [
     title: '配置中台',
     icon: <SettingOutlined />,
     items: [
-      { key: 'rules',        path: '/ops/rules',        label: '业务规则',   icon: <ToolOutlined /> },
-      { key: 'store-tpl',    path: '/ops/store-tpl',    label: '门店模板',   icon: <CopyOutlined /> },
-      { key: 'agent-train',  path: '/ops/agent-train',  label: 'Agent训练',  icon: <ExperimentOutlined /> },
-      { key: 'isolation',    path: '/ops/isolation',     label: '数据隔离',   icon: <LockOutlined /> },
+      { key: 'rules',              path: '/ops/rules',              label: '业务规则',   icon: <ToolOutlined /> },
+      { key: 'store-tpl',          path: '/ops/store-tpl',          label: '门店模板',   icon: <CopyOutlined /> },
+      { key: 'agent-train',        path: '/ops/agent-train',        label: 'Agent训练',  icon: <ExperimentOutlined /> },
+      { key: 'isolation',          path: '/ops/isolation',          label: '数据隔离',   icon: <LockOutlined /> },
+      { key: 'config-management',  path: '/ops/config-management',  label: '运维配置',   icon: <SettingOutlined />, badge: 'new' as const },
     ],
   },
   {

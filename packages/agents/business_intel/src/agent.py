@@ -28,6 +28,7 @@ from src.models.business_intel import (
     AnomalyLevelEnum, ScenarioTypeEnum, BizIntelAgentTypeEnum,
     DecisionPriorityEnum, DecisionStatusEnum,
 )
+from src.services.org_hierarchy_service import OrgHierarchyService
 
 logger = logging.getLogger(__name__)
 
@@ -151,12 +152,14 @@ def classify_scenario(
     food_cost_ratio: float,
     labor_cost_ratio: float,
     complaint_count: int,
+    food_cost_alert: float = 0.42,
+    labor_cost_alert: float = 0.35,
 ) -> str:
     if revenue_deviation_pct >= 15:
         return "peak_revenue"
     if revenue_deviation_pct <= -15:
         return "revenue_slump"
-    if food_cost_ratio >= 0.42 or labor_cost_ratio >= 0.35:
+    if food_cost_ratio >= food_cost_alert or labor_cost_ratio >= labor_cost_alert:
         return "cost_overrun"
     if complaint_count >= 5:
         return "inventory_crisis"
@@ -317,11 +320,32 @@ class KpiScorecardAgent:
         t0 = datetime.utcnow()
         values = kpi_values or {}
 
+        # 从 OrgHierarchyService 动态读取 KPI 权重配置
+        svc = OrgHierarchyService(db)
+        kpi_weights = await svc.resolve(store_id, "biz_intel_kpi_weights", default={
+            "food_cost": 0.25, "table_turnover": 0.15, "revenue": 0.30,
+            "labor_cost": 0.20, "complaint": 0.10,
+        })
+        food_cost_weight = kpi_weights.get("food_cost", 0.25)
+        table_turnover_weight = kpi_weights.get("table_turnover", 0.15)
+        revenue_weight = kpi_weights.get("revenue", 0.30)
+        labor_cost_weight = kpi_weights.get("labor_cost", 0.20)
+        complaint_weight = kpi_weights.get("complaint", 0.10)
+
+        # 使用动态权重覆盖默认 KPI 配置
+        kpi_config = [
+            {"kpi_id": "revenue_achievement", "name": "营收达成率", "category": "revenue",   "weight": revenue_weight,       "target": 1.0},
+            {"kpi_id": "food_cost_ratio",     "name": "食材成本率", "category": "cost",      "weight": food_cost_weight,     "target": 0.38},
+            {"kpi_id": "labor_cost_ratio",    "name": "人力成本率", "category": "cost",      "weight": labor_cost_weight,    "target": 0.28},
+            {"kpi_id": "table_turnover",      "name": "翻台率",     "category": "efficiency", "weight": table_turnover_weight, "target": 3.5},
+            {"kpi_id": "complaint_rate",      "name": "投诉率",     "category": "cost",      "weight": complaint_weight,     "target": 0.01},
+        ]
+
         kpi_items = []
         achievements = []
         weights = []
 
-        for cfg in self.DEFAULT_KPI_CONFIG:
+        for cfg in kpi_config:
             kid = cfg["kpi_id"]
             actual = values.get(kid)
             if actual is None:
@@ -776,13 +800,20 @@ class ScenarioMatchAgent:
         labor_ratio = float(snap.labor_cost_ratio or 0) if snap else m.get("labor_cost_ratio", 0.28)
         complaint_cnt = int(snap.complaint_count or 0) if snap else m.get("complaint_count", 0)
 
-        scenario = classify_scenario(rev_dev, food_ratio, labor_ratio, complaint_cnt)
+        # 从 OrgHierarchyService 动态读取成本告警阈值
+        svc = OrgHierarchyService(db)
+        food_cost_alert = await svc.resolve(store_id, "food_cost_alert_threshold", default=0.42)
+        labor_cost_alert = await svc.resolve(store_id, "labor_cost_alert_threshold", default=0.35)
+        cost_ratio_threshold = await svc.resolve(store_id, "labor_cost_ratio_target", default=0.35)
+
+        scenario = classify_scenario(rev_dev, food_ratio, labor_ratio, complaint_cnt,
+                                     food_cost_alert=food_cost_alert, labor_cost_alert=labor_cost_alert)
         playbook = self.PLAYBOOKS.get(scenario, self.PLAYBOOKS["normal_ops"])
 
         key_signals = [
             {"signal": "revenue_deviation_pct", "value": rev_dev, "threshold": 15},
-            {"signal": "food_cost_ratio", "value": food_ratio, "threshold": 0.42},
-            {"signal": "labor_cost_ratio", "value": labor_ratio, "threshold": 0.35},
+            {"signal": "food_cost_ratio", "value": food_ratio, "threshold": food_cost_alert},
+            {"signal": "labor_cost_ratio", "value": labor_ratio, "threshold": cost_ratio_threshold},
             {"signal": "complaint_count", "value": complaint_cnt, "threshold": 5},
         ]
 

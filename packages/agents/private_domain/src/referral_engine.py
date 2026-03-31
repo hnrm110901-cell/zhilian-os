@@ -14,6 +14,13 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+try:
+    from src.services.org_hierarchy_service import OrgHierarchyService
+    from sqlalchemy.ext.asyncio import AsyncSession
+    _ORG_HIERARCHY_AVAILABLE = True
+except ImportError:
+    _ORG_HIERARCHY_AVAILABLE = False
+
 
 # ── 裂变场景枚举 ──────────────────────────────────────────────────────────────
 
@@ -79,9 +86,11 @@ REFERRAL_PLAYBOOKS: Dict[str, Dict[str, Any]] = {
 # ── 裂变信号检测 ──────────────────────────────────────────────────────────────
 
 
-def detect_referral_potential(
+async def detect_referral_potential(
     customer: Dict[str, Any],
     order_history: List[Dict[str, Any]],
+    db: Optional[Any] = None,
+    store_id: Optional[str] = None,
 ) -> Optional[ReferralScenario]:
     """
     识别高裂变潜力场景，返回最优先的 ReferralScenario（或 None）。
@@ -91,53 +100,102 @@ def detect_referral_potential(
     Args:
         customer: 顾客数据，含 total_visits_30d 等字段
         order_history: 订单列表，每项含 days_ago / party_size / tags / weekday / hour
+        db: 可选数据库会话，用于读取动态配置
+        store_id: 门店ID，与 db 配合使用
 
     Returns:
         ReferralScenario 或 None（不符合任何高K值场景）
     """
+    # 读取动态配置（有 db 时从层级配置读取，否则使用默认值）
+    if db is not None and store_id and _ORG_HIERARCHY_AVAILABLE:
+        svc = OrgHierarchyService(db)
+        family_min_party = await svc.resolve(store_id, "referral_family_min_party", default=6)
+        business_lunch_hours = await svc.resolve(store_id, "referral_business_lunch_hours",
+            default={"start": 11, "end": 13})
+        business_min_party = await svc.resolve(store_id, "referral_business_min_party", default=4)
+        super_fan_frequency = await svc.resolve(store_id, "referral_super_fan_frequency", default=4)
+    else:
+        family_min_party = 6
+        business_lunch_hours = {"start": 11, "end": 13}
+        business_min_party = 4
+        super_fan_frequency = 4
+
     recent_orders = [o for o in order_history if o.get("days_ago", 999) <= 90]
 
-    # 1. 生日宴组织者（优先级最高，K=3.2）
+    # 1. 生日宴组织者（优先级最高）
     has_birthday = any(
         "生日" in str(o.get("tags", "")) for o in recent_orders
     )
     if has_birthday:
         return ReferralScenario.BIRTHDAY_ORGANIZER
 
-    # 2. 家宴组织者（大桌，K=2.4）
+    # 2. 家宴组织者（大桌）
     avg_party_size = (
         sum(o.get("party_size", 2) for o in recent_orders)
         / max(len(recent_orders), 1)
     )
-    if avg_party_size >= 6:
+    if avg_party_size >= family_min_party:
         return ReferralScenario.FAMILY_BANQUET
 
-    # 3. 商务宴请（工作日中午大桌，K=2.0）
+    # 3. 商务宴请（工作日中午大桌）
+    lunch_start = business_lunch_hours.get("start", 11)
+    lunch_end = business_lunch_hours.get("end", 13)
     business_orders = [
         o for o in recent_orders
-        if o.get("weekday", True)          # 工作日
-        and 11 <= o.get("hour", 12) <= 13  # 午餐时段
-        and o.get("party_size", 2) >= 4    # 4人以上
+        if o.get("weekday", True)                                    # 工作日
+        and lunch_start <= o.get("hour", 12) <= lunch_end            # 午餐时段
+        and o.get("party_size", 2) >= business_min_party             # 最小人数
     ]
     if len(business_orders) >= 2:
         return ReferralScenario.CORPORATE_HOST
 
-    # 4. 超级用户（近30天4次以上，K=1.8）
-    high_freq = len([o for o in order_history if o.get("days_ago", 999) <= 30]) >= 4
+    # 4. 超级用户（近30天高频次）
+    high_freq = len([o for o in order_history if o.get("days_ago", 999) <= 30]) >= super_fan_frequency
     if high_freq:
         return ReferralScenario.SUPER_FAN
 
     return None
 
 
-def get_playbook(scenario: ReferralScenario) -> Dict[str, Any]:
-    """返回指定裂变场景的完整剧本（诱饵/工具/钩子/K值预估）。"""
-    return REFERRAL_PLAYBOOKS[scenario]
+async def get_playbook(
+    scenario: ReferralScenario,
+    db: Optional[Any] = None,
+    store_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """返回指定裂变场景的完整剧本（诱饵/工具/钩子/K值预估）。
+    有 db 时从层级配置读取动态 K 值并覆盖静态默认值。
+    """
+    playbook = dict(REFERRAL_PLAYBOOKS[scenario])
+
+    if db is not None and store_id and _ORG_HIERARCHY_AVAILABLE:
+        svc = OrgHierarchyService(db)
+        viral_coefficients = await svc.resolve(store_id, "referral_viral_coefficients", default={
+            "birthday": 3.2, "family": 2.4, "business": 2.0, "super_fan": 1.8
+        })
+        _k_map = {
+            ReferralScenario.BIRTHDAY_ORGANIZER: "birthday",
+            ReferralScenario.FAMILY_BANQUET: "family",
+            ReferralScenario.CORPORATE_HOST: "business",
+            ReferralScenario.SUPER_FAN: "super_fan",
+        }
+        key = _k_map.get(scenario)
+        if key and key in viral_coefficients:
+            playbook["k_estimate"] = viral_coefficients[key]
+
+        # 生日宴：动态触发延迟小时数
+        if scenario == ReferralScenario.BIRTHDAY_ORGANIZER:
+            birthday_delay_hours = await svc.resolve(store_id, "referral_birthday_delay_hours", default=24)
+            playbook["birthday_delay_hours"] = birthday_delay_hours
+            playbook["trigger_timing"] = f"订单中出现生日关键词后{birthday_delay_hours}小时"
+
+    return playbook
 
 
-def detect_and_get_playbook(
+async def detect_and_get_playbook(
     customer: Dict[str, Any],
     order_history: List[Dict[str, Any]],
+    db: Optional[Any] = None,
+    store_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     一步返回裂变场景 + 剧本。
@@ -145,10 +203,10 @@ def detect_and_get_playbook(
     Returns:
         { "scenario": ReferralScenario, "playbook": {...} } 或 None
     """
-    scenario = detect_referral_potential(customer, order_history)
+    scenario = await detect_referral_potential(customer, order_history, db=db, store_id=store_id)
     if scenario is None:
         return None
     return {
         "scenario": scenario,
-        "playbook": get_playbook(scenario),
+        "playbook": await get_playbook(scenario, db=db, store_id=store_id),
     }

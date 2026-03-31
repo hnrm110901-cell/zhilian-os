@@ -21,13 +21,30 @@ class MemberLevel(str, Enum):
     HONORED_GUEST = "荣誉食客"  # 16 次+
 
 
-# 每个等级所需最低消费次数
-LEVEL_MIN_VISITS: Dict[str, int] = {
+# 每个等级所需最低消费次数（默认值，可由门店级配置覆盖）
+DEFAULT_LEVEL_THRESHOLDS: Dict[str, int] = {
     MemberLevel.NEW_FRIEND:    1,
     MemberLevel.REGULAR:       4,
     MemberLevel.OLD_FRIEND:    8,
     MemberLevel.HONORED_GUEST: 16,
 }
+
+# 向后兼容别名
+LEVEL_MIN_VISITS = DEFAULT_LEVEL_THRESHOLDS
+
+
+async def get_level_thresholds(db: Any = None, store_id: Any = None) -> Dict[str, int]:
+    """获取门店级会员等级阈值配置，db/store_id 为 None 时降级使用默认值"""
+    if db is None or store_id is None:
+        return DEFAULT_LEVEL_THRESHOLDS
+    try:
+        from src.services.org_hierarchy_service import OrgHierarchyService
+        svc = OrgHierarchyService(db)
+        custom = await svc.resolve(store_id, "member_level_thresholds", default=None)
+        return custom if custom else DEFAULT_LEVEL_THRESHOLDS
+    except Exception:
+        return DEFAULT_LEVEL_THRESHOLDS
+
 
 # 每个等级的专属权益描述
 LEVEL_PRIVILEGE: Dict[str, str] = {
@@ -187,7 +204,14 @@ def build_push_message(milestone_type: MilestoneType, member: Dict[str, Any]) ->
 # ── 核心检测函数 ──────────────────────────────────────────────────────────────
 
 
-def check_milestones(member: Dict[str, Any]) -> List[Dict[str, Any]]:
+def check_milestones(
+    member: Dict[str, Any],
+    db: Any = None,
+    store_id: Any = None,
+    first_spend_threshold: float = 100.0,
+    consecutive_months_threshold: int = 3,
+    points_expiry_warning_days: int = 7,
+) -> List[Dict[str, Any]]:
     """
     检查当前会员数据触发了哪些里程碑，返回触发列表。
 
@@ -201,6 +225,11 @@ def check_milestones(member: Dict[str, Any]) -> List[Dict[str, Any]]:
             consecutive_months: int    连续消费月数
             first_visit_date: str      首次到店日期 YYYY-MM-DD（None=未知）
             today: str                 当前日期 YYYY-MM-DD（测试可注入）
+        db: 数据库会话（可选），用于读取门店级动态配置
+        store_id: 门店ID（可选），与 db 配合读取门店级动态配置
+        first_spend_threshold: 首次消费触发金额阈值，默认100元
+        consecutive_months_threshold: 连续消费月数阈值，默认3个月
+        points_expiry_warning_days: 积分过期预警天数，默认7天
 
     Returns:
         触发的里程碑列表，每项包含 milestone_type / message / psychology
@@ -217,8 +246,8 @@ def check_milestones(member: Dict[str, Any]) -> List[Dict[str, Any]]:
     today_str: str     = member.get("today") or date.today().isoformat()
     today              = date.fromisoformat(today_str)
 
-    # 1. 首次消费满100元（起点效应）
-    if is_first_spend and total_spend >= 100:
+    # 1. 首次消费满阈值（起点效应），阈值可由门店级配置覆盖（默认100元）
+    if is_first_spend and total_spend >= first_spend_threshold:
         triggered.append({
             "milestone_type": MilestoneType.FIRST_SPEND_100,
             "message":    build_push_message(MilestoneType.FIRST_SPEND_100, member),
@@ -234,16 +263,16 @@ def check_milestones(member: Dict[str, Any]) -> List[Dict[str, Any]]:
             "psychology": "目标趋近效应——越接近目标，动力越强",
         })
 
-    # 3. 连续3个月消费（关系飞轮）
-    if consecutive_months >= 3:
+    # 3. 连续消费月数达阈值（关系飞轮），阈值可由门店级配置覆盖（默认3个月）
+    if consecutive_months >= consecutive_months_threshold:
         triggered.append({
             "milestone_type": MilestoneType.CONSECUTIVE_MONTHS_3,
             "message":    build_push_message(MilestoneType.CONSECUTIVE_MONTHS_3, member),
             "psychology": "《关系飞轮》：强调共同历史，而非交易记录",
         })
 
-    # 4. 积分将在7天内过期（损失厌恶，具体化兑换内容）
-    if points_expire_days is not None and 0 < points_expire_days <= 7 and points > 0:
+    # 4. 积分将在预警天数内过期（损失厌恶，具体化兑换内容），天数可由门店级配置覆盖（默认7天）
+    if points_expire_days is not None and 0 < points_expire_days <= points_expiry_warning_days and points > 0:
         triggered.append({
             "milestone_type": MilestoneType.POINTS_EXPIRING_7D,
             "message":    build_push_message(MilestoneType.POINTS_EXPIRING_7D, member),

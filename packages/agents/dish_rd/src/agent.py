@@ -25,6 +25,7 @@ from src.models.dish_rd import (
     LifecycleAssessmentEnum, FeedbackTypeEnum, DishRdAgentTypeEnum,
     SupplyRecommendationEnum, RiskLevelEnum,
 )
+from src.services.org_hierarchy_service import OrgHierarchyService
 
 
 # ─────────────────────────────────────────────
@@ -312,8 +313,21 @@ class DishReviewAgent:
         period: str = "30d",
         sales_data: Optional[dict] = None,    # 来自POS的销售摘要
         dry_run: bool = False,
+        store_id: Optional[str] = None,       # 用于动态配置解析
     ) -> dict:
         """生成复盘报告"""
+        # ── 动态配置解析 ──────────────────────────────────────────────
+        _return_rate_alert: float = 0.15
+        if store_id:
+            try:
+                _svc = OrgHierarchyService(db)
+                _return_rate_alert = await _svc.resolve(
+                    store_id, "dish_return_rate_alert", default=0.15
+                )
+            except Exception as _e:
+                pass  # 降级使用默认值
+        # ────────────────────────────────────────────────────────────
+
         # 获取近期反馈
         days = int(period.replace("d", ""))
         cutoff = datetime.utcnow() - timedelta(days=days)
@@ -349,6 +363,7 @@ class DishReviewAgent:
             complaint_count=len(complaint_feedbacks),
             total_feedback=total_feedback,
             sales_data=sales_data,
+            return_rate_alert=_return_rate_alert,
         )
 
         # 优化建议
@@ -357,6 +372,7 @@ class DishReviewAgent:
             assessment=assessment,
             return_rate=return_rate,
             avg_taste=avg_taste,
+            return_rate_alert=_return_rate_alert,
         )
 
         result = {
@@ -408,11 +424,12 @@ class DishReviewAgent:
         complaint_count: int,
         total_feedback: int,
         sales_data: Optional[dict],
+        return_rate_alert: float = 0.15,
     ) -> str:
         # 高退菜率或高差评 → 建议淘汰/观察
-        if return_rate > 0.3 or complaint_count > total_feedback * 0.2:
+        if return_rate > return_rate_alert * 2 or complaint_count > total_feedback * 0.2:
             return LifecycleAssessmentEnum.RETIRE.value
-        if return_rate > 0.15 or complaint_count > total_feedback * 0.1:
+        if return_rate > return_rate_alert or complaint_count > total_feedback * 0.1:
             return LifecycleAssessmentEnum.MONITOR.value
 
         # 口味评分良好
@@ -432,9 +449,10 @@ class DishReviewAgent:
         assessment: str,
         return_rate: float,
         avg_taste: Optional[float],
+        return_rate_alert: float = 0.15,
     ) -> list[str]:
         suggestions = []
-        if return_rate > 0.15:
+        if return_rate > return_rate_alert:
             suggestions.append(f"退菜率 {return_rate:.0%} 偏高，建议排查出品温度与分量一致性")
         if avg_taste is not None and avg_taste < 3.8:
             suggestions.append(f"口味评分 {avg_taste:.1f}（满分5分），建议研发复核调味方向")
@@ -496,8 +514,21 @@ class LaunchAssistAgent:
         brand_id: str,
         launch_project_id: Optional[str],
         db: AsyncSession,
+        store_id: Optional[str] = None,       # 用于动态配置解析
     ) -> dict:
         """检查上市发布就绪状态"""
+        # ── 动态配置解析 ──────────────────────────────────────────────
+        _min_gross_margin: float = 0.50
+        if store_id:
+            try:
+                _svc = OrgHierarchyService(db)
+                _min_gross_margin = await _svc.resolve(
+                    store_id, "dish_min_gross_margin", default=0.50
+                )
+            except Exception:
+                pass  # 降级使用默认值
+        # ────────────────────────────────────────────────────────────
+
         dish_result = await db.execute(select(Dish).where(Dish.id == dish_id))
         dish = dish_result.scalars().first()
         if not dish:
@@ -525,11 +556,11 @@ class LaunchAssistAgent:
         )
         cost_model = cost_result.scalars().first()
         has_cost = cost_model is not None
-        margin_ok = float(cost_model.margin_rate or 0) >= 0.50 if cost_model else False
-        checklist.append({"key": "cost_model", "label": "成本模型 & 毛利≥50%", "done": has_cost and margin_ok,
+        margin_ok = float(cost_model.margin_rate or 0) >= _min_gross_margin if cost_model else False
+        checklist.append({"key": "cost_model", "label": f"成本模型 & 毛利≥{_min_gross_margin:.0%}", "done": has_cost and margin_ok,
                           "detail": f"当前毛利率 {float(cost_model.margin_rate or 0):.0%}" if cost_model else "无成本数据"})
         if not (has_cost and margin_ok):
-            missing_items.append("成本模型未建立或毛利率未达50%")
+            missing_items.append(f"成本模型未建立或毛利率未达{_min_gross_margin:.0%}")
 
         # 3. 检查 SOP
         from src.models.dish_rd import SOP
@@ -612,8 +643,21 @@ class RiskAlertAgent:
         db: AsyncSession,
         days_back: int = 14,
         dry_run: bool = False,
+        store_id: Optional[str] = None,       # 用于动态配置解析
     ) -> dict:
         """扫描品牌下所有菜品的风险信号"""
+        # ── 动态配置解析 ──────────────────────────────────────────────
+        _return_rate_alert: float = self.RETURN_RATE_THRESHOLD
+        if store_id:
+            try:
+                _svc = OrgHierarchyService(db)
+                _return_rate_alert = await _svc.resolve(
+                    store_id, "dish_return_rate_alert", default=self.RETURN_RATE_THRESHOLD
+                )
+            except Exception:
+                pass  # 降级使用类默认值
+        # ────────────────────────────────────────────────────────────
+
         cutoff = datetime.utcnow() - timedelta(days=days_back)
         risks  = []
 
@@ -690,7 +734,7 @@ class RiskAlertAgent:
             return_rate    = returns / total
             complaint_rate = complaints / total
 
-            if return_rate > self.RETURN_RATE_THRESHOLD:
+            if return_rate > _return_rate_alert:
                 risks.append({
                     "risk_type":  "high_return_rate",
                     "dish_id":    row.dish_id,

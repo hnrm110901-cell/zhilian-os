@@ -28,6 +28,7 @@ from src.models.supplier_agent import (
     SupplierTierEnum, QuoteStatusEnum, ContractStatusEnum,
     DeliveryStatusEnum, RiskLevelEnum, AlertTypeEnum, SupplierAgentTypeEnum,
 )
+from src.services.org_hierarchy_service import OrgHierarchyService
 
 logger = logging.getLogger(__name__)
 
@@ -62,22 +63,23 @@ async def _ai_insight(system: str, user_data: dict) -> Optional[str]:
 # 纯函数层（可独立测试）
 # ─────────────────────────────────────────────
 
-def compute_price_score(price_yuan: float, benchmark_yuan: float) -> float:
+def compute_price_score(price_yuan: float, benchmark_yuan: float, price_tolerance: float = 0.10) -> float:
     """
     价格竞争力得分（0-100）：越低于基准价得分越高。
-    - 低于基准 10% 以上 → 100
-    - 等于基准          → 70
-    - 高于基准 20% 以上 → 0
+    - 低于基准 price_tolerance（默认10%）以上 → 100
+    - 等于基准                               → 70
+    - 高于基准 20% 以上                       → 0
     """
     if benchmark_yuan <= 0:
         return 50.0
     delta_pct = (price_yuan - benchmark_yuan) / benchmark_yuan  # 正=贵
-    if delta_pct <= -0.10:
+    if delta_pct <= -price_tolerance:
         return 100.0
     if delta_pct >= 0.20:
         return 0.0
-    # 线性映射：[-10%, +20%] → [100, 0]
-    return round(100 - (delta_pct + 0.10) / 0.30 * 100, 1)
+    # 线性映射：[-price_tolerance, +20%] → [100, 0]
+    span = price_tolerance + 0.20
+    return round(100 - (delta_pct + price_tolerance) / span * 100, 1)
 
 
 def compute_delivery_score(on_time_count: int, total_count: int) -> float:
@@ -104,16 +106,24 @@ def compute_composite_score(
     quality_score: float,
     delivery_score: float,
     service_score: float,
+    weights: Optional[dict] = None,
 ) -> float:
     """
     综合评分（加权）：
-    - 价格 30%，质量 35%，交期 25%，服务 10%
+    - 价格 30%，质量 35%，交期 25%，服务 10%（默认）
+    - weights 可覆盖各维度权重 {"price": 0.30, "quality": 0.35, "delivery": 0.25, "service": 0.10}
     """
+    if weights is None:
+        weights = {}
+    w_price    = weights.get("price",    0.30)
+    w_quality  = weights.get("quality",  0.35)
+    w_delivery = weights.get("delivery", 0.25)
+    w_service  = weights.get("service",  0.10)
     return round(
-        price_score * 0.30
-        + quality_score * 0.35
-        + delivery_score * 0.25
-        + service_score * 0.10,
+        price_score    * w_price
+        + quality_score  * w_quality
+        + delivery_score * w_delivery
+        + service_score  * w_service,
         1,
     )
 
@@ -129,10 +139,10 @@ def classify_supplier_tier(composite_score: float) -> SupplierTierEnum:
     return SupplierTierEnum.PROBATION
 
 
-def classify_risk_level(probability: float, financial_impact_yuan: float) -> RiskLevelEnum:
-    """风险等级 = 概率 × 影响综合判断"""
+def classify_risk_level(probability: float, financial_impact_yuan: float, excellent_threshold: float = 1.5) -> RiskLevelEnum:
+    """风险等级 = 概率 × 影响综合判断，excellent_threshold 对应 CRITICAL 阈值（默认 1.5）"""
     score = probability * (1 + min(financial_impact_yuan / 10000, 1.0))
-    if score >= 1.5:
+    if score >= excellent_threshold:
         return RiskLevelEnum.CRITICAL
     if score >= 0.8:
         return RiskLevelEnum.HIGH
@@ -208,13 +218,24 @@ class PriceComparisonAgent:
         material = mat_result.scalar_one_or_none()
         benchmark = float(material.benchmark_price_yuan) if material else 0.0
 
+        # 动态解析价格允差
+        _price_tolerance = 0.10
+        if store_id:
+            try:
+                _svc = OrgHierarchyService(db)
+                _price_tolerance = await _svc.resolve(
+                    store_id, "supplier_price_tolerance", default=0.10
+                )
+            except Exception as _e:
+                logger.warning("supplier_price_tolerance_resolve_failed: %s", str(_e))
+
         # 计算各报价得分
         prices = [float(q.unit_price_yuan) for q in quotes]
         ranked = []
         for q in quotes:
             price = float(q.unit_price_yuan)
             price_delta_pct = ((price - benchmark) / benchmark * 100) if benchmark > 0 else 0
-            p_score = compute_price_score(price, benchmark) if benchmark > 0 else 50.0
+            p_score = compute_price_score(price, benchmark, _price_tolerance) if benchmark > 0 else 50.0
             # 获取供应商档案（用于delivery/quality分）
             prof_result = await db.execute(
                 select(SupplierProfile).where(SupplierProfile.supplier_id == q.supplier_id)
@@ -369,11 +390,33 @@ class SupplierRatingAgent:
         db: AsyncSession,
         service_score: Optional[float] = None,  # 可由人工传入
         save: bool = True,
+        store_id: Optional[str] = None,         # 用于动态配置解析
     ) -> dict:
         """评估单家供应商"""
         t0 = datetime.utcnow()
         period_start = datetime.strptime(eval_period + "-01", "%Y-%m-%d").date()
         period_end = (period_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+
+        # ── 动态配置解析 ──────────────────────────────────────────────
+        _score_weights: Optional[dict] = None
+        _excellent_threshold: float = 1.5
+        _eval_price_tolerance: float = 0.10
+        if store_id:
+            try:
+                _svc = OrgHierarchyService(db)
+                _score_weights = await _svc.resolve(
+                    store_id, "supplier_score_weights",
+                    default={"price": 0.30, "quality": 0.35, "delivery": 0.25, "service": 0.10}
+                )
+                _excellent_threshold = await _svc.resolve(
+                    store_id, "supplier_excellent_threshold", default=1.5
+                )
+                _eval_price_tolerance = await _svc.resolve(
+                    store_id, "supplier_price_tolerance", default=0.10
+                )
+            except Exception as _e:
+                logger.warning("supplier_eval_dyn_cfg_failed: %s", str(_e))
+        # ────────────────────────────────────────────────────────────
 
         # 1. 收货记录 → 交期/质量维度
         del_result = await db.execute(
@@ -420,14 +463,14 @@ class SupplierRatingAgent:
             avg_delta_pct = 0.0
 
         price_score = compute_price_score(
-            100 * (1 + avg_delta_pct / 100), 100
+            100 * (1 + avg_delta_pct / 100), 100, _eval_price_tolerance
         )  # 用相对偏差计算
 
         # 3. 服务分（外部传入或默认）
         s_score = service_score if service_score is not None else self.SERVICE_SCORE_DEFAULT
 
-        # 4. 综合得分
-        composite = compute_composite_score(price_score, quality_score, delivery_score, s_score)
+        # 4. 综合得分（使用动态权重）
+        composite = compute_composite_score(price_score, quality_score, delivery_score, s_score, _score_weights)
         tier_suggestion = classify_supplier_tier(composite)
 
         # 5. 行动建议

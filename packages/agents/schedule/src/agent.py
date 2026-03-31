@@ -17,6 +17,19 @@ from pathlib import Path
 core_path = Path(__file__).parent.parent.parent.parent.parent / "src" / "core"
 sys.path.insert(0, str(core_path))
 
+# Add api-gateway src to path for OrgHierarchyService
+api_src_path = Path(__file__).parent.parent.parent.parent.parent / "apps" / "api-gateway" / "src"
+if str(api_src_path) not in sys.path:
+    sys.path.insert(0, str(api_src_path))
+
+# 导入配置相关（降级安全：导入失败时正常运行）
+try:
+    from services.org_hierarchy_service import OrgHierarchyService
+    from models.org_config import ConfigKey
+    _CONFIG_AVAILABLE = True
+except ImportError:
+    _CONFIG_AVAILABLE = False
+
 from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
@@ -57,6 +70,8 @@ class ScheduleAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
         super().__init__()
         self.config = config
+        self.store_id = config.get("store_id")
+        # 保留默认值，_load_store_config 调用时会用 OrgHierarchyService 覆盖
         self.min_shift_hours = config.get("min_shift_hours", int(os.getenv("SCHEDULE_MIN_SHIFT_HOURS", "4")))
         self.max_shift_hours = config.get("max_shift_hours", int(os.getenv("SCHEDULE_MAX_SHIFT_HOURS", "8")))
         self.max_weekly_hours = config.get("max_weekly_hours", int(os.getenv("SCHEDULE_MAX_WEEKLY_HOURS", "40")))
@@ -75,6 +90,28 @@ class ScheduleAgent(BaseAgent):
                 except Exception as e:
                     logger.warning("schedule_db_engine_init_failed", error=str(e))
         return self._db_engine
+
+    async def _load_store_config(self, db=None) -> dict:
+        """从 OrgConfig 加载门店级配置，无 DB 或导入失败时返回空字典（降级安全）"""
+        if not _CONFIG_AVAILABLE or not db or not self.store_id:
+            return {}
+        try:
+            svc = OrgHierarchyService(db)
+            return {
+                "min_shift_hours": await svc.resolve(self.store_id, "schedule_min_shift_hours", default=self.min_shift_hours),
+                "max_shift_hours": await svc.resolve(self.store_id, "schedule_max_shift_hours", default=self.max_shift_hours),
+                "max_weekly_hours": await svc.resolve(self.store_id, "schedule_max_weekly_hours", default=self.max_weekly_hours),
+                "shift_morning_start": await svc.resolve(self.store_id, "shift_morning_start", default="06:00"),
+                "shift_morning_end": await svc.resolve(self.store_id, "shift_morning_end", default="14:00"),
+                "shift_afternoon_start": await svc.resolve(self.store_id, "shift_afternoon_start", default="14:00"),
+                "shift_afternoon_end": await svc.resolve(self.store_id, "shift_afternoon_end", default="22:00"),
+                "shift_evening_start": await svc.resolve(self.store_id, "shift_evening_start", default="18:00"),
+                "shift_evening_end": await svc.resolve(self.store_id, "shift_evening_end", default="02:00"),
+                "peak_hours": await svc.resolve(self.store_id, "peak_hours", default=[{"start": "12:00", "end": "13:00"}, {"start": "18:00", "end": "20:00"}]),
+                "scoring_weights": await svc.resolve(self.store_id, "schedule_scoring_weights", default={"preference": 0.35, "skill": 0.35, "history": 0.25, "fatigue": -0.15}),
+            }
+        except Exception:
+            return {}
 
     async def _fetch_historical_traffic(
         self, store_id: str, date: str, lookback_weeks: int = 4
@@ -252,11 +289,14 @@ class ScheduleAgent(BaseAgent):
         except Exception as e:
             return AgentResponse(success=False, data=None, error=str(e))
 
-    async def analyze_traffic(self, state: ScheduleState) -> ScheduleState:
+    async def analyze_traffic(self, state: ScheduleState, peak_hours: Optional[List] = None) -> ScheduleState:
         """分析客流数据（真实模型优先，历史订单均值次级，无 DB 时回退固定系数）"""
         store_id = state["store_id"]
         date = state["date"]
         logger.info("分析客流", store_id=store_id, date=date)
+
+        # 默认高峰时段（可被 OrgConfig 动态配置覆盖）
+        default_peak_hours = peak_hours or [{"start": "12:00", "end": "13:00"}, {"start": "18:00", "end": "20:00"}]
 
         try:
             weekday = datetime.strptime(date, "%Y-%m-%d").weekday()  # 0=周一
@@ -270,7 +310,7 @@ class ScheduleAgent(BaseAgent):
             predicted = model_result["predicted_customers"]
             confidence = model_result["confidence"]
             source = "traffic_model"
-            peak_hours = model_result.get("peak_hours", ["12:00-13:00", "18:00-20:00"])
+            peak_hours = model_result.get("peak_hours", default_peak_hours)
             model_name = model_result.get("model_name", "custom_predictor")
         else:
             # 次级：历史订单均值
@@ -279,7 +319,7 @@ class ScheduleAgent(BaseAgent):
                 predicted = historical
                 confidence = 0.85 if not is_weekend else 0.80
                 source = "historical_orders"
-                peak_hours = ["12:00-13:00", "18:00-20:00"]
+                peak_hours = default_peak_hours
                 model_name = None
             else:
                 # 兜底：固定系数
@@ -294,7 +334,7 @@ class ScheduleAgent(BaseAgent):
                 }
                 confidence = 0.75 if not is_weekend else 0.65
                 source = "default_coefficients"
-                peak_hours = ["12:00-13:00", "18:00-20:00"]
+                peak_hours = default_peak_hours
                 model_name = None
 
         state["traffic_data"] = {
@@ -337,7 +377,12 @@ class ScheduleAgent(BaseAgent):
         logger.info("人力需求计算完成", requirements=state["requirements"])
         return state
 
-    async def generate_schedule(self, state: ScheduleState) -> ScheduleState:
+    async def generate_schedule(
+        self,
+        state: ScheduleState,
+        shift_times: Optional[Dict[str, tuple]] = None,
+        scoring_weights: Optional[Dict[str, float]] = None,
+    ) -> ScheduleState:
         """生成排班表"""
         requirements = state["requirements"]
         employees = state["employees"]
@@ -357,7 +402,7 @@ class ScheduleAgent(BaseAgent):
                 if use_ml_optimizer:
                     available = sorted(
                         available,
-                        key=lambda emp: self._score_employee_ml(emp=emp, shift_name=shift_name, skill=skill),
+                        key=lambda emp: self._score_employee_ml(emp=emp, shift_name=shift_name, skill=skill, scoring_weights=scoring_weights),
                         reverse=True,
                     )
                 for emp in available[:count]:
@@ -367,8 +412,8 @@ class ScheduleAgent(BaseAgent):
                         "skill": skill,
                         "shift": shift_name,
                         "date": date,
-                        "start_time": self._get_shift_start_time(shift_name),
-                        "end_time": self._get_shift_end_time(shift_name),
+                        "start_time": self._get_shift_start_time(shift_name, shift_times=shift_times),
+                        "end_time": self._get_shift_end_time(shift_name, shift_times=shift_times),
                     })
                     assigned_employees.add(emp["id"])
 
@@ -376,10 +421,11 @@ class ScheduleAgent(BaseAgent):
         logger.info("排班表生成完成", schedule_count=len(schedule))
         return state
 
-    async def optimize_schedule(self, state: ScheduleState) -> ScheduleState:
+    async def optimize_schedule(self, state: ScheduleState, max_shift_hours: Optional[float] = None) -> ScheduleState:
         """优化排班表"""
         schedule = state["schedule"]
         requirements = state["requirements"]
+        effective_max_shift_hours = max_shift_hours if max_shift_hours is not None else self.max_shift_hours
         logger.info("优化排班表", schedule_count=len(schedule))
 
         suggestions = []
@@ -396,8 +442,8 @@ class ScheduleAgent(BaseAgent):
             employee_hours[emp_id] = employee_hours.get(emp_id, 0) + hours
 
         for emp_id, hours in employee_hours.items():
-            if hours > self.max_shift_hours:
-                suggestions.append(f"员工{emp_id}工作时长超过{self.max_shift_hours}小时")
+            if hours > effective_max_shift_hours:
+                suggestions.append(f"员工{emp_id}工作时长超过{effective_max_shift_hours}小时")
 
         labor_cost_summary = self._estimate_labor_cost(schedule)
         target_labor_cost = float(
@@ -432,10 +478,14 @@ class ScheduleAgent(BaseAgent):
         logger.info("排班优化完成", suggestions_count=len(suggestions))
         return state
 
-    def _get_shift_start_time(self, shift_name: str) -> str:
+    def _get_shift_start_time(self, shift_name: str, shift_times: Optional[Dict[str, tuple]] = None) -> str:
+        if shift_times and shift_name in shift_times:
+            return shift_times[shift_name][0]
         return {"morning": "06:00", "afternoon": "14:00", "evening": "18:00"}.get(shift_name, "09:00")
 
-    def _get_shift_end_time(self, shift_name: str) -> str:
+    def _get_shift_end_time(self, shift_name: str, shift_times: Optional[Dict[str, tuple]] = None) -> str:
+        if shift_times and shift_name in shift_times:
+            return shift_times[shift_name][1]
         return {"morning": "14:00", "afternoon": "22:00", "evening": "02:00"}.get(shift_name, "21:00")
 
     def _calculate_shift_hours(self, start_time: str, end_time: str) -> float:
@@ -470,13 +520,20 @@ class ScheduleAgent(BaseAgent):
             "hourly_cost_config": hourly_cost,
         }
 
-    def _score_employee_ml(self, emp: Dict[str, Any], shift_name: str, skill: str) -> float:
+    def _score_employee_ml(
+        self,
+        emp: Dict[str, Any],
+        shift_name: str,
+        skill: str,
+        scoring_weights: Optional[Dict[str, float]] = None,
+    ) -> float:
         """
         轻量 ML 风格排班打分：
         - 偏好匹配（preferred_shifts）
         - 技能等级（skill_levels[skill] 或 skill_level）
         - 历史表现（historical_performance 0-1）
         - 近期工时惩罚（recent_hours）
+        权重可通过 scoring_weights 动态覆盖（来自 OrgConfig）
         """
         preferences = emp.get("preferences", {})
         preferred_shifts = preferences.get("preferred_shifts", []) if isinstance(preferences, dict) else []
@@ -492,7 +549,14 @@ class ScheduleAgent(BaseAgent):
         recent_hours = float(emp.get("recent_hours", 0.0))
         fatigue_penalty = min(1.0, recent_hours / 40.0)
 
-        return round(preference_score * 0.35 + skill_score * 0.35 + historical_score * 0.25 - fatigue_penalty * 0.15, 6)
+        w = scoring_weights or {}
+        return round(
+            preference_score * w.get("preference", 0.35)
+            + skill_score * w.get("skill", 0.35)
+            + historical_score * w.get("history", 0.25)
+            + fatigue_penalty * w.get("fatigue", -0.15),
+            6,
+        )
 
     def _build_auto_scheduling_actions(
         self,
@@ -609,6 +673,7 @@ class ScheduleAgent(BaseAgent):
         store_id: str,
         date: str,
         employees: List[Dict[str, Any]],
+        db=None,
     ) -> Dict[str, Any]:
         """
         运行排班Agent（返回排班结果，由调用方持久化到DB）
@@ -617,8 +682,21 @@ class ScheduleAgent(BaseAgent):
             store_id: 门店ID
             date: 排班日期 (YYYY-MM-DD)
             employees: 员工列表
+            db: 可选 AsyncSession，用于从 OrgConfig 加载门店级配置
         """
         logger.info("开始排班", store_id=store_id, date=date)
+
+        # 从 OrgConfig 加载门店级配置（无 DB 时自动降级为空字典，使用默认值）
+        cfg = await self._load_store_config(db)
+        min_shift_h = cfg.get("min_shift_hours", self.min_shift_hours)
+        max_shift_h = cfg.get("max_shift_hours", self.max_shift_hours)
+        peak_hours = cfg.get("peak_hours", [{"start": "12:00", "end": "13:00"}, {"start": "18:00", "end": "20:00"}])
+        scoring_weights = cfg.get("scoring_weights", {"preference": 0.35, "skill": 0.35, "history": 0.25, "fatigue": -0.15})
+        shift_times = {
+            "morning": (cfg.get("shift_morning_start", "06:00"), cfg.get("shift_morning_end", "14:00")),
+            "afternoon": (cfg.get("shift_afternoon_start", "14:00"), cfg.get("shift_afternoon_end", "22:00")),
+            "evening": (cfg.get("shift_evening_start", "18:00"), cfg.get("shift_evening_end", "02:00")),
+        }
 
         state: ScheduleState = {
             "store_id": store_id,
@@ -635,10 +713,10 @@ class ScheduleAgent(BaseAgent):
         }
 
         try:
-            state = await self.analyze_traffic(state)
+            state = await self.analyze_traffic(state, peak_hours=peak_hours)
             state = await self.calculate_requirements(state)
-            state = await self.generate_schedule(state)
-            state = await self.optimize_schedule(state)
+            state = await self.generate_schedule(state, shift_times=shift_times, scoring_weights=scoring_weights)
+            state = await self.optimize_schedule(state, max_shift_hours=max_shift_h)
 
             schedule_id = f"SCH{uuid.uuid4().hex[:12].upper()}"
             logger.info("排班完成", schedule_id=schedule_id, schedule_count=len(state["schedule"]))
