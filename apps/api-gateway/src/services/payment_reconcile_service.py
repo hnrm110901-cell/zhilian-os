@@ -444,8 +444,13 @@ class PaymentReconcileService:
                     batch.error_message = str(e)[:500]
                     session.add(batch)
                     await session.commit()
-            except Exception:
-                pass
+            except Exception as status_err:
+                logger.error(
+                    "[对账批次] 更新失败状态时出错，批次可能永久悬挂在非failed状态",
+                    batch_id=getattr(batch, "id", None),
+                    error=str(status_err),
+                    exc_info=True,
+                )
             raise
 
     # ── 查询 ──────────────────────────────────────────────────────────────────

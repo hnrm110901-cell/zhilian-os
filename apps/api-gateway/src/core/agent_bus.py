@@ -286,8 +286,15 @@ class AgentBus:
                 ctx.add_breadcrumb(f"agent_bus:{msg.from_agent}->{msg.to_agent}:{msg.action}")
                 msg.context = ctx.to_dict()
                 params["_business_context"] = msg.context
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "[AgentBus] 业务上下文注入失败，消息追踪链将中断",
+                    from_agent=msg.from_agent,
+                    to_agent=msg.to_agent,
+                    action=msg.action,
+                    error=str(e),
+                    exc_info=True,
+                )
 
         try:
             response = await asyncio.wait_for(
@@ -378,7 +385,13 @@ class AgentBus:
             from src.core.skill_registry import SkillRegistry
 
             return SkillRegistry.get().query(intent=intent)
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "[AgentBus] SkillRegistry 查询失败，意图路由将降级为空",
+                intent=intent,
+                error=str(e),
+                exc_info=True,
+            )
             return []
 
     async def fire_and_forget(self, msg: AgentMessage) -> str:
