@@ -19,6 +19,7 @@ from src.api.employees import (
 def _employee(employee_id="E001", store_id="S001", preferences=None):
     e = MagicMock()
     e.id = employee_id
+    e.legacy_employee_id = employee_id
     e.store_id = store_id
     e.preferences = preferences if preferences is not None else {}
     return e

@@ -146,7 +146,7 @@ class TestYesterdayReviewFoodCost:
             FoodCostService,
             "get_store_food_cost_variance",
             new_callable=AsyncMock,
-            side_effect=RuntimeError("DB 连接超时"),
+            side_effect=ValueError("DB 连接超时"),
         ):
             mock_drs.generate_daily_report = AsyncMock(return_value=report)
             svc    = DailyHubService()

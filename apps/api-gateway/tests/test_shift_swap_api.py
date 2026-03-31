@@ -26,8 +26,8 @@ async def test_create_shift_swap_request_success():
     session.commit = AsyncMock()
     session.refresh = AsyncMock()
 
-    requester = SimpleNamespace(id="E1", store_id="S1", name="张三", skills=["cashier"], is_active=True)
-    target = SimpleNamespace(id="E2", store_id="S1", name="李四", skills=["cashier"], is_active=True)
+    requester = SimpleNamespace(id="E1", legacy_employee_id="E1", store_id="S1", name="张三", skills=["cashier"], is_active=True, preferences={"skills": ["cashier"]})
+    target = SimpleNamespace(id="E2", legacy_employee_id="E2", store_id="S1", name="李四", skills=["cashier"], is_active=True, preferences={"skills": ["cashier"]})
 
     shift_id = uuid.uuid4()
     schedule_id = uuid.uuid4()
@@ -64,8 +64,8 @@ async def test_create_shift_swap_request_success():
 @pytest.mark.asyncio
 async def test_create_shift_swap_request_skill_mismatch():
     session = AsyncMock()
-    requester = SimpleNamespace(id="E1", store_id="S1", name="张三", skills=["cashier"], is_active=True)
-    target = SimpleNamespace(id="E2", store_id="S1", name="李四", skills=["chef"], is_active=True)
+    requester = SimpleNamespace(id="E1", legacy_employee_id="E1", store_id="S1", name="张三", skills=["cashier"], is_active=True, preferences={})
+    target = SimpleNamespace(id="E2", legacy_employee_id="E2", store_id="S1", name="李四", skills=["chef"], is_active=True, preferences={})
 
     shift_id = uuid.uuid4()
     schedule_id = uuid.uuid4()

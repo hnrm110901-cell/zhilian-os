@@ -74,7 +74,7 @@ class TestMemberContextStoreGet:
     async def test_redis_error_returns_none(self):
         """Redis 抛异常 → 静默返回 None。"""
         redis = AsyncMock()
-        redis.get.side_effect = Exception("connection refused")
+        redis.get.side_effect = ConnectionError("connection refused")
 
         store = MemberContextStore(redis)
         result = await store.get("S001", "C001")
@@ -119,7 +119,7 @@ class TestMemberContextStoreSet:
     @pytest.mark.asyncio
     async def test_redis_error_does_not_raise(self):
         redis = AsyncMock()
-        redis.setex.side_effect = Exception("timeout")
+        redis.setex.side_effect = ConnectionError("timeout")
         store = MemberContextStore(redis)
 
         # 不应抛异常
@@ -148,7 +148,7 @@ class TestMemberContextStoreInvalidate:
     @pytest.mark.asyncio
     async def test_redis_error_does_not_raise(self):
         redis = AsyncMock()
-        redis.delete.side_effect = Exception("timeout")
+        redis.delete.side_effect = ConnectionError("timeout")
         store = MemberContextStore(redis)
 
         await store.invalidate("S001", "C001")  # 不抛异常
@@ -190,7 +190,7 @@ class TestMemberContextStoreInvalidateStore:
     @pytest.mark.asyncio
     async def test_redis_error_returns_zero(self):
         redis = AsyncMock()
-        redis.scan_iter.side_effect = Exception("error")
+        redis.scan_iter.side_effect = ConnectionError("error")
         store = MemberContextStore(redis)
 
         result = await store.invalidate_store("S001")

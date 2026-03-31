@@ -558,7 +558,8 @@ class TestMobileFetchEdgeHubStatus:
         from src.api.mobile import _fetch_edge_hub_status
 
         db = AsyncMock()
-        db.execute = AsyncMock(side_effect=RuntimeError("connection lost"))
+        from sqlalchemy.exc import SQLAlchemyError
+        db.execute = AsyncMock(side_effect=SQLAlchemyError("connection lost"))
 
         result = await _fetch_edge_hub_status("S001", db)
 

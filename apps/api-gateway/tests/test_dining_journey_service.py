@@ -21,10 +21,20 @@ for _k, _v in {
 }.items():
     os.environ.setdefault(_k, _v)
 
+import builtins
 import pytest
 from datetime import date, time, datetime, timedelta
 from unittest.mock import MagicMock, AsyncMock, patch
 import uuid
+
+_real_import = builtins.__import__
+
+
+def _block_sentiment_import(name, *args, **kwargs):
+    """阻止 CustomerSentimentService 导入，强制走关键词降级。"""
+    if "customer_sentiment_service" in name:
+        raise ImportError("Mocked: CustomerSentimentService not available in test")
+    return _real_import(name, *args, **kwargs)
 
 from src.models.reservation import Reservation, ReservationStatus, ReservationType
 from src.models.queue import Queue, QueueStatus
@@ -47,11 +57,13 @@ class TestLinkConsumerToReservation:
         mock_session = AsyncMock()
         test_uuid = uuid.uuid4()
 
-        with patch("src.services.dining_journey_service.identity_resolution_service", create=True) as mock_svc:
-            # Patch the lazy import
-            with patch("src.services.identity_resolution_service.identity_resolution_service", create=True) as mock_irs:
-                mock_irs.resolve = AsyncMock(return_value=test_uuid)
-                result = await link_consumer_to_reservation(mock_session, reservation)
+        with patch("src.services.identity_resolution_service.identity_resolution_service") as mock_irs:
+            mock_irs.resolve = AsyncMock(return_value=test_uuid)
+            result = await link_consumer_to_reservation(mock_session, reservation)
+            # verify resolve was called with db session as first arg
+            mock_irs.resolve.assert_awaited_once()
+            call_args = mock_irs.resolve.call_args
+            assert call_args[0][0] is mock_session
 
     @pytest.mark.asyncio
     async def test_skips_if_already_linked(self):
@@ -76,9 +88,11 @@ class TestLinkConsumerToReservation:
 
         mock_session = AsyncMock()
 
-        # Import will fail in test env — should return None, not raise
-        result = await link_consumer_to_reservation(mock_session, reservation)
-        assert result is None
+        # Mock identity_resolution_service.resolve to raise, should return None
+        with patch("src.services.identity_resolution_service.identity_resolution_service") as mock_irs:
+            mock_irs.resolve = AsyncMock(side_effect=ValueError("resolution failed"))
+            result = await link_consumer_to_reservation(mock_session, reservation)
+            assert result is None
 
 
 class TestConvertQueueToReservation:
@@ -314,7 +328,12 @@ class TestPreArrivalPush:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        content = await generate_pre_arrival_push(mock_session, "RES_001")
+        mock_profile = {
+            "consumer_id": None, "display_name": None, "tags": [],
+            "total_order_count": 0, "total_order_amount_fen": 0, "rfm_level": "S3",
+        }
+        with patch("src.services.dining_journey_service._get_consumer_profile", new_callable=AsyncMock, return_value=mock_profile):
+            content = await generate_pre_arrival_push(mock_session, "RES_001")
         assert content["reservation_id"] == "RES_001"
         assert content["customer_name"] == "张三"
         assert "scene" in content
@@ -355,7 +374,12 @@ class TestRecognizeReturningCustomer:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        result = await recognize_returning_customer(mock_session, "13800138000", "S001")
+        mock_profile = {
+            "consumer_id": None, "display_name": None, "tags": [],
+            "total_order_count": 0, "total_order_amount_fen": 0, "rfm_level": "S3",
+        }
+        with patch("src.services.dining_journey_service._get_consumer_profile", new_callable=AsyncMock, return_value=mock_profile):
+            result = await recognize_returning_customer(mock_session, "13800138000", "S001")
         assert result["is_returning"] is True
         assert result["total_visits"] == 1
         assert "recommended_actions" in result
@@ -369,7 +393,12 @@ class TestRecognizeReturningCustomer:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        result = await recognize_returning_customer(mock_session, "13000000000", "S001")
+        mock_profile = {
+            "consumer_id": None, "display_name": None, "tags": [],
+            "total_order_count": 0, "total_order_amount_fen": 0, "rfm_level": "S3",
+        }
+        with patch("src.services.dining_journey_service._get_consumer_profile", new_callable=AsyncMock, return_value=mock_profile):
+            result = await recognize_returning_customer(mock_session, "13000000000", "S001")
         assert result["is_returning"] is False
         assert result["total_visits"] == 0
 
@@ -559,7 +588,13 @@ class TestSatisfactionSurvey:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        survey = await trigger_satisfaction_survey(mock_session, "RES_001")
+        mock_profile = {
+            "consumer_id": None, "display_name": None, "tags": [],
+            "total_order_count": 0, "total_order_amount_fen": 0, "rfm_level": "S3",
+        }
+        with patch("src.services.dining_journey_service._get_consumer_profile", new_callable=AsyncMock, return_value=mock_profile), \
+             patch("src.services.dining_journey_service._send_push", new_callable=AsyncMock):
+            survey = await trigger_satisfaction_survey(mock_session, "RES_001")
 
         assert survey["reservation_id"] == "RES_001"
         assert len(survey["questions"]) == 5
@@ -583,7 +618,13 @@ class TestSatisfactionSurvey:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        survey = await trigger_satisfaction_survey(mock_session, "RES_002")
+        mock_profile = {
+            "consumer_id": None, "display_name": None, "tags": [],
+            "total_order_count": 0, "total_order_amount_fen": 0, "rfm_level": "S3",
+        }
+        with patch("src.services.dining_journey_service._get_consumer_profile", new_callable=AsyncMock, return_value=mock_profile), \
+             patch("src.services.dining_journey_service._send_push", new_callable=AsyncMock):
+            survey = await trigger_satisfaction_survey(mock_session, "RES_002")
         assert "marketing" in survey
 
 
@@ -606,11 +647,13 @@ class TestReviewProcessing:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        result = await process_post_dining_review(
-            mock_session, "RES_001", "meituan",
-            "菜品非常好吃，服务态度好，环境好！强烈推荐！",
-            platform_rating=5,
-        )
+        positive_sentiment = {"sentiment": "positive", "confidence": 0.6, "key_points": ["关键词匹配：正面"]}
+        with patch("src.services.dining_journey_service._analyze_sentiment", new_callable=AsyncMock, return_value=positive_sentiment):
+            result = await process_post_dining_review(
+                mock_session, "RES_001", "meituan",
+                "菜品非常好吃，服务态度好，环境好！强烈推荐！",
+                platform_rating=5,
+            )
 
         assert result["sentiment"]["sentiment"] == "positive"
         assert any(a["action"] == "thank_and_promote" for a in result["actions"])
@@ -630,11 +673,13 @@ class TestReviewProcessing:
         mock_session = AsyncMock()
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        result = await process_post_dining_review(
-            mock_session, "RES_002", "dianping",
-            "太差了，菜难吃，服务慢，环境脏，价格贵，非常失望",
-            platform_rating=1,
-        )
+        negative_sentiment = {"sentiment": "negative", "confidence": 0.6, "key_points": ["关键词匹配：负面"]}
+        with patch("src.services.dining_journey_service._analyze_sentiment", new_callable=AsyncMock, return_value=negative_sentiment):
+            result = await process_post_dining_review(
+                mock_session, "RES_002", "dianping",
+                "太差了，菜难吃，服务慢，环境脏，价格贵，非常失望",
+                platform_rating=1,
+            )
 
         assert result["sentiment"]["sentiment"] == "negative"
         assert any(a["action"] == "review_repair" for a in result["actions"])
@@ -653,26 +698,31 @@ class TestReviewProcessing:
 
 
 class TestSentimentAnalysis:
+    """测试情感分析关键词降级逻辑（mock掉LLM服务，强制走keyword fallback）。"""
 
     @pytest.mark.asyncio
     async def test_keyword_fallback(self):
         from src.services.dining_journey_service import _analyze_sentiment
 
-        result = await _analyze_sentiment("菜太难吃了，服务差，很失望")
+        # Force keyword fallback by making CustomerSentimentService raise on import
+        with patch("builtins.__import__", side_effect=_block_sentiment_import):
+            result = await _analyze_sentiment("菜太难吃了，服务差，很失望")
         assert result["sentiment"] == "negative"
 
     @pytest.mark.asyncio
     async def test_positive_keywords(self):
         from src.services.dining_journey_service import _analyze_sentiment
 
-        result = await _analyze_sentiment("非常好吃，服务好，环境棒，推荐！")
+        with patch("builtins.__import__", side_effect=_block_sentiment_import):
+            result = await _analyze_sentiment("非常好吃，服务好，环境棒，推荐！")
         assert result["sentiment"] == "positive"
 
     @pytest.mark.asyncio
     async def test_neutral(self):
         from src.services.dining_journey_service import _analyze_sentiment
 
-        result = await _analyze_sentiment("一般般吧")
+        with patch("builtins.__import__", side_effect=_block_sentiment_import):
+            result = await _analyze_sentiment("一般般吧")
         assert result["sentiment"] == "neutral"
 
 

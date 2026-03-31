@@ -43,6 +43,8 @@ sys.modules.setdefault("src.core.config", MagicMock(settings=MagicMock(
     REDIS_SENTINEL_DB=0,
 )))
 
+import redis.exceptions
+
 from src.services.redis_cache_service import RedisCacheService, redis_cache
 
 
@@ -220,7 +222,7 @@ class TestGet:
     @pytest.mark.asyncio
     async def test_generic_exception_returns_none(self):
         svc = _svc()
-        svc._redis.get = AsyncMock(side_effect=RuntimeError("bad"))
+        svc._redis.get = AsyncMock(side_effect=redis.exceptions.RedisError("bad"))
         result = await svc.get("k")
         assert result is None
 
@@ -287,7 +289,7 @@ class TestSet:
     @pytest.mark.asyncio
     async def test_generic_exception_returns_false(self):
         svc = _svc()
-        svc._redis.set = AsyncMock(side_effect=RuntimeError("fail"))
+        svc._redis.set = AsyncMock(side_effect=redis.exceptions.RedisError("fail"))
         result = await svc.set("k", "v")
         assert result is False
 
@@ -308,7 +310,7 @@ class TestDelete:
     @pytest.mark.asyncio
     async def test_exception_returns_false(self):
         svc = _svc()
-        svc._redis.delete = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.delete = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         result = await svc.delete("k")
         assert result is False
 
@@ -333,7 +335,7 @@ class TestExists:
     @pytest.mark.asyncio
     async def test_exception_returns_false(self):
         svc = _svc()
-        svc._redis.exists = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.exists = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.exists("k") is False
 
 
@@ -351,7 +353,7 @@ class TestExpire:
     @pytest.mark.asyncio
     async def test_exception_returns_false(self):
         svc = _svc()
-        svc._redis.expire = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.expire = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.expire("k", 60) is False
 
 
@@ -375,7 +377,7 @@ class TestTTL:
     @pytest.mark.asyncio
     async def test_exception_returns_minus_two(self):
         svc = _svc()
-        svc._redis.ttl = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.ttl = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.ttl("k") == -2
 
 
@@ -402,7 +404,7 @@ class TestIncrDecr:
     @pytest.mark.asyncio
     async def test_incr_exception_returns_none(self):
         svc = _svc()
-        svc._redis.incrby = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.incrby = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.incr("counter") is None
 
     @pytest.mark.asyncio
@@ -423,7 +425,7 @@ class TestIncrDecr:
     @pytest.mark.asyncio
     async def test_decr_exception_returns_none(self):
         svc = _svc()
-        svc._redis.decrby = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.decrby = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.decr("counter") is None
 
 
@@ -454,7 +456,7 @@ class TestHashOperations:
     @pytest.mark.asyncio
     async def test_hget_exception_returns_none(self):
         svc = _svc()
-        svc._redis.hget = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.hget = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.hget("hash", "f") is None
 
     @pytest.mark.asyncio
@@ -482,7 +484,7 @@ class TestHashOperations:
     @pytest.mark.asyncio
     async def test_hset_exception_returns_false(self):
         svc = _svc()
-        svc._redis.hset = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.hset = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.hset("hash", "f", "v") is False
 
     @pytest.mark.asyncio
@@ -499,7 +501,7 @@ class TestHashOperations:
     @pytest.mark.asyncio
     async def test_hgetall_exception_returns_empty_dict(self):
         svc = _svc()
-        svc._redis.hgetall = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.hgetall = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.hgetall("hash") == {}
 
     @pytest.mark.asyncio
@@ -512,7 +514,7 @@ class TestHashOperations:
     @pytest.mark.asyncio
     async def test_hdel_exception_returns_false(self):
         svc = _svc()
-        svc._redis.hdel = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.hdel = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.hdel("hash", "f") is False
 
 
@@ -536,7 +538,7 @@ class TestListOperations:
     @pytest.mark.asyncio
     async def test_lpush_exception_returns_none(self):
         svc = _svc()
-        svc._redis.lpush = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.lpush = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.lpush("list", "v") is None
 
     @pytest.mark.asyncio
@@ -549,7 +551,7 @@ class TestListOperations:
     @pytest.mark.asyncio
     async def test_rpush_exception_returns_none(self):
         svc = _svc()
-        svc._redis.rpush = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.rpush = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.rpush("list", "v") is None
 
     @pytest.mark.asyncio
@@ -573,7 +575,7 @@ class TestListOperations:
     @pytest.mark.asyncio
     async def test_lrange_exception_returns_empty_list(self):
         svc = _svc()
-        svc._redis.lrange = AsyncMock(side_effect=RuntimeError("err"))
+        svc._redis.lrange = AsyncMock(side_effect=redis.exceptions.RedisError("err"))
         assert await svc.lrange("list") == []
 
 
@@ -613,7 +615,7 @@ class TestClearPattern:
     @pytest.mark.asyncio
     async def test_exception_returns_zero(self):
         svc = _svc()
-        svc._redis.scan_iter = MagicMock(side_effect=RuntimeError("scan failed"))
+        svc._redis.scan_iter = MagicMock(side_effect=redis.exceptions.RedisError("scan failed"))
         count = await svc.clear_pattern("*")
         assert count == 0
 

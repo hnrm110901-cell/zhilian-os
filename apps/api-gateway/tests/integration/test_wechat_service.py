@@ -170,7 +170,7 @@ class TestSendTemplatedMessage:
         redis.exists = AsyncMock(return_value=False)
         redis.rpush = AsyncMock(return_value=1)
         svc = WeChatService(redis_client=redis)
-        svc.send_text_message = AsyncMock(side_effect=RuntimeError("net"))
+        svc.send_text_message = AsyncMock(side_effect=ConnectionError("net"))
 
         result = await svc.send_templated_message("anomaly_alert", {"anomaly_type": "x"}, "U1")
         assert result["status"] == "failed"
@@ -704,7 +704,7 @@ class TestRetryFailedMessagesExtended:
         redis.rpush = AsyncMock(return_value=1)
 
         svc = WeChatService(redis_client=redis)
-        svc.send_templated_message = AsyncMock(side_effect=RuntimeError("boom"))
+        svc.send_templated_message = AsyncMock(side_effect=ConnectionError("boom"))
 
         result = await svc.retry_failed_messages(max_retries=3)
 
@@ -728,7 +728,7 @@ class TestIsDuplicate:
     async def test_redis_exists_raises_returns_false(self):
         """Lines 564-565: redis.exists raises → except returns False."""
         redis = _make_redis()
-        redis.exists = AsyncMock(side_effect=Exception("redis down"))
+        redis.exists = AsyncMock(side_effect=ConnectionError("redis down"))
         svc = WeChatService(redis_client=redis)
         result = await svc._is_duplicate("MSG1")
         assert result is False
@@ -750,7 +750,7 @@ class TestMarkSent:
     async def test_redis_set_raises_logs_warning(self):
         """Lines 574-575: redis.set raises → except logs warning (no re-raise)."""
         redis = _make_redis()
-        redis.set = AsyncMock(side_effect=Exception("redis down"))
+        redis.set = AsyncMock(side_effect=OSError("redis down"))
         svc = WeChatService(redis_client=redis)
         # Should not raise
         await svc._mark_sent("MSG1")
@@ -772,7 +772,7 @@ class TestEnqueueFailedMessage:
     async def test_redis_rpush_raises_logs_error(self):
         """Lines 600-601: redis.rpush raises → except logs error (no re-raise)."""
         redis = _make_redis()
-        redis.rpush = AsyncMock(side_effect=Exception("redis down"))
+        redis.rpush = AsyncMock(side_effect=OSError("redis down"))
         svc = WeChatService(redis_client=redis)
         # Should not raise
         await svc._enqueue_failed_message("shift_report", {}, "U1", "MSG1", "err")

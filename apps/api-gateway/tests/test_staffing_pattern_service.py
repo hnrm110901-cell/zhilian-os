@@ -122,8 +122,8 @@ class TestStaffingPatternService:
             performance_score=76.9,
         )
         employees = [
-            SimpleNamespace(id="E001", skills=["waiter"], is_active=True),
-            SimpleNamespace(id="E002", skills=["waiter"], is_active=True),
+            SimpleNamespace(id="E001", legacy_employee_id="E001", skills=["waiter"], is_active=True),
+            SimpleNamespace(id="E002", legacy_employee_id="E002", skills=["waiter"], is_active=True),
         ]
         db.execute = AsyncMock(return_value=_result_with_row(row))
         with patch(

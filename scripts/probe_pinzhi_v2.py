@@ -1,10 +1,13 @@
 """验证品智API正确的端点名称"""
 import hashlib
+import os
 import urllib.request
 import urllib.error
 from collections import OrderedDict
 
-TOKEN = "752b4b16a8b8ddb1a7e5c1abcb62a5ef"
+TOKEN = os.getenv("PINZHI_PROBE_TOKEN")
+if not TOKEN:
+    raise ValueError("PINZHI_PROBE_TOKEN environment variable not set")
 BASE = "http://czyq.pinzhikeji.net:8899/pzcatering-gateway"
 
 def sign(token, params):

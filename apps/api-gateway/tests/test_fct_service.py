@@ -554,8 +554,8 @@ class TestGetDashboard:
         svc.forecast_cash_flow   = AsyncMock(return_value={
             "summary": {"net_flow": 0, "ending_balance": 0, "alert_count": 0}
         })
-        svc.estimate_monthly_tax = AsyncMock(side_effect=Exception("DB error"))
-        svc.get_budget_execution = AsyncMock(side_effect=Exception("DB error"))
+        svc.estimate_monthly_tax = AsyncMock(side_effect=ValueError("DB error"))
+        svc.get_budget_execution = AsyncMock(side_effect=ValueError("DB error"))
         db.execute.return_value  = _scalars_all([])
 
         result = await svc.get_dashboard("STORE001")

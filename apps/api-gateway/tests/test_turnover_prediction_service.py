@@ -78,6 +78,7 @@ async def test_predict_employee_turnover_high_risk_send_alert():
 
     employee = SimpleNamespace(
         id="E1",
+        legacy_employee_id="E1",
         store_id="S1",
         name="张三",
         preferences={
@@ -110,6 +111,7 @@ async def test_predict_employee_turnover_low_risk_no_alert():
 
     employee = SimpleNamespace(
         id="E2",
+        legacy_employee_id="E2",
         store_id="S1",
         name="李四",
         preferences={
