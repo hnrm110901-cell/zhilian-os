@@ -1239,6 +1239,26 @@ app.include_router(hr_api.router, prefix="/api/v1/hr", tags=["HR"])
 from src.api.webhooks.wechat_attendance import router as wechat_attendance_router
 app.include_router(wechat_attendance_router, prefix="/api/v1", tags=["webhooks"])
 
+# ── Phase 1a: 真实支付网关（微信V3+支付宝）────────────────────────────────
+from src.api.payment_gateway import router as payment_gateway_router
+app.include_router(payment_gateway_router)
+
+# ── Phase 1b: 自研储值卡+积分+会员等级────────────────────────────────────
+from src.api.stored_value import router as stored_value_router
+from src.api.loyalty_points import router as loyalty_points_router
+app.include_router(stored_value_router)
+app.include_router(loyalty_points_router)
+
+# ── Phase 2a: 集团菜单模板中心+多渠道定价────────────────────────────────
+from src.api.menu_template import router as menu_template_router
+app.include_router(menu_template_router)
+
+# ── Phase 2b: 门店间调拨+收货验收────────────────────────────────────────
+from src.api.inter_store_transfer import router as inter_store_transfer_router
+from src.api.receiving_inspection import router as receiving_inspection_router
+app.include_router(inter_store_transfer_router)
+app.include_router(receiving_inspection_router)
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:

@@ -180,6 +180,19 @@ class Settings(BaseSettings):
         "Accept-Language",
     ]
 
+    # 微信支付V3
+    WECHAT_PAY_MCH_ID: str = ""           # 商户号
+    WECHAT_PAY_API_V3_KEY: str = ""       # APIv3密钥（32字节，AES-256-GCM解密回调）
+    WECHAT_PAY_CERT_SERIAL_NO: str = ""   # 商户证书序列号
+    WECHAT_PAY_APP_ID: str = ""           # 微信公众号/小程序 AppID
+    WECHAT_PAY_PRIVATE_KEY: str = ""      # 商户私钥（RSA，PEM格式，不含换行转义）
+
+    # 支付宝
+    ALIPAY_APP_ID: str = ""               # 支付宝应用ID
+    ALIPAY_PRIVATE_KEY: str = ""          # 应用私钥（RSA2，PEM格式）
+    ALIPAY_PUBLIC_KEY: str = ""           # 支付宝公钥（验签用）
+    ALIPAY_GATEWAY: str = "https://openapi.alipay.com/gateway.do"
+
     # 业财税资金一体化扩展（FCT）
     FCT_ENABLED: bool = True
     FCT_MODE: str = "embedded"  # embedded | remote
