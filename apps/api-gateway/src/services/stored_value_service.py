@@ -11,11 +11,10 @@ StoredValueService — 充值/消费/退款/查询/活动管理
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.stored_value import (
