@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db_session
@@ -164,7 +165,7 @@ class Customer360Service:
 
             return None
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError) as e:
             logger.error("获取会员信息失败", error=str(e))
             return None
 
@@ -210,7 +211,7 @@ class Customer360Service:
                 for order in orders
             ]
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, AttributeError) as e:
             logger.error("获取订单历史失败", error=str(e))
             return []
 
@@ -288,7 +289,7 @@ class Customer360Service:
 
             return reservation_list
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, AttributeError) as e:
             logger.error("获取预订记录失败", error=str(e))
             return []
 
@@ -331,7 +332,7 @@ class Customer360Service:
                 for trans in transactions
             ]
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, AttributeError) as e:
             logger.error("获取POS交易记录失败", error=str(e))
             return []
 
@@ -369,7 +370,7 @@ class Customer360Service:
                 for log in logs
             ]
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, AttributeError) as e:
             logger.error("获取活动日志失败", error=str(e))
             return []
 
@@ -490,7 +491,7 @@ class Customer360Service:
                 "customer_tier": self._get_customer_tier(rfm_score),
             }
 
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, ZeroDivisionError) as e:
             logger.error("计算客户价值失败", error=str(e))
             return {}
 

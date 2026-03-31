@@ -24,6 +24,7 @@ import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import exc as sa_exc
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -121,7 +122,7 @@ class EffectEvaluator:
                     trust_after=new_trust,
                 )
 
-            except Exception as exc:
+            except (sa_exc.SQLAlchemyError, ValueError, KeyError, TypeError) as exc:
                 errors += 1
                 logger.warning(
                     "effect_evaluator.eval_error",
@@ -164,7 +165,7 @@ class EffectEvaluator:
                 }
                 for r in rows
             ]
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.warning("effect_evaluator.find_failed", error=str(exc))
             return []
 
@@ -184,7 +185,7 @@ class EffectEvaluator:
             skills = registry.query(intent=decision_type)
             if skills:
                 return skills[0].evaluation_delay_hours
-        except Exception:
+        except (ImportError, AttributeError, ValueError):
             pass
 
         return _DEFAULT_EVAL_DELAYS.get(decision_type, 72)
@@ -252,7 +253,7 @@ class EffectEvaluator:
                 },
                 "deviation": abs(deviation),
             }
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.debug("effect_evaluator.inventory_eval_error", error=str(exc))
             return None
 
@@ -290,7 +291,7 @@ class EffectEvaluator:
                 },
                 "deviation": abs(deviation),
             }
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.debug("effect_evaluator.schedule_eval_error", error=str(exc))
             return None
 
@@ -333,7 +334,7 @@ class EffectEvaluator:
                 },
                 "deviation": abs(deviation),
             }
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.debug("effect_evaluator.purchase_eval_error", error=str(exc))
             return None
 
@@ -396,7 +397,7 @@ class EffectEvaluator:
                 "actual_result": {"actual_cost_rate": actual_rate, "expected_cost_rate": expected_rate},
                 "deviation": abs(deviation),
             }
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.debug("effect_evaluator.cost_eval_error", error=str(exc))
             return None
 
@@ -454,7 +455,7 @@ class EffectEvaluator:
                 },
                 "deviation": abs(deviation),
             }
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.debug("effect_evaluator.revenue_eval_error", error=str(exc))
             return None
 
@@ -513,7 +514,7 @@ class EffectEvaluator:
                 "actual_result": {"anomaly_count_after": anomaly_count},
                 "deviation": float(anomaly_count),
             }
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.debug("effect_evaluator.order_eval_error", error=str(exc))
             return None
 
@@ -547,7 +548,7 @@ class EffectEvaluator:
                 )
             ).fetchone()
             return int(rows[0]) if rows else 0
-        except Exception:
+        except sa_exc.SQLAlchemyError:
             return 0
 
     async def _get_labor_cost_ratio(
@@ -578,7 +579,7 @@ class EffectEvaluator:
                 )
             ).fetchone()
             return float(rows[0]) if rows and rows[0] is not None else None
-        except Exception:
+        except sa_exc.SQLAlchemyError:
             return None
 
     async def _get_actual_purchase_cost(
@@ -607,7 +608,7 @@ class EffectEvaluator:
             val = float(rows[0]) if rows and rows[0] else None
             # 分 → 元
             return round(val / 100, 2) if val else None
-        except Exception:
+        except sa_exc.SQLAlchemyError:
             return None
 
     async def _update_decision(
@@ -639,7 +640,7 @@ class EffectEvaluator:
                 },
             )
             await self.db.commit()
-        except Exception as exc:
+        except sa_exc.SQLAlchemyError as exc:
             logger.warning("effect_evaluator.update_failed", decision_id=decision_id, error=str(exc))
             await self.db.rollback()
 

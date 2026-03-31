@@ -11,6 +11,7 @@ from datetime import timedelta
 from typing import Any, List, Optional, Union
 
 import redis.asyncio as redis
+import redis.exceptions
 import structlog
 
 from ..core.config import settings
@@ -53,7 +54,7 @@ class RedisCacheService:
                     )
                     await self._redis.ping()
                     logger.info("Redis Sentinel 模式初始化成功", master=settings.REDIS_SENTINEL_MASTER)
-                except Exception as sentinel_err:
+                except (redis.exceptions.RedisError, ConnectionError, TimeoutError, OSError) as sentinel_err:
                     # Sentinel 连接失败 → 降级为直连 Redis master
                     logger.warning(
                         "Redis Sentinel 连接失败，降级为直连模式",
@@ -88,7 +89,7 @@ class RedisCacheService:
             logger.error("Redis连接失败，请检查地址和端口", error=str(e))
             raise
         except Exception as e:
-            logger.error("Redis缓存服务初始化失败", error=str(e))
+            logger.error("Redis缓存服务初始化失败", error=str(e), exc_info=True)
             raise
 
     async def close(self):
@@ -125,7 +126,7 @@ class RedisCacheService:
         except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.warning("Redis连接/超时，缓存读取降级", key=key, error=str(e))
             return None
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("获取缓存失败", key=key, error=str(e))
             return None
 
@@ -165,7 +166,7 @@ class RedisCacheService:
         except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.warning("Redis连接/超时，缓存写入降级", key=key, error=str(e))
             return False
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("设置缓存失败", key=key, error=str(e))
             return False
 
@@ -186,7 +187,7 @@ class RedisCacheService:
             await self._redis.delete(key)
             return True
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("删除缓存失败", key=key, error=str(e))
             return False
 
@@ -206,7 +207,7 @@ class RedisCacheService:
 
             return await self._redis.exists(key) > 0
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("检查缓存存在失败", key=key, error=str(e))
             return False
 
@@ -227,7 +228,7 @@ class RedisCacheService:
 
             return await self._redis.expire(key, seconds)
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("设置缓存过期时间失败", key=key, error=str(e))
             return False
 
@@ -247,7 +248,7 @@ class RedisCacheService:
 
             return await self._redis.ttl(key)
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("获取缓存TTL失败", key=key, error=str(e))
             return -2
 
@@ -268,7 +269,7 @@ class RedisCacheService:
 
             return await self._redis.incrby(key, amount)
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("递增计数器失败", key=key, error=str(e))
             return None
 
@@ -289,7 +290,7 @@ class RedisCacheService:
 
             return await self._redis.decrby(key, amount)
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("递减计数器失败", key=key, error=str(e))
             return None
 
@@ -317,7 +318,7 @@ class RedisCacheService:
             except (json.JSONDecodeError, TypeError):
                 return value
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("获取哈希表字段失败", name=name, key=key, error=str(e))
             return None
 
@@ -345,7 +346,7 @@ class RedisCacheService:
             await self._redis.hset(name, key, value)
             return True
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("设置哈希表字段失败", name=name, key=key, error=str(e))
             return False
 
@@ -374,7 +375,7 @@ class RedisCacheService:
 
             return result
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("获取哈希表所有字段失败", name=name, error=str(e))
             return {}
 
@@ -396,7 +397,7 @@ class RedisCacheService:
             await self._redis.hdel(name, *keys)
             return True
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("删除哈希表字段失败", name=name, keys=keys, error=str(e))
             return False
 
@@ -424,7 +425,7 @@ class RedisCacheService:
 
             return await self._redis.lpush(key, *serialized_values)
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("列表左推失败", key=key, error=str(e))
             return None
 
@@ -452,7 +453,7 @@ class RedisCacheService:
 
             return await self._redis.rpush(key, *serialized_values)
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("列表右推失败", key=key, error=str(e))
             return None
 
@@ -483,7 +484,7 @@ class RedisCacheService:
 
             return result
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("获取列表范围失败", key=key, error=str(e))
             return []
 
@@ -511,7 +512,7 @@ class RedisCacheService:
             logger.info("清除缓存模式", pattern=pattern, count=len(keys))
             return len(keys)
 
-        except Exception as e:
+        except redis.exceptions.RedisError as e:
             logger.error("清除缓存模式失败", pattern=pattern, error=str(e))
             return 0
 

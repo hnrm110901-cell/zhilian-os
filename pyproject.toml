@@ -88,24 +88,31 @@ extend-exclude = '''
 '''
 
 [tool.ruff]
-line-length = 100
-target-version = "py38"
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "C",  # flake8-comprehensions
-    "B",  # flake8-bugbear
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "C",    # flake8-comprehensions
+    "B",    # flake8-bugbear
+    "S",    # bandit (security)
+    "SIM",  # simplify
 ]
 ignore = [
-    "E501",  # line too long, handled by black
-    "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
+    "E501",   # line too long (handled by formatter)
+    "S101",   # assert (used in tests)
+    "B008",   # function-call-in-default-argument (FastAPI Depends)
+    "C901",   # too complex
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"tests/**/*.py" = ["S101", "S106"]  # allow assert and hardcoded passwords in tests
+"alembic/**/*.py" = ["E501"]         # migration files can be long
 
 [tool.mypy]
 python_version = "3.8"

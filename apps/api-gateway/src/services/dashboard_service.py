@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List
 
 import structlog
+from sqlalchemy import exc as sa_exc
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,7 +71,7 @@ class DashboardService:
                 stores = await pos_service.get_stores()
                 stats["stores"]["total"] = len(stores)
                 stats["stores"]["active"] = len(stores)
-            except Exception as e:
+            except (ConnectionError, TimeoutError, OSError) as e:
                 logger.warning("获取门店数据失败", error=str(e))
 
             # 获取订单数据
@@ -106,14 +107,14 @@ class DashboardService:
                 if yesterday_revenue > 0:
                     stats["revenue"]["growth_rate"] = (today_revenue - yesterday_revenue) / yesterday_revenue * 100
 
-            except Exception as e:
+            except (ConnectionError, TimeoutError, OSError, ValueError, KeyError, TypeError) as e:
                 logger.warning("获取订单数据失败", error=str(e))
 
             logger.info("获取概览统计数据成功")
             return stats
 
         except Exception as e:
-            logger.error("获取概览统计数据失败", error=str(e))
+            logger.error("获取概览统计数据失败", error=str(e), exc_info=True)
             raise
 
     async def get_sales_trend(self, days: int = int(os.getenv("DASHBOARD_SALES_TREND_DAYS", "7"))) -> Dict[str, Any]:
@@ -147,7 +148,7 @@ class DashboardService:
                     orders_count.append(len(orders))
                     revenue.append(sum(order.get("realPrice", 0) for order in orders))
 
-                except Exception as e:
+                except (ConnectionError, TimeoutError, OSError, ValueError, KeyError, TypeError) as e:
                     logger.warning(f"获取{date}销售数据失败", error=str(e))
                     orders_count.append(0)
                     revenue.append(0)
@@ -159,7 +160,7 @@ class DashboardService:
             }
 
         except Exception as e:
-            logger.error("获取销售趋势数据失败", error=str(e))
+            logger.error("获取销售趋势数据失败", error=str(e), exc_info=True)
             raise
 
     async def get_category_sales(self) -> Dict[str, Any]:
@@ -188,7 +189,7 @@ class DashboardService:
                         .limit(int(os.getenv("DASHBOARD_CATEGORY_RANK_LIMIT", "5")))
                     )
                     rows = result.all()
-            except Exception as e:
+            except sa_exc.SQLAlchemyError as e:
                 logger.warning("dashboard_category_sales_db_failed", error=str(e))
 
             if rows:
@@ -199,12 +200,12 @@ class DashboardService:
             try:
                 categories = await pos_service.get_dish_categories()
                 return {"categories": [{"name": c.get("rcNAME", "未知"), "value": 0} for c in categories[:5]]}
-            except Exception as e:
+            except (ConnectionError, TimeoutError, OSError) as e:
                 logger.warning("dashboard_pos_categories_fallback_failed", error=str(e))
                 return {"categories": []}
 
         except Exception as e:
-            logger.error("获取菜品类别销售数据失败", error=str(e))
+            logger.error("获取菜品类别销售数据失败", error=str(e), exc_info=True)
             return {"categories": []}
 
     async def get_payment_methods(self) -> Dict[str, Any]:
@@ -225,7 +226,7 @@ class DashboardService:
                         .limit(int(os.getenv("DASHBOARD_PAYMENT_QUERY_LIMIT", "200")))
                     )
                     rows = result.all()
-            except Exception as e:
+            except sa_exc.SQLAlchemyError as e:
                 logger.warning("dashboard_payment_db_failed", error=str(e))
 
             # 从 order_metadata JSON 中提取 payment_method
@@ -245,14 +246,14 @@ class DashboardService:
                 try:
                     pay_types = await pos_service.get_pay_types()
                     payment_distribution = [{"name": p.get("name", "未知"), "value": 0} for p in pay_types]
-                except Exception as e:
+                except (ConnectionError, TimeoutError, OSError) as e:
                     logger.warning("dashboard_pos_pay_types_failed", error=str(e))
                     payment_distribution = []
 
             return {"payment_methods": payment_distribution}
 
         except Exception as e:
-            logger.error("获取支付方式分布失败", error=str(e))
+            logger.error("获取支付方式分布失败", error=str(e), exc_info=True)
             return {"payment_methods": []}
 
     async def get_member_stats(self) -> Dict[str, Any]:
@@ -307,7 +308,7 @@ class DashboardService:
                 ],
             }
 
-        except Exception as e:
+        except sa_exc.SQLAlchemyError as e:
             logger.error("获取会员统计数据失败", error=str(e))
             return {
                 "total_members": 0,
@@ -365,7 +366,7 @@ class DashboardService:
 
             return {"agents": agents}
 
-        except Exception as e:
+        except sa_exc.SQLAlchemyError as e:
             logger.error("获取Agent性能数据失败", error=str(e))
             return {
                 "agents": [
@@ -429,7 +430,7 @@ class DashboardService:
                 "kitchen_queue": kitchen_queue,
             }
 
-        except Exception as e:
+        except sa_exc.SQLAlchemyError as e:
             logger.error("获取实时指标失败", error=str(e))
             return {
                 "timestamp": datetime.now().isoformat(),

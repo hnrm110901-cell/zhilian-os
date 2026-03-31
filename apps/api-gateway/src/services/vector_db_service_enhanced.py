@@ -95,7 +95,7 @@ class VectorDatabaseServiceEnhanced:
                 import qdrant_client
 
                 self._client_version = getattr(qdrant_client, "__version__", "unknown")
-            except Exception as e:
+            except (ImportError, AttributeError) as e:
                 self._client_version = "unknown"
                 logger.warning("qdrant_version_check_failed", error=str(e))
 
@@ -122,7 +122,7 @@ class VectorDatabaseServiceEnhanced:
             logger.info("向量数据库初始化成功")
 
         except Exception as e:
-            logger.error("向量数据库初始化失败", error=str(e))
+            logger.error("向量数据库初始化失败", error=str(e), exc_info=True)
             self._initialized = False
             raise
 
@@ -132,9 +132,9 @@ class VectorDatabaseServiceEnhanced:
             # 尝试获取集合列表
             collections = self.client.get_collections()
             logger.info(f"Qdrant连接成功，当前集合数: {len(collections.collections)}")
-        except Exception as e:
+        except (ConnectionError, TimeoutError, OSError) as e:
             logger.error("Qdrant连接失败", error=str(e))
-            raise ConnectionError(f"无法连接到Qdrant: {str(e)}")
+            raise ConnectionError(f"无法连接到Qdrant: {str(e)}") from e
 
     async def _initialize_embedding_model(self):
         """初始化嵌入模型"""
@@ -147,13 +147,13 @@ class VectorDatabaseServiceEnhanced:
 
                 version = getattr(sentence_transformers, "__version__", "unknown")
                 logger.info(f"sentence-transformers版本: {version}")
-            except Exception as e:
+            except (ImportError, AttributeError) as e:
                 logger.warning("sentence_transformers_version_check_failed", error=str(e))
             model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
             self.embedding_model = SentenceTransformer(model_name, device="cpu")  # 使用CPU，避免GPU依赖
             logger.info("嵌入模型加载成功", model=model_name)
 
-        except Exception as e:
+        except (ImportError, OSError, ValueError) as e:
             logger.warning(f"嵌入模型加载失败，将降级到 API 模式: {str(e)}")
             self.embedding_model = None
 
@@ -204,7 +204,7 @@ class VectorDatabaseServiceEnhanced:
                     logger.info(f"集合已存在: {collection['name']}")
 
             except Exception as e:
-                logger.error(f"处理集合失败: {collection['name']}", error=str(e))
+                logger.error(f"处理集合失败: {collection['name']}", error=str(e), exc_info=True)
                 # 不抛出异常，继续处理其他集合
 
     def generate_embedding(self, text: str) -> List[float]:
@@ -227,7 +227,7 @@ class VectorDatabaseServiceEnhanced:
             try:
                 embedding = self.embedding_model.encode(text, convert_to_numpy=True)
                 return embedding.tolist()
-            except Exception as e:
+            except (RuntimeError, ValueError, OSError) as e:
                 logger.warning(f"本地嵌入生成失败，尝试 API 降级: {str(e)}")
 
         # 降级：OpenAI-compatible embedding API
@@ -288,7 +288,7 @@ class VectorDatabaseServiceEnhanced:
         except urllib.error.HTTPError as e:
             logger.warning(f"嵌入 API 请求失败: HTTP {e.code}", model=model)
             return None
-        except Exception as e:
+        except (urllib.error.URLError, json.JSONDecodeError, KeyError, TimeoutError) as e:
             logger.warning(f"嵌入 API 调用异常: {str(e)}")
             return None
 
@@ -372,8 +372,11 @@ class VectorDatabaseServiceEnhanced:
 
             logger.info("订单索引成功", order_id=order_data["order_id"])
             return True
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error("订单数据处理失败", error=str(e))
+            return False
         except Exception as e:
-            logger.error("订单索引失败", error=str(e))
+            logger.error("订单索引失败", error=str(e), exc_info=True)
             return False
 
     async def index_orders_batch(self, orders: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -430,7 +433,7 @@ class VectorDatabaseServiceEnhanced:
                     points.append(point)
                     success_count += 1
 
-                except Exception as e:
+                except (KeyError, ValueError, TypeError) as e:
                     failure_count += 1
                     errors.append(f"订单 {order_data.get('order_id', 'unknown')} 处理失败: {str(e)}")
 
@@ -457,7 +460,7 @@ class VectorDatabaseServiceEnhanced:
             }
 
         except Exception as e:
-            logger.error("批量订单索引失败", error=str(e))
+            logger.error("批量订单索引失败", error=str(e), exc_info=True)
             return {
                 "total": len(orders),
                 "success": 0,
@@ -508,7 +511,7 @@ class VectorDatabaseServiceEnhanced:
         except Exception as e:
             health_status["status"] = "unhealthy"
             health_status["error"] = str(e)
-            logger.error("健康检查失败", error=str(e))
+            logger.error("健康检查失败", error=str(e), exc_info=True)
 
         return health_status
 
@@ -566,11 +569,11 @@ class VectorDatabaseServiceEnhanced:
             logger.info("菜品索引成功", dish_id=dish_data["dish_id"])
             return True
 
-        except KeyError as e:
+        except (KeyError, ValueError, TypeError) as e:
             logger.error(f"菜品数据字段错误: {str(e)}")
             return False
         except Exception as e:
-            logger.error("菜品索引失败", error=str(e))
+            logger.error("菜品索引失败", error=str(e), exc_info=True)
             return False
 
     @retry_on_failure(
@@ -631,11 +634,11 @@ class VectorDatabaseServiceEnhanced:
             logger.info("事件索引成功", event_id=event_data["event_id"])
             return True
 
-        except KeyError as e:
+        except (KeyError, ValueError, TypeError) as e:
             logger.error(f"事件数据字段错误: {str(e)}")
             return False
         except Exception as e:
-            logger.error("事件索引失败", error=str(e))
+            logger.error("事件索引失败", error=str(e), exc_info=True)
             return False
 
     @retry_on_failure(
@@ -708,7 +711,7 @@ class VectorDatabaseServiceEnhanced:
             return formatted_results
 
         except Exception as e:
-            logger.error("语义搜索失败", error=str(e))
+            logger.error("语义搜索失败", error=str(e), exc_info=True)
             return []
 
     def _order_to_text(self, order_data: Dict[str, Any]) -> str:
@@ -808,7 +811,7 @@ class VectorDatabaseServiceEnhanced:
                     points.append(point)
                     success_count += 1
 
-                except Exception as e:
+                except (KeyError, ValueError, TypeError) as e:
                     failure_count += 1
                     errors.append(f"菜品 {dish_data.get('dish_id', 'unknown')} 处理失败: {str(e)}")
 
@@ -835,7 +838,7 @@ class VectorDatabaseServiceEnhanced:
             }
 
         except Exception as e:
-            logger.error("批量菜品索引失败", error=str(e))
+            logger.error("批量菜品索引失败", error=str(e), exc_info=True)
             return {
                 "total": len(dishes),
                 "success": 0,
@@ -898,7 +901,7 @@ class VectorDatabaseServiceEnhanced:
                     points.append(point)
                     success_count += 1
 
-                except Exception as e:
+                except (KeyError, ValueError, TypeError) as e:
                     failure_count += 1
                     errors.append(f"事件 {event_data.get('event_id', 'unknown')} 处理失败: {str(e)}")
 
@@ -925,7 +928,7 @@ class VectorDatabaseServiceEnhanced:
             }
 
         except Exception as e:
-            logger.error("批量事件索引失败", error=str(e))
+            logger.error("批量事件索引失败", error=str(e), exc_info=True)
             return {
                 "total": len(events),
                 "success": 0,

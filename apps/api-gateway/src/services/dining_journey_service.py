@@ -28,7 +28,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, exc as sa_exc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.queue import Queue, QueueStatus
 from src.models.reservation import Reservation, ReservationStatus, ReservationType
@@ -57,6 +57,7 @@ async def link_consumer_to_reservation(
         from src.services.identity_resolution_service import identity_resolution_service
 
         consumer_id = await identity_resolution_service.resolve(
+            session,
             phone=reservation.customer_phone,
             display_name=reservation.customer_name,
         )
@@ -69,7 +70,7 @@ async def link_consumer_to_reservation(
                 consumer_id=str(consumer_id),
             )
         return str(consumer_id) if consumer_id else None
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
         logger.warning("consumer_link_failed", error=str(e))
         return None
 
@@ -86,6 +87,7 @@ async def link_consumer_to_queue(
         from src.services.identity_resolution_service import identity_resolution_service
 
         consumer_id = await identity_resolution_service.resolve(
+            session,
             phone=queue.customer_phone,
             display_name=queue.customer_name,
         )
@@ -93,7 +95,7 @@ async def link_consumer_to_queue(
             queue.consumer_id = consumer_id
             await session.flush()
         return str(consumer_id) if consumer_id else None
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
         logger.warning("queue_consumer_link_failed", error=str(e))
         return None
 
@@ -422,7 +424,7 @@ async def send_pre_arrival_reminders(
                 content = await generate_pre_arrival_push(session, item["reservation_id"])
                 await _send_push(item, content, push_type="t_minus_24h")
                 sent_count += 1
-            except Exception as e:
+            except (ConnectionError, TimeoutError, ValueError) as e:
                 logger.warning("pre_arrival_push_failed", reservation_id=item["reservation_id"], error=str(e))
                 failed_count += 1
 
@@ -434,7 +436,7 @@ async def send_pre_arrival_reminders(
                 content = await generate_pre_arrival_push(session, item["reservation_id"])
                 await _send_push(item, content, push_type="t_minus_4h")
                 sent_count += 1
-            except Exception as e:
+            except (ConnectionError, TimeoutError, ValueError) as e:
                 logger.warning("pre_arrival_push_failed_4h", reservation_id=item["reservation_id"], error=str(e))
                 failed_count += 1
 
@@ -572,7 +574,7 @@ async def trigger_birthday_journey(
                         "journey_triggered": True,
                     }
                 )
-            except Exception as e:
+            except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
                 logger.warning("birthday_journey_trigger_failed", customer_id=event.get("customer_id"), error=str(e))
                 triggered.append(
                     {
@@ -581,7 +583,7 @@ async def trigger_birthday_journey(
                         "error": str(e),
                     }
                 )
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
         logger.warning("birthday_scan_failed", error=str(e))
 
     return triggered
@@ -670,7 +672,7 @@ async def create_patrol_record(
             store_id=store_id,
             priority="high" if has_critical else "normal",
         )
-    except Exception as e:
+    except (ImportError, ConnectionError, ValueError) as e:
         logger.warning("patrol_event_emit_failed", error=str(e))
 
     # 知识学习建议
@@ -821,7 +823,7 @@ async def trigger_satisfaction_survey(
             push_type="satisfaction_survey",
         )
         survey["sent"] = True
-    except Exception as e:
+    except (ConnectionError, TimeoutError, ImportError) as e:
         logger.warning("satisfaction_survey_send_failed", error=str(e))
         survey["sent"] = False
 
@@ -887,7 +889,7 @@ async def process_post_dining_review(
                     db=session,
                 )
                 actions.append({"action": "repair_journey_triggered", "status": "success"})
-            except Exception as e:
+            except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
                 logger.warning("repair_journey_failed", error=str(e))
 
     elif sentiment["sentiment"] == "positive":
@@ -912,7 +914,7 @@ async def process_post_dining_review(
             data=review_record,
             store_id=review_record.get("store_id", ""),
         )
-    except Exception as e:
+    except (ImportError, ConnectionError, ValueError) as e:
         logger.warning("review_event_failed", error=str(e))
 
     return review_record
@@ -1039,7 +1041,7 @@ async def _get_consumer_profile(
                             consumer.rfm_monetary_fen,
                         ),
                     }
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
         logger.debug("consumer_profile_fallback", error=str(e))
 
     return {
@@ -1140,7 +1142,7 @@ def _check_birthday_proximity(profile: Dict[str, Any]) -> Optional[Dict[str, Any
             "is_upcoming": days_until <= 7,
             "is_today": days_until == 0,
         }
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 
@@ -1229,8 +1231,8 @@ async def _send_push(
     try:
         from src.services.wechat_trigger_service import wechat_trigger_service
 
-        if hasattr(wechat_trigger_service, "trigger"):
-            await wechat_trigger_service.trigger(
+        if hasattr(wechat_trigger_service, "trigger_push"):
+            await wechat_trigger_service.trigger_push(
                 f"reservation.{push_type}",
                 {
                     "customer_phone": target.get("customer_phone", ""),
@@ -1238,7 +1240,7 @@ async def _send_push(
                     "content": content,
                 },
             )
-    except Exception as e:
+    except (ImportError, ConnectionError, TimeoutError, ValueError) as e:
         logger.debug("push_send_fallback", push_type=push_type, error=str(e))
 
 
@@ -1255,7 +1257,7 @@ async def _notify_critical_issue(
         from src.services.wechat_trigger_service import wechat_trigger_service
 
         descriptions = "; ".join(i.get("description", "") for i in critical)
-        await wechat_trigger_service.trigger(
+        await wechat_trigger_service.trigger_push(
             "quality.critical_issue",
             {
                 "store_id": store_id,
@@ -1263,7 +1265,7 @@ async def _notify_critical_issue(
                 "issues": descriptions,
             },
         )
-    except Exception as e:
+    except (ImportError, ConnectionError, TimeoutError, ValueError) as e:
         logger.debug("critical_notify_failed", error=str(e))
 
 
@@ -1282,7 +1284,7 @@ async def _analyze_sentiment(text: str) -> Dict[str, Any]:
                 "confidence": r.confidence,
                 "key_points": r.key_points,
             }
-    except Exception as e:
+    except (ImportError, ConnectionError, TimeoutError, ValueError) as e:
         logger.debug("sentiment_fallback", error=str(e))
 
     # 关键词降级分析

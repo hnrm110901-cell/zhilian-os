@@ -1,6 +1,12 @@
+# 屯象OS pre-commit 安全扫描配置
+# 安装: pip install pre-commit && pre-commit install
+# 启用 commit-msg 钩子: pre-commit install --hook-type commit-msg
+# 首次运行全量检查: pre-commit run --all-files
+
 repos:
+  # 通用文件检查
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -10,28 +16,26 @@ repos:
       - id: check-json
       - id: check-merge-conflict
       - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
 
-  - repo: https://github.com/psf/black
-    rev: 24.1.1
+  # Python代码格式化和lint（替代 black + isort + flake8）
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
     hooks:
-      - id: black
-        language_version: python3.11
-        files: ^apps/api-gateway/
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+  # Python安全漏洞扫描
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.8
     hooks:
-      - id: isort
-        args: ["--profile", "black"]
-        files: ^apps/api-gateway/
+      - id: bandit
+        args: [-r, apps/api-gateway/src/, -ll, --skip, B101]
+        # B101: assert_used - 测试中使用assert是合理的
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        args: ['--max-line-length=120', '--extend-ignore=E203,W503']
-        files: ^apps/api-gateway/
-
+  # 类型检查（保留现有配置）
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.8.0
     hooks:
@@ -40,6 +44,7 @@ repos:
         files: ^apps/api-gateway/
         args: ['--ignore-missing-imports']
 
+  # ESLint（前端，保留现有配置）
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v9.0.0-beta.0
     hooks:
@@ -50,6 +55,13 @@ repos:
           - eslint@8.56.0
           - '@typescript-eslint/parser@6.19.0'
           - '@typescript-eslint/eslint-plugin@6.19.0'
+
+  # 密钥检测
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
 
   # Conventional Commits 格式校验（commit-msg 阶段触发）
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook

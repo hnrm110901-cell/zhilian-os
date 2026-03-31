@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import structlog
-from sqlalchemy import and_, case, func, select, text
+from sqlalchemy import and_, case, exc as sa_exc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.models.fct import (
@@ -634,7 +634,7 @@ class FCTService:
                 "effective_rate": tax_result["effective_rate"],
                 "period": tax_result["period"],
             }
-        except Exception:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError):
             tax_summary = {"total_tax": 0, "effective_rate": 0.0, "period": f"{year}-{month:02d}"}
 
         # 当月预算执行率（简化：只看整体利润率）
@@ -644,7 +644,7 @@ class FCTService:
                 "profit_margin_pct": bex_result["overall"]["profit_margin_pct"],
                 "alert_count": len(bex_result["alerts"]),
             }
-        except Exception:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError):
             bex_summary = {"profit_margin_pct": 0.0, "alert_count": 0}
 
         return {
@@ -743,7 +743,7 @@ class FCTService:
         self.db.add(rec)
         try:
             await self.db.flush()
-        except Exception as e:
+        except sa_exc.SQLAlchemyError as e:
             logger.warning("税务记录持久化失败", error=str(e))
 
     @staticmethod
@@ -1170,7 +1170,7 @@ class StandaloneFCTService:
                 "entity_id": entity_id,
                 "tenant_id": tenant_id,
             }
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError, TypeError) as e:
             logger.error("FCT 事件接入失败", error=str(e))
             return {"success": False, "error": str(e)}
 
@@ -1194,7 +1194,7 @@ class StandaloneFCTService:
             return None
         try:
             return UUID(str(value))
-        except Exception:
+        except (ValueError, AttributeError):
             return None
 
     async def _resolve_budget_policy(
@@ -1232,7 +1232,7 @@ class StandaloneFCTService:
                     row = await maybe_row if inspect.isawaitable(maybe_row) else maybe_row
                 if inspect.isawaitable(row):
                     row = await row
-            except Exception:
+            except sa_exc.SQLAlchemyError:
                 row = None
             if isinstance(row, FCTBudgetControl):
                 return {
@@ -1287,7 +1287,7 @@ class StandaloneFCTService:
                 {"sid": tenant_id, "pkey": period_key},
             )
             row = await self._resolve_maybe_await(execute_result.fetchone())
-        except Exception:
+        except sa_exc.SQLAlchemyError:
             return False
         if not row:
             return False
@@ -1680,7 +1680,7 @@ class StandaloneFCTService:
         try:
             persisted_result = await session.execute(persisted_stmt, {"sid": tenant_id})
             persisted_rows = await self._resolve_maybe_await(persisted_result.fetchall())
-        except Exception:
+        except sa_exc.SQLAlchemyError:
             persisted_rows = []
         persisted_status: Dict[str, str] = {}
         for row in persisted_rows:
@@ -1695,7 +1695,7 @@ class StandaloneFCTService:
                 else:
                     pkey = getattr(row, "period_key", "")
                     status = getattr(row, "status", "")
-            except Exception:
+            except (ValueError, TypeError, AttributeError):
                 continue
             pkey_str = str(pkey or "").strip()
             status_str = str(status or "").strip().lower()
@@ -2007,7 +2007,7 @@ class StandaloneFCTService:
                 for r in rows
             ]
             return {"items": items, "total": len(items), "skip": skip, "limit": limit}
-        except Exception:
+        except sa_exc.SQLAlchemyError:
             return {"items": [], "total": 0, "skip": skip, "limit": limit}
 
     async def create_cash_transaction(
@@ -2125,7 +2125,7 @@ class StandaloneFCTService:
                 )
                 session.add(txn)
                 imported += 1
-            except Exception:
+            except (ValueError, TypeError, KeyError):
                 skipped += 1
         await session.flush()
         return {
@@ -2400,7 +2400,7 @@ class StandaloneFCTService:
             except httpx.TimeoutException:
                 verify_status = "api_timeout"
                 logger.warning("发票验真 API 超时", invoice_id=invoice_id)
-            except Exception as exc:
+            except (httpx.HTTPError, ConnectionError, ValueError) as exc:
                 verify_status = "api_error"
                 logger.error("发票验真 API 调用失败", invoice_id=invoice_id, error=str(exc))
         elif not format_valid:
@@ -2552,8 +2552,8 @@ class StandaloneFCTService:
                 "status": "draft",
                 "note": "基于 FinancialTransaction 估算，正式申报以账务系统为准",
             }
-        except Exception as e:
-            raise ValueError(str(e))
+        except (sa_exc.SQLAlchemyError, KeyError, TypeError) as e:
+            raise ValueError(str(e)) from e
 
     # ── 预算管理 ──────────────────────────────────────────────────────────────
 
@@ -3416,7 +3416,7 @@ class StandaloneFCTService:
             income = (await session.execute(inc_stmt)).scalar() or 0
             expense = (await session.execute(exp_stmt)).scalar() or 0
             return {"income": income, "expense": expense, "net": income - expense}
-        except Exception:
+        except sa_exc.SQLAlchemyError:
             return {"income": 0, "expense": 0, "net": 0}
 
     async def get_report_period_summary(

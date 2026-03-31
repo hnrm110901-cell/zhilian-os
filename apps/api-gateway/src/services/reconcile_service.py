@@ -10,7 +10,9 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import and_, func, select
+from sqlalchemy import exc as sa_exc
 from src.core.clock import now_local, today_local
+from src.core.exceptions import POSAdapterError
 from src.core.database import get_db_session
 from src.models.order import Order, OrderStatus
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
@@ -138,7 +140,7 @@ class ReconcileService:
 
                 return self.DEFAULT_THRESHOLD
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError) as e:
             logger.warning("获取门店阈值失败，使用默认值", error=str(e))
             return self.DEFAULT_THRESHOLD
 
@@ -182,7 +184,7 @@ class ReconcileService:
                     "order_count": order_count,
                     "transaction_count": transaction_count,
                 }
-        except Exception as e:
+        except (POSAdapterError, ConnectionError, TimeoutError) as e:
             logger.warning("POS系统获取数据失败，回退到Order表", store_id=store_id, error=str(e))
 
         # 回退：从Order表获取数据
@@ -207,7 +209,7 @@ class ReconcileService:
 
             return {"total_amount": total_amount, "order_count": order_count, "transaction_count": order_count}
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError,) as e:
             logger.error("获取POS数据失败", error=str(e))
             return {"total_amount": 0, "order_count": 0, "transaction_count": 0}
 
@@ -236,7 +238,7 @@ class ReconcileService:
 
             return {"total_amount": total_amount, "order_count": order_count, "transaction_count": order_count}
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError,) as e:
             logger.error("获取实际数据失败", error=str(e))
             return {"total_amount": 0, "order_count": 0, "transaction_count": 0}
 
@@ -314,7 +316,7 @@ class ReconcileService:
         try:
             async with get_db_session() as session:
                 return await self._get_existing_record(session, store_id, reconciliation_date)
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError,) as e:
             logger.error("获取对账记录失败", error=str(e), exc_info=e)
             return None
 
@@ -340,7 +342,7 @@ class ReconcileService:
 
                 return False
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError,) as e:
             logger.error("确认对账记录失败", error=str(e), exc_info=e)
             return False
 
@@ -392,7 +394,7 @@ class ReconcileService:
                     "total_pages": (total + page_size - 1) // page_size,
                 }
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError,) as e:
             logger.error("查询对账记录失败", error=str(e), exc_info=e)
             raise
 

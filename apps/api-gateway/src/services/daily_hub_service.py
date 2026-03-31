@@ -19,7 +19,10 @@ import os
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+import redis.exceptions
 import structlog
+from sqlalchemy import exc as sa_exc
+
 from src.services.auspicious_date_service import AuspiciousDateService
 from src.services.banquet_planning_engine import BANQUET_CIRCUIT_THRESHOLD, banquet_planning_engine
 from src.services.external_factors_adapter import ExternalFactorsAdapter
@@ -135,7 +138,7 @@ class DailyHubService:
                 if wf:
                     has_workflow = True
                     wf_phase = wf.current_phase
-            except Exception as e:
+            except (sa_exc.SQLAlchemyError, ValueError, KeyError) as e:
                 logger.warning("工作流状态查询失败（非致命）", error=str(e))
 
         return {
@@ -191,7 +194,7 @@ class DailyHubService:
                 "current_phase": wf.current_phase,
                 "phases": result,
             }
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError, AttributeError) as e:
             logger.warning("获取工作流阶段失败", store_id=store_id, error=str(e))
             return {"workflow": None, "message": f"工作流查询失败: {str(e)}"}
 
@@ -208,7 +211,7 @@ class DailyHubService:
 
                 rows = (await db.execute(select(Store.id).where(Store.is_active == True))).all()  # noqa: E712
                 store_ids = [str(r[0]) for r in rows]
-            except Exception as e:
+            except sa_exc.SQLAlchemyError as e:
                 logger.warning("获取门店列表失败", error=str(e))
 
         approved = 0
@@ -386,7 +389,7 @@ class DailyHubService:
                 "staffing_plan_override": staffing_override,
             }
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError, AttributeError) as e:
             logger.warning("工作流同步失败（非致命，降级到 Agent 数据）", error=str(e))
             return {"phases": None, "data_sources": {}}
 
@@ -408,7 +411,7 @@ class DailyHubService:
 
                     score_result = await StoreHealthService.get_store_score(store_id=store_id, target_date=report_date, db=db)
                     health_score = score_result.get("score")
-                except Exception as e:
+                except (sa_exc.SQLAlchemyError, ValueError, KeyError, AttributeError, TypeError) as e:
                     logger.warning("StoreHealthService 评分失败（非致命）", store_id=store_id, error=str(e))
 
             # ── 食材成本差异分析（需要 DB）────────────────────────────────────
@@ -437,7 +440,7 @@ class DailyHubService:
                         alerts.append(
                             f"🟡 食材成本偏高：实际成本率 {fc['actual_cost_pct']}%" f"（差异 +{fc['variance_pct']}%）"
                         )
-                except Exception as e:
+                except (sa_exc.SQLAlchemyError, ValueError, KeyError) as e:
                     logger.warning("食材成本分析失败（非致命）", store_id=store_id, error=str(e))
 
             return {
@@ -449,7 +452,7 @@ class DailyHubService:
                 "food_cost": food_cost,
             }
         except Exception as e:
-            logger.warning("获取昨日复盘失败，使用空数据", error=str(e))
+            logger.warning("获取昨日复盘失败，使用空数据", error=str(e), exc_info=True)
             return {
                 "total_revenue": 0,
                 "order_count": 0,
@@ -484,7 +487,7 @@ class DailyHubService:
                 "auspicious": result.auspicious,
                 "composite_factor": result.composite_factor,
             }
-        except Exception as e:
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:
             logger.warning("ExternalFactorsAdapter 失败，降级为空因子", error=str(e))
             return {"weather": None, "holiday": None, "auspicious": None, "composite_factor": 1.0}
 
@@ -558,7 +561,7 @@ class DailyHubService:
 
                 banquets.append(banquet_entry)
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError, AttributeError) as e:
             logger.warning("获取宴会变量失败", error=str(e))
 
         result = {
@@ -594,7 +597,7 @@ class DailyHubService:
                 "confidence_interval": ci,
                 "confidence_level": "95%",
             }
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
             logger.warning("散客预测失败，使用零值", error=str(e))
             return {
                 "predicted_revenue": 0,
@@ -636,7 +639,7 @@ class DailyHubService:
                 }
                 for a in alerts
             ]
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
             logger.warning("获取采购清单失败", error=str(e))
             return []
 
@@ -651,7 +654,7 @@ class DailyHubService:
                 return {"shifts": [], "total_staff": 0}
             shifts = schedule.get("shifts", [])
             return {"shifts": shifts, "total_staff": len(shifts)}
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
             logger.warning("获取排班计划失败", error=str(e))
             return {"shifts": [], "total_staff": 0}
 
@@ -696,7 +699,7 @@ class DailyHubService:
                 "losing_count": losing,
                 "data_source": "menu_profit_engine",
             }
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError, AttributeError) as e:
             logger.warning("MenuProfitEngine 毛利摘要失败，降级为空", store_id=store_id, error=str(e))
             return {"avg_gross_margin_pct": None, "data_source": "error:fallback"}
 
@@ -746,7 +749,7 @@ class DailyHubService:
             )
             await fsm.push_to_wechat(action.action_id)
 
-        except Exception as e:
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:
             logger.warning(
                 "备战板审批通知推送失败（非致命）",
                 store_id=store_id,

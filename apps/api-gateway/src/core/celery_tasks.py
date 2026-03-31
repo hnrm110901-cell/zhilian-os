@@ -22,6 +22,12 @@ _SAFE_TABLE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 from celery import Task
 
 from .celery_app import celery_app
+from .exceptions import (
+    DataValidationError,
+    FeishuWebhookError,
+    POSAdapterError,
+    WeComWebhookError,
+)
 
 logger = structlog.get_logger()
 
@@ -846,8 +852,11 @@ def perform_daily_reconciliation(
                 "alert_sent": record.alert_sent,
             }
 
+        except (ValueError, KeyError, DataValidationError) as e:
+            logger.error("data_processing_failed", task="perform_daily_reconciliation", store_id=store_id, error=str(e))
+            raise self.retry(exc=e)
         except Exception as e:
-            logger.error("执行每日对账失败", store_id=store_id, error=str(e), exc_info=e)
+            logger.error("data_processing_unexpected", task="perform_daily_reconciliation", store_id=store_id, error=str(e), exc_info=True)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -991,8 +1000,11 @@ def detect_revenue_anomaly(
                                 else:
                                     logger.warning("无可用接收人", store_id=str(store.id))
 
+                    except (ValueError, KeyError, DataValidationError) as e:
+                        logger.error("data_processing_failed", task="detect_revenue_anomaly", store_id=str(store.id), error=str(e))
+                        continue
                     except Exception as e:
-                        logger.error("门店营收异常检测失败", store_id=str(store.id), error=str(e))
+                        logger.error("data_processing_unexpected", task="detect_revenue_anomaly", store_id=str(store.id), error=str(e), exc_info=True)
                         continue
 
             logger.info("营收异常检测完成", stores_checked=len(stores), alerts_sent=alerts_sent)
@@ -1004,8 +1016,11 @@ def detect_revenue_anomaly(
                 "timestamp": datetime.now().isoformat(),
             }
 
+        except (ValueError, KeyError, DataValidationError) as e:
+            logger.error("data_processing_failed", task="detect_revenue_anomaly", error=str(e))
+            raise self.retry(exc=e)
         except Exception as e:
-            logger.error("营收异常检测失败", error=str(e), exc_info=e)
+            logger.error("data_processing_unexpected", task="detect_revenue_anomaly", error=str(e), exc_info=True)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -1250,8 +1265,11 @@ def check_inventory_alert(
                             else:
                                 logger.warning("无可用接收人", store_id=str(store.id))
 
+                    except (ValueError, KeyError, DataValidationError) as e:
+                        logger.error("data_processing_failed", task="check_inventory_alert", store_id=str(store.id), error=str(e))
+                        continue
                     except Exception as e:
-                        logger.error("门店库存检查失败", store_id=str(store.id), error=str(e))
+                        logger.error("data_processing_unexpected", task="check_inventory_alert", store_id=str(store.id), error=str(e), exc_info=True)
                         continue
 
             logger.info("库存预警检查完成", stores_checked=len(stores), alerts_sent=alerts_sent)
@@ -1263,8 +1281,11 @@ def check_inventory_alert(
                 "timestamp": datetime.now().isoformat(),
             }
 
+        except (ValueError, KeyError, DataValidationError) as e:
+            logger.error("data_processing_failed", task="check_inventory_alert", error=str(e))
+            raise self.retry(exc=e)
         except Exception as e:
-            logger.error("库存预警检查失败", error=str(e), exc_info=e)
+            logger.error("data_processing_unexpected", task="check_inventory_alert", error=str(e), exc_info=True)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -1587,8 +1608,15 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
                                 text(f"SELECT * FROM {table} WHERE updated_at > :ts"),
                                 {"ts": since_ts},
                             )
-                        except Exception:
-                            # 表没有 updated_at 字段时跳过
+                        except Exception as e:
+                            logger.error(
+                                "celery_task_failure",
+                                error=str(e),
+                                error_type=type(e).__name__,
+                                task="run_backup",
+                                table=table,
+                                exc_info=True,
+                            )
                             row_counts[table] = 0
                             continue
                     else:
@@ -1888,30 +1916,42 @@ def nightly_cross_store_sync(
                 sim_result = await svc.compute_pairwise_similarity(store_ids=store_ids)
                 similarity_pairs = sim_result.get("pairs_computed", 0)
                 logger.info("跨店相似度矩阵已计算", pairs=similarity_pairs)
+            except (ValueError, KeyError, DataValidationError) as e:
+                errors.append({"step": "similarity", "error": str(e)})
+                similarity_pairs = 0
+                logger.error("data_processing_failed", step="similarity", error=str(e))
             except Exception as e:
                 errors.append({"step": "similarity", "error": str(e)})
                 similarity_pairs = 0
-                logger.error("相似度矩阵计算失败", error=str(e))
+                logger.error("data_processing_unexpected", step="similarity", error=str(e), exc_info=True)
 
             # Step 2: 同伴组重建
             try:
                 pg_result = await svc.build_peer_groups(store_ids=store_ids)
                 peer_groups = pg_result.get("groups_built", 0)
                 logger.info("同伴组重建完成", groups=peer_groups)
+            except (ValueError, KeyError, DataValidationError) as e:
+                errors.append({"step": "peer_groups", "error": str(e)})
+                peer_groups = 0
+                logger.error("data_processing_failed", step="peer_groups", error=str(e))
             except Exception as e:
                 errors.append({"step": "peer_groups", "error": str(e)})
                 peer_groups = 0
-                logger.error("同伴组重建失败", error=str(e))
+                logger.error("data_processing_unexpected", step="peer_groups", error=str(e), exc_info=True)
 
             # Step 3: 日维度指标物化
             try:
                 mat_result = await svc.materialize_metrics(store_ids=store_ids)
                 metrics_upserted = mat_result.get("upserted", 0)
                 logger.info("跨店指标物化完成", upserted=metrics_upserted)
+            except (ValueError, KeyError, DataValidationError) as e:
+                errors.append({"step": "materialize", "error": str(e)})
+                metrics_upserted = 0
+                logger.error("data_processing_failed", step="materialize", error=str(e))
             except Exception as e:
                 errors.append({"step": "materialize", "error": str(e)})
                 metrics_upserted = 0
-                logger.error("指标物化失败", error=str(e))
+                logger.error("data_processing_unexpected", step="materialize", error=str(e), exc_info=True)
 
             await session.commit()
 
@@ -1921,9 +1961,12 @@ def nightly_cross_store_sync(
                 graph_result = await svc.sync_store_graph(store_ids=store_ids)
                 graph_synced = not graph_result.get("skipped", False)
                 logger.info("Neo4j 跨店图同步完成", result=graph_result)
+            except (ConnectionError, TimeoutError) as e:
+                errors.append({"step": "graph_sync", "error": str(e)})
+                logger.error("data_processing_failed", step="graph_sync", error=str(e))
             except Exception as e:
                 errors.append({"step": "graph_sync", "error": str(e)})
-                logger.error("Neo4j 跨店图同步失败", error=str(e))
+                logger.error("data_processing_unexpected", step="graph_sync", error=str(e), exc_info=True)
 
         logger.info(
             "L3 跨店知识聚合夜间任务完成",
@@ -2113,9 +2156,14 @@ def daily_ontology_sync(
                 result = await sync_ontology_from_pg(session, tenant_id, store_id)
                 nodes_upserted = sum(result.values())
                 synced_stores = result.get("stores", 0)
+            except (ConnectionError, TimeoutError) as e:
+                errors.append({"store_id": store_id or "all", "error": str(e)})
+                logger.error("data_processing_failed", task="daily_ontology_sync", error=str(e), error_type=type(e).__name__)
+                nodes_upserted = 0
+                synced_stores = 0
             except Exception as e:
                 errors.append({"store_id": store_id or "all", "error": str(e)})
-                logger.error("本体同步失败", error=str(e))
+                logger.error("data_processing_unexpected", task="daily_ontology_sync", error=str(e), exc_info=True)
                 nodes_upserted = 0
                 synced_stores = 0
 
@@ -2843,16 +2891,18 @@ def push_daily_forecast(self, store_id: str = None):
                         data=message_data,
                         to_user_id=f"store_{sid}",
                     )
+                except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+                    logger.warning("notification_failed", task="push_daily_forecast", store_id=sid, error=str(exc))
                 except Exception as exc:
-                    logger.warning(
-                        "push_daily_forecast.store_failed",
-                        store_id=sid,
-                        error=str(exc),
-                    )
+                    logger.error("notification_unexpected", task="push_daily_forecast", store_id=sid, error=str(exc), exc_info=True)
 
     try:
         asyncio.run(_run())
+    except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+        logger.warning("notification_failed", task="push_daily_forecast", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("notification_unexpected", task="push_daily_forecast", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -2903,16 +2953,18 @@ def push_daily_workforce_advice(self, store_id: str = None):
                         store_name=sname,
                         recipient_user_id=_get_store_recipient(sid),
                     )
+                except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+                    logger.warning("notification_failed", task="push_daily_workforce_advice", store_id=sid, error=str(exc))
                 except Exception as exc:
-                    logger.warning(
-                        "push_daily_workforce_advice.store_failed",
-                        store_id=sid,
-                        error=str(exc),
-                    )
+                    logger.error("notification_unexpected", task="push_daily_workforce_advice", store_id=sid, error=str(exc), exc_info=True)
 
     try:
         asyncio.run(_run())
+    except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+        logger.warning("notification_failed", task="push_daily_workforce_advice", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("notification_unexpected", task="push_daily_workforce_advice", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -3102,12 +3154,18 @@ def push_morning_decisions(self, store_id: str = None):
                         db=db,
                         store_name=sname,
                     )
+                except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+                    logger.warning("notification_failed", task="push_morning_decisions", store_id=sid, error=str(exc))
                 except Exception as exc:
-                    logger.warning("push_morning_decisions.store_failed", store_id=sid, error=str(exc))
+                    logger.error("notification_unexpected", task="push_morning_decisions", store_id=sid, error=str(exc), exc_info=True)
 
     try:
         asyncio.run(_run())
+    except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+        logger.warning("notification_failed", task="push_morning_decisions", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("notification_unexpected", task="push_morning_decisions", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -3138,12 +3196,18 @@ def push_noon_anomaly(self, store_id: str = None):
                         db=db,
                         store_name=sname,
                     )
+                except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+                    logger.warning("notification_failed", task="push_noon_anomaly", store_id=sid, error=str(exc))
                 except Exception as exc:
-                    logger.warning("push_noon_anomaly.store_failed", store_id=sid, error=str(exc))
+                    logger.error("notification_unexpected", task="push_noon_anomaly", store_id=sid, error=str(exc), exc_info=True)
 
     try:
         asyncio.run(_run())
+    except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+        logger.warning("notification_failed", task="push_noon_anomaly", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("notification_unexpected", task="push_noon_anomaly", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -3174,12 +3238,18 @@ def push_prebattle_decisions(self, store_id: str = None):
                         db=db,
                         store_name=sname,
                     )
+                except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+                    logger.warning("notification_failed", task="push_prebattle_decisions", store_id=sid, error=str(exc))
                 except Exception as exc:
-                    logger.warning("push_prebattle_decisions.store_failed", store_id=sid, error=str(exc))
+                    logger.error("notification_unexpected", task="push_prebattle_decisions", store_id=sid, error=str(exc), exc_info=True)
 
     try:
         asyncio.run(_run())
+    except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+        logger.warning("notification_failed", task="push_prebattle_decisions", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("notification_unexpected", task="push_prebattle_decisions", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -3210,12 +3280,18 @@ def push_evening_recap(self, store_id: str = None):
                         db=db,
                         store_name=sname,
                     )
+                except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+                    logger.warning("notification_failed", task="push_evening_recap", store_id=sid, error=str(exc))
                 except Exception as exc:
-                    logger.warning("push_evening_recap.store_failed", store_id=sid, error=str(exc))
+                    logger.error("notification_unexpected", task="push_evening_recap", store_id=sid, error=str(exc), exc_info=True)
 
     try:
         asyncio.run(_run())
+    except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+        logger.warning("notification_failed", task="push_evening_recap", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("notification_unexpected", task="push_evening_recap", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -3248,7 +3324,11 @@ def check_food_cost_kpi_alert(self):
 
     try:
         asyncio.run(_run())
+    except (ValueError, KeyError, DataValidationError) as exc:
+        logger.error("data_processing_failed", task="check_food_cost_kpi_alert", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("data_processing_unexpected", task="check_food_cost_kpi_alert", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -3281,7 +3361,11 @@ def check_food_cost_trend_alert(self):
 
     try:
         asyncio.run(_run())
+    except (ValueError, KeyError, DataValidationError) as exc:
+        logger.error("data_processing_failed", task="check_food_cost_trend_alert", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
+        logger.error("data_processing_unexpected", task="check_food_cost_trend_alert", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
     """
     每日 06:00 扫描私域会员生命周期变更。
@@ -3992,10 +4076,14 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
                         orders=len(order_list),
                     )
 
+                except (ConnectionError, TimeoutError, POSAdapterError) as e:
+                    await session.rollback()
+                    errors.append({"store_id": sid, "error": str(e)})
+                    logger.error("pos_sync_failed", store_id=sid, error=str(e), error_type=type(e).__name__)
                 except Exception as e:
                     await session.rollback()
                     errors.append({"store_id": sid, "error": str(e)})
-                    logger.error("tiancai_pull.store_failed", store_id=sid, error=str(e))
+                    logger.error("pos_sync_unexpected", store_id=sid, error=str(e), error_type=type(e).__name__, exc_info=True)
 
         logger.info(
             "tiancai_pull_daily_orders.done",
@@ -4014,8 +4102,11 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
 
     try:
         return asyncio.run(_run())
+    except (ConnectionError, TimeoutError, POSAdapterError) as e:
+        logger.error("pos_sync_failed", task="pull_tiancai_daily_orders", error=str(e), error_type=type(e).__name__)
+        raise self.retry(exc=e)
     except Exception as e:
-        logger.error("tiancai_pull_daily_orders.failed", error=str(e))
+        logger.error("pos_sync_unexpected", task="pull_tiancai_daily_orders", error=str(e), error_type=type(e).__name__, exc_info=True)
         raise self.retry(exc=e)
 
 
@@ -4246,15 +4337,22 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                             orders=store_orders,
                         )
 
+                    except (ConnectionError, TimeoutError, POSAdapterError) as e:
+                        await session.rollback()
+                        errors.append({"store_id": sid, "error": str(e)})
+                        logger.error("pos_sync_failed", store_id=sid, error=str(e), error_type=type(e).__name__)
                     except Exception as e:
                         await session.rollback()
                         errors.append({"store_id": sid, "error": str(e)})
-                        logger.error("pinzhi_pull.store_failed", store_id=sid, error=str(e))
+                        logger.error("pos_sync_unexpected", store_id=sid, error=str(e), error_type=type(e).__name__, exc_info=True)
                     finally:
                         await adapter.close()
 
+        except (ConnectionError, TimeoutError, POSAdapterError) as exc:
+            logger.error("pos_sync_failed", task="pinzhi_pull", error=str(exc), error_type=type(exc).__name__)
+            raise
         except Exception as exc:
-            logger.error("pinzhi_pull.session_error", error=str(exc))
+            logger.error("pos_sync_unexpected", task="pinzhi_pull", error=str(exc), error_type=type(exc).__name__, exc_info=True)
             raise
 
         logger.info(
@@ -4276,8 +4374,11 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
 
     try:
         return asyncio.run(_run())
+    except (ConnectionError, TimeoutError, POSAdapterError) as e:
+        logger.error("pos_sync_failed", task="pull_pinzhi_daily_data", error=str(e), error_type=type(e).__name__)
+        raise self.retry(exc=e)
     except Exception as e:
-        logger.error("pinzhi_pull_daily_data.failed", error=str(e))
+        logger.error("pos_sync_unexpected", task="pull_pinzhi_daily_data", error=str(e), error_type=type(e).__name__, exc_info=True)
         raise self.retry(exc=e)
 
 
@@ -4918,16 +5019,21 @@ def ops_patrol(self, store_id: str = None):
                         p0_down=p0_down,
                         recipient=recipient,
                     )
+                except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+                    logger.warning("notification_failed", task="ops_patrol", store_id=sid, error=str(exc))
                 except Exception as exc:
-                    logger.warning("ops_patrol.store_failed", store_id=sid, error=str(exc))
+                    logger.error("notification_unexpected", task="ops_patrol", store_id=sid, error=str(exc), exc_info=True)
 
         logger.info("ops_patrol.done", total_stores=len(stores), pushed=pushed)
         return {"stores_checked": len(stores), "alerts_pushed": pushed}
 
     try:
         return asyncio.run(_run())
+    except (WeComWebhookError, FeishuWebhookError, ConnectionError) as exc:
+        logger.warning("notification_failed", task="ops_patrol", error=str(exc))
+        raise self.retry(exc=exc)
     except Exception as exc:
-        logger.error("ops_patrol.failed", error=str(exc))
+        logger.error("notification_unexpected", task="ops_patrol", error=str(exc), exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -5970,15 +6076,22 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
                             stock_items=len(stock_list) if stock_list else 0,
                         )
 
+                    except (ConnectionError, TimeoutError, POSAdapterError) as store_exc:
+                        err_msg = f"store {sid}: {store_exc}"
+                        errors.append(err_msg)
+                        logger.error("pos_sync_failed", store_id=sid, error=str(store_exc), error_type=type(store_exc).__name__)
                     except Exception as store_exc:
                         err_msg = f"store {sid}: {store_exc}"
                         errors.append(err_msg)
-                        logger.error("aoqiwei_supply_pull.store_error", store_id=sid, error=str(store_exc))
+                        logger.error("pos_sync_unexpected", store_id=sid, error=str(store_exc), error_type=type(store_exc).__name__, exc_info=True)
 
                 await session.commit()
 
+        except (ConnectionError, TimeoutError, POSAdapterError) as exc:
+            logger.error("pos_sync_failed", task="aoqiwei_supply_pull", error=str(exc), error_type=type(exc).__name__)
+            errors.append(str(exc))
         except Exception as exc:
-            logger.error("aoqiwei_supply_pull.fatal", error=str(exc))
+            logger.error("pos_sync_unexpected", task="aoqiwei_supply_pull", error=str(exc), error_type=type(exc).__name__, exc_info=True)
             errors.append(str(exc))
 
         return {
@@ -5992,8 +6105,11 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
 
     try:
         return asyncio.run(_run())
+    except (ConnectionError, TimeoutError, POSAdapterError) as exc:
+        logger.error("pos_sync_failed", task="pull_aoqiwei_daily_supply", error=str(exc), error_type=type(exc).__name__)
+        raise self.retry(exc=exc)
     except Exception as exc:
-        logger.error("pull_aoqiwei_daily_supply.failed", error=str(exc))
+        logger.error("pos_sync_unexpected", task="pull_aoqiwei_daily_supply", error=str(exc), error_type=type(exc).__name__, exc_info=True)
         raise self.retry(exc=exc)
 
 
@@ -7374,15 +7490,22 @@ def pull_pinzhi_missed_orders(self) -> Dict[str, Any]:
                             gaps_filled=gaps_filled,
                         )
 
+                    except (ConnectionError, TimeoutError, POSAdapterError) as e:
+                        await session.rollback()
+                        errors.append({"store_id": sid, "error": str(e)})
+                        logger.error("pos_sync_failed", store_id=sid, error=str(e), error_type=type(e).__name__)
                     except Exception as e:
                         await session.rollback()
                         errors.append({"store_id": sid, "error": str(e)})
-                        logger.error("pinzhi_missed.store_failed", store_id=sid, error=str(e))
+                        logger.error("pos_sync_unexpected", store_id=sid, error=str(e), error_type=type(e).__name__, exc_info=True)
                     finally:
                         await adapter.close()
 
+        except (ConnectionError, TimeoutError, POSAdapterError) as exc:
+            logger.error("pos_sync_failed", task="pinzhi_missed", error=str(exc), error_type=type(exc).__name__)
+            raise
         except Exception as exc:
-            logger.error("pinzhi_missed.session_error", error=str(exc))
+            logger.error("pos_sync_unexpected", task="pinzhi_missed", error=str(exc), error_type=type(exc).__name__, exc_info=True)
             raise
 
         logger.info(
@@ -7402,8 +7525,11 @@ def pull_pinzhi_missed_orders(self) -> Dict[str, Any]:
 
     try:
         return asyncio.run(_run())
+    except (ConnectionError, TimeoutError, POSAdapterError) as e:
+        logger.error("pos_sync_failed", task="pull_pinzhi_missed_orders", error=str(e), error_type=type(e).__name__)
+        raise self.retry(exc=e)
     except Exception as e:
-        logger.error("pull_pinzhi_missed_orders.failed", error=str(e))
+        logger.error("pos_sync_unexpected", task="pull_pinzhi_missed_orders", error=str(e), error_type=type(e).__name__, exc_info=True)
         raise self.retry(exc=e)
 
 

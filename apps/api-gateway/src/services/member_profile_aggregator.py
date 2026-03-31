@@ -26,11 +26,14 @@ logger = structlog.get_logger(__name__)
 
 
 async def _safe(coro, *, label: str = "unknown") -> Any:
-    """执行协程，失败时返回 None 并记录日志（不阻塞其他子调用）"""
+    """执行协程，失败时返回 None 并记录日志（不阻塞其他子调用）
+
+    NOTE: 保留 except Exception 作为兜底——每个子源独立失败，不影响其他子调用。
+    """
     try:
         return await coro
     except Exception as exc:
-        logger.warning("子源聚合失败，降级", label=label, error=str(exc))
+        logger.warning("子源聚合失败，降级", label=label, error=str(exc), exc_info=True)
         return None
 
 
@@ -150,8 +153,8 @@ class MemberProfileAggregator:
         try:
             from ..services.member_service import member_service
             member = await member_service.query_member(mobile=phone)
-        except Exception:
-            logger.warning("微生活CRM不可用", phone=_mask_phone(phone))
+        except (ConnectionError, TimeoutError, ValueError, KeyError) as exc:
+            logger.warning("微生活CRM不可用", phone=_mask_phone(phone), error=str(exc))
             return None
 
         if not member:
@@ -170,7 +173,7 @@ class MemberProfileAggregator:
                     "name": c.get("coupon_name", ""),
                     "expires": c.get("end_time", ""),
                 })
-        except Exception:
+        except (ConnectionError, TimeoutError, ValueError, KeyError):
             pass
 
         return {
@@ -254,7 +257,8 @@ class MemberProfileAggregator:
             )
             result = await agent.arun(prompt)
             return result.strip() if result else None
-        except Exception:
+        except Exception:  # LLM调用失败类型不可预测，保留宽泛捕获
+            logger.debug("ai_script_generation_failed", exc_info=True)
             return None
 
 

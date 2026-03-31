@@ -35,7 +35,7 @@ class BankReconcileService:
         try:
             reader = csv.DictReader(io.StringIO(file_content))
             rows = list(reader)
-        except Exception as e:
+        except (ValueError, KeyError, csv.Error) as e:
             return {"import_batch_id": batch_id, "imported": 0, "errors": [f"文件解析失败: {str(e)}"]}
 
         for idx, row in enumerate(rows, start=2):
@@ -89,7 +89,7 @@ class BankReconcileService:
                 db.add(stmt)
                 imported += 1
 
-            except Exception as e:
+            except (ValueError, KeyError, IndexError, TypeError) as e:
                 errors.append(f"第{idx}行: {str(e)}")
 
         if imported > 0:

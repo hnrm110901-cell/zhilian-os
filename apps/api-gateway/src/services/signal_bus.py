@@ -23,6 +23,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import exc as sa_exc
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,7 +57,7 @@ async def _mark_signal_routed(
             {"action": action, "now": datetime.datetime.utcnow(), "sid": signal_id},
         )
         await db.commit()
-    except Exception as exc:
+    except sa_exc.SQLAlchemyError as exc:
         logger.warning("signal_bus.mark_routed_failed", signal_id=signal_id, error=str(exc))
         await db.rollback()
 
@@ -93,7 +94,7 @@ async def _write_signal(
             },
         )
         await db.commit()
-    except Exception as exc:
+    except sa_exc.SQLAlchemyError as exc:
         logger.warning("signal_bus.write_signal_failed", error=str(exc))
         await db.rollback()
     return sid
@@ -147,7 +148,7 @@ async def route_bad_review(
         logger.info("signal_bus.bad_review.routed", store_id=store_id, customer_id=customer_id, journey_id=journey_id)
         return {"routed": True, "journey_id": journey_id, "action": f"已触发差评修复旅程 ({journey_id})"}
     except Exception as exc:
-        logger.error("signal_bus.bad_review.failed", store_id=store_id, error=str(exc))
+        logger.error("signal_bus.bad_review.failed", store_id=store_id, error=str(exc), exc_info=True)
         return {"routed": False, "journey_id": None, "action": f"路由失败: {exc}"}
 
 
@@ -182,7 +183,7 @@ async def route_near_expiry(
                 {"s": store_id},
             )
         ).fetchall()
-    except Exception as exc:
+    except sa_exc.SQLAlchemyError as exc:
         logger.warning("signal_bus.near_expiry.query_failed", error=str(exc))
         return {"routed": False, "items_count": 0, "pushed": False, "signal_ids": []}
 
@@ -217,7 +218,7 @@ async def route_near_expiry(
         )
         total_yuan = report.get("total_waste_yuan", 0)
         waste_summary = f"今日已损耗 ¥{total_yuan:.2f}"
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, ValueError, KeyError) as exc:
         logger.warning("signal_bus.near_expiry.waste_svc_failed", error=str(exc))
 
     # 推送企微告警
@@ -234,7 +235,7 @@ async def route_near_expiry(
             if _wechat:
                 await _wechat.send_text(body)
                 pushed = True
-        except Exception as exc:
+        except (ConnectionError, TimeoutError, OSError, ValueError) as exc:
             logger.warning("signal_bus.near_expiry.push_failed", error=str(exc))
 
     logger.info("signal_bus.near_expiry.done", store_id=store_id, items=len(rows), pushed=pushed)
@@ -298,7 +299,7 @@ async def route_large_table_reservation(
         ).fetchone()
         if row:
             member_id = row[0]
-    except Exception as exc:
+    except sa_exc.SQLAlchemyError as exc:
         logger.warning("signal_bus.large_table.member_lookup_failed", error=str(exc))
 
     logger.info("signal_bus.large_table.routed", store_id=store_id, scene=scene, k_factor=k_factor, member_id=member_id)
@@ -402,13 +403,13 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
                 db,
             )
             results["bad_review"].append(res)
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, ValueError) as exc:
         logger.warning("signal_bus.scan.bad_review_failed", store_id=store_id, error=str(exc))
 
     # ② 临期/低库存
     try:
         results["near_expiry"] = await route_near_expiry(store_id, db, push=True)
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, ValueError, ConnectionError, TimeoutError) as exc:
         logger.warning("signal_bus.scan.near_expiry_failed", store_id=store_id, error=str(exc))
 
     # ③ 今日新增大桌预订
@@ -447,7 +448,7 @@ async def run_periodic_scan(store_id: str, db: AsyncSession) -> Dict[str, Any]:
                 db=db,
             )
             results["large_tables"].append(res)
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, ValueError) as exc:
         logger.warning("signal_bus.scan.large_table_failed", store_id=store_id, error=str(exc))
 
     total_routed = (
@@ -490,7 +491,7 @@ async def _load_active_rules(db: AsyncSession) -> List[Dict[str, Any]]:
             }
             for r in rows
         ]
-    except Exception as exc:
+    except sa_exc.SQLAlchemyError as exc:
         logger.warning("signal_bus.load_rules_failed", error=str(exc))
         return []
 
@@ -586,7 +587,7 @@ async def run_rule_driven_scan(store_id: str, db: AsyncSession) -> Dict[str, Any
         try:
             result = await _dispatch_rule(rule, store_id, db)
             dispatch_results.append(result)
-        except Exception as exc:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError, ConnectionError, TimeoutError) as exc:
             logger.warning(
                 "signal_bus.rule_dispatch_failed",
                 rule_id=rule["id"], error=str(exc),

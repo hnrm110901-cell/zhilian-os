@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, exc as sa_exc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.decision_flow_state import DecisionFlowState
 from src.services.decision_priority_engine import DecisionPriorityEngine
@@ -31,7 +31,7 @@ from src.services.waste_guard_service import WasteGuardService
 
 try:
     from src.services.wechat_service import wechat_service
-except Exception:
+except (ImportError, AttributeError):
     wechat_service = None
 
 logger = structlog.get_logger()
@@ -229,7 +229,7 @@ async def _fetch_cross_system_insights(
             "avg_ticket_yuan": (pos_data["avg_ticket_fen"] or 0) / 100.0 if pos_data else 0.0,
             "top_dishes": top_dishes,
         }
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, KeyError, TypeError) as exc:
         logger.warning("cross_system_insights.pos_failed", store_id=store_id, error=str(exc))
         result["pos"] = {
             "today_revenue_yuan": 0.0,
@@ -268,7 +268,7 @@ async def _fetch_cross_system_insights(
             "churning_members": m["churning"] if m else 0,
             "avg_stored_value_yuan": (m["avg_stored_fen"] or 0) / 100.0 if m else 0.0,
         }
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, KeyError, TypeError) as exc:
         logger.warning("cross_system_insights.member_failed", store_id=store_id, error=str(exc))
         result["member"] = {
             "active_members_30d": 0,
@@ -307,7 +307,7 @@ async def _fetch_cross_system_insights(
             )
             po = po_row.mappings().first()
             pending_orders = po["cnt"] if po else 0
-        except Exception:
+        except (sa_exc.SQLAlchemyError, KeyError):
             pending_orders = 0
 
         # 昨日损耗
@@ -324,7 +324,7 @@ async def _fetch_cross_system_insights(
             )
             w = waste_row.mappings().first()
             waste_yuan = (w["total_waste_fen"] or 0) / 100.0 if w else 0.0
-        except Exception:
+        except (sa_exc.SQLAlchemyError, KeyError, TypeError):
             waste_yuan = 0.0
 
         # 食材成本率（本月累计食材成本 / 本月累计营收）
@@ -344,7 +344,7 @@ async def _fetch_cross_system_insights(
             cost_fen = c["cost_fen"] if c else 0
             rev_fen = c["rev_fen"] if c else 0
             cost_ratio = round((cost_fen / rev_fen * 100), 1) if rev_fen > 0 else 0.0
-        except Exception:
+        except (sa_exc.SQLAlchemyError, KeyError, TypeError, ZeroDivisionError):
             cost_ratio = 0.0
 
         result["supply"] = {
@@ -353,7 +353,7 @@ async def _fetch_cross_system_insights(
             "yesterday_waste_yuan": waste_yuan,
             "cost_ratio": cost_ratio,
         }
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, KeyError, TypeError) as exc:
         logger.warning("cross_system_insights.supply_failed", store_id=store_id, error=str(exc))
         result["supply"] = {
             "low_stock_items": 0,
@@ -400,7 +400,7 @@ async def _fetch_cross_system_insights(
                     ls = ls_row.first()
                     if ls:
                         popular_low_stock.append(dish_name)
-                except Exception:
+                except (sa_exc.SQLAlchemyError, KeyError):
                     pass
 
         # 会员消费与成本差异（会员人均消费 vs 人均食材成本）
@@ -413,7 +413,7 @@ async def _fetch_cross_system_insights(
             "popular_dish_low_stock": popular_low_stock,
             "member_spend_vs_cost_gap": gap,
         }
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, KeyError, TypeError) as exc:
         logger.warning("cross_system_insights.cross_failed", store_id=store_id, error=str(exc))
         result["cross_system"] = {
             "high_value_member_no_visit_7d": 0,
@@ -494,7 +494,7 @@ class DecisionPushService:
                 monthly_revenue_yuan=monthly_revenue_yuan,
             )
         except Exception as exc:
-            logger.warning("decision_push.morning.engine_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.morning.engine_failed", store_id=store_id, error=str(exc), exc_info=True)
             decisions = []
 
         if not decisions:
@@ -546,7 +546,7 @@ class DecisionPushService:
                     "source": "cross_system",
                 })
         except Exception as exc:
-            logger.warning("decision_push.morning.cross_system_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.morning.cross_system_failed", store_id=store_id, error=str(exc), exc_info=True)
 
         state.set_decisions_from_engine(decisions)
 
@@ -611,7 +611,7 @@ class DecisionPushService:
                 db=db,
             )
         except Exception as exc:
-            logger.warning("decision_push.noon.waste_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.noon.waste_failed", store_id=store_id, error=str(exc), exc_info=True)
             waste_summary = None
 
         # 获取 Top3 决策（午推重点：food_cost/reasoning 类）
@@ -619,7 +619,7 @@ class DecisionPushService:
         try:
             decisions = await engine.get_top3(db=db)
         except Exception as exc:
-            logger.warning("decision_push.noon.engine_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.noon.engine_failed", store_id=store_id, error=str(exc), exc_info=True)
             decisions = []
 
         # 仅在有实质性异常时推送
@@ -688,7 +688,7 @@ class DecisionPushService:
                 monthly_revenue_yuan=monthly_revenue_yuan,
             )
         except Exception as exc:
-            logger.warning("decision_push.prebattle.engine_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.prebattle.engine_failed", store_id=store_id, error=str(exc), exc_info=True)
             decisions = []
 
         # 战前推：仅在有库存或紧急决策时推送
@@ -764,7 +764,7 @@ class DecisionPushService:
                 monthly_revenue_yuan=monthly_revenue_yuan,
             )
         except Exception as exc:
-            logger.warning("decision_push.evening.engine_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.evening.engine_failed", store_id=store_id, error=str(exc), exc_info=True)
             decisions = []
 
         if pending_count == 0 and not decisions:
@@ -786,7 +786,7 @@ class DecisionPushService:
                 pending_count=pending_count,
             )
         except Exception as exc:
-            logger.warning("decision_push.evening.narrative_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.evening.narrative_failed", store_id=store_id, error=str(exc), exc_info=True)
             description = _format_evening_description(decisions, pending_count)
 
         state.narrative = description
@@ -852,7 +852,7 @@ class DecisionPushService:
                 store_id=store_id, brand_id=brand_id, db=db,
             )
         except Exception as exc:
-            logger.warning("decision_push.cross_alert.insights_failed", store_id=store_id, error=str(exc))
+            logger.warning("decision_push.cross_alert.insights_failed", store_id=store_id, error=str(exc), exc_info=True)
             return {"sent": False, "alert_count": 0, "message_id": None, "flow_id": state.flow_id}
 
         cross = insights.get("cross_system") or {}
@@ -966,6 +966,6 @@ async def _count_pending_approvals(store_id: str, db: AsyncSession) -> int:
             )
         )
         return result.scalar() or 0
-    except Exception as exc:
+    except (sa_exc.SQLAlchemyError, ImportError) as exc:
         logger.warning("decision_push.count_pending_failed", store_id=store_id, error=str(exc))
         return 0

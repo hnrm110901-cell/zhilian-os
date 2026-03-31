@@ -117,7 +117,7 @@ class WeChatService:
                     logger.error("企业微信access_token获取失败", error=data)
                     raise Exception(f"获取access_token失败: {data.get('errmsg')}")
 
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("企业微信API调用失败", error=str(e))
             raise
 
@@ -166,7 +166,7 @@ class WeChatService:
                     logger.error("企业微信消息发送失败", error=result)
                     raise Exception(f"发送消息失败: {result.get('errmsg')}")
 
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("企业微信消息发送异常", error=str(e))
             raise
 
@@ -214,7 +214,7 @@ class WeChatService:
                     logger.error("企业微信Markdown消息发送失败", error=result)
                     raise Exception(f"发送消息失败: {result.get('errmsg')}")
 
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("企业微信消息发送异常", error=str(e))
             raise
 
@@ -267,7 +267,7 @@ class WeChatService:
                     logger.error("企业微信卡片消息发送失败", error=result)
                     raise Exception(f"发送消息失败: {result.get('errmsg')}")
 
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("企业微信消息发送异常", error=str(e))
             raise
 
@@ -296,7 +296,7 @@ class WeChatService:
                     logger.error("获取用户信息失败", error=result)
                     raise Exception(f"获取用户信息失败: {result.get('errmsg')}")
 
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("获取用户信息异常", error=str(e))
             raise
 
@@ -329,7 +329,7 @@ class WeChatService:
                     logger.error("获取部门成员列表失败", error=result)
                     raise Exception(f"获取部门成员列表失败: {result.get('errmsg')}")
 
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("获取部门成员列表异常", error=str(e))
             raise
 
@@ -393,7 +393,7 @@ class WeChatService:
             }
 
         except Exception as e:
-            logger.error("Agent执行失败", agent_type=agent_type, action=action, error=str(e))
+            logger.error("Agent执行失败", agent_type=agent_type, action=action, error=str(e), exc_info=True)
             return {
                 "type": "text",
                 "content": f"❌ 处理失败：{str(e)}\n\n请稍后重试或联系管理员。",
@@ -473,7 +473,7 @@ class WeChatService:
             )
             return {"status": "sent", "message_id": message_id, "result": result}
 
-        except Exception as e:
+        except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             logger.error(
                 "wechat.send_decision_card.failed",
                 to_user_id=to_user_id,
@@ -543,7 +543,7 @@ class WeChatService:
             )
             return {"status": "sent", "message_id": message_id, "result": result}
 
-        except Exception as e:
+        except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             logger.error(
                 "wechat.send_templated.failed",
                 template=template,
@@ -612,11 +612,11 @@ class WeChatService:
                     else:
                         # 仍然失败，重新入队
                         await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
-                except Exception as e:
+                except (httpx.HTTPError, ConnectionError, TimeoutError, ValueError) as e:
                     logger.error("wechat.retry.failed", error=str(e))
                     await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
 
-            except Exception as e:
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
                 logger.warning("wechat.retry.queue_error", error=str(e))
                 break
 
@@ -630,7 +630,7 @@ class WeChatService:
         try:
             key = f"{DEDUP_KEY_PREFIX}{message_id}"
             return bool(await self._redis.exists(key))
-        except Exception:
+        except (ConnectionError, TimeoutError, OSError):
             return False
 
     async def _mark_sent(self, message_id: str, ttl: int = 86400) -> None:
@@ -640,7 +640,7 @@ class WeChatService:
         try:
             key = f"{DEDUP_KEY_PREFIX}{message_id}"
             await self._redis.set(key, "1", ex=ttl)
-        except Exception as e:
+        except (ConnectionError, TimeoutError, OSError) as e:
             logger.warning("wechat.mark_sent.failed", message_id=message_id, error=str(e))
 
     async def _enqueue_failed_message(
@@ -666,7 +666,7 @@ class WeChatService:
             }
             await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
             logger.info("wechat.failed_message_enqueued", message_id=message_id)
-        except Exception as e:
+        except (ConnectionError, TimeoutError, OSError) as e:
             logger.error("wechat.enqueue_failed.error", error=str(e))
 
 

@@ -20,6 +20,7 @@ import json
 import os
 from typing import Any, Dict, Optional
 
+import redis.exceptions
 import structlog
 
 logger = structlog.get_logger()
@@ -79,7 +80,7 @@ async def get_context_store() -> Optional["MemberContextStore"]:
         _store_instance = MemberContextStore(client)
         logger.info("member_context_store.initialized", url=url[:30])
         return _store_instance
-    except Exception as exc:
+    except (redis.exceptions.RedisError, ConnectionError, OSError) as exc:
         logger.warning("member_context_store.init_failed", error=str(exc))
         return None
 
@@ -119,7 +120,7 @@ class MemberContextStore:
             if raw is None:
                 return None
             return json.loads(raw)
-        except Exception as exc:
+        except (redis.exceptions.RedisError, ConnectionError, json.JSONDecodeError, TypeError, ValueError) as exc:
             logger.debug(
                 "member_context_store.get_failed",
                 store_id=store_id,
@@ -152,7 +153,7 @@ class MemberContextStore:
                     json.dumps(data, ensure_ascii=False, default=str),
                 )
             )
-        except Exception as exc:
+        except (redis.exceptions.RedisError, ConnectionError, TypeError, ValueError) as exc:
             logger.debug(
                 "member_context_store.set_failed",
                 store_id=store_id,
@@ -175,7 +176,7 @@ class MemberContextStore:
                 store_id=store_id,
                 customer_id=customer_id,
             )
-        except Exception as exc:
+        except (redis.exceptions.RedisError, ConnectionError) as exc:
             logger.debug(
                 "member_context_store.invalidate_failed",
                 store_id=store_id,
@@ -212,7 +213,7 @@ class MemberContextStore:
                 deleted=deleted,
             )
             return deleted
-        except Exception as exc:
+        except (redis.exceptions.RedisError, ConnectionError) as exc:
             logger.warning(
                 "member_context_store.invalidate_store_failed",
                 store_id=store_id,

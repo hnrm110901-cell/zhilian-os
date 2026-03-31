@@ -12,8 +12,10 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import exc as sa_exc
 
 from ..core.celery_tasks import process_neural_event
+from ..core.exceptions import WeComWebhookError
 from ..schemas.restaurant_standard_schema import DishSchema, NeuralEventSchema, OrderSchema, StaffSchema
 from .vector_db_service import vector_db_service
 
@@ -51,7 +53,7 @@ class NeuralSystemOrchestrator:
             logger.info("神经系统初始化成功")
 
         except Exception as e:
-            logger.error("神经系统初始化失败", error=str(e))
+            logger.error("神经系统初始化失败", error=str(e), exc_info=True)
             raise
 
     def _register_event_handlers(self):
@@ -136,7 +138,7 @@ class NeuralSystemOrchestrator:
             }
 
         except Exception as e:
-            logger.error("事件发射失败", error=str(e))
+            logger.error("事件发射失败", error=str(e), exc_info=True)
             return {
                 "success": False,
                 "error": str(e),
@@ -163,7 +165,7 @@ class NeuralSystemOrchestrator:
                 logger.info("事件处理成功", event_type=event_type)
                 return result
             except Exception as e:
-                logger.error("事件处理失败", event_type=event_type, error=str(e))
+                logger.error("事件处理失败", event_type=event_type, error=str(e), exc_info=True)
                 return {"success": False, "error": str(e)}
         else:
             logger.warning("未找到事件处理器", event_type=event_type)
@@ -247,8 +249,8 @@ class NeuralSystemOrchestrator:
                     )
                 )
                 await session.commit()
-        except Exception as e:
-            logger.error("处理员工上班事件失败", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("处理员工上班事件失败", error=str(e), exc_info=True)
         return {"success": True, "action": "shift_start_recorded"}
 
     async def _handle_staff_shift_end(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -266,7 +268,7 @@ class NeuralSystemOrchestrator:
                 try:
                     start = dt.fromisoformat(start_str)
                     work_hours = round((dt.utcnow() - start).total_seconds() / 3600, 2)
-                except Exception as e:
+                except (ValueError, TypeError) as e:
                     logger.warning("time_parse_failed", start_str=start_str, error=str(e))
             async with get_db_session() as session:
                 session.add(
@@ -284,8 +286,8 @@ class NeuralSystemOrchestrator:
                     )
                 )
                 await session.commit()
-        except Exception as e:
-            logger.error("处理员工下班事件失败", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("处理员工下班事件失败", error=str(e), exc_info=True)
         return {"success": True, "action": "shift_end_recorded"}
 
     async def _handle_payment_completed(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -323,8 +325,8 @@ class NeuralSystemOrchestrator:
                         )
                     )
                 await session.commit()
-        except Exception as e:
-            logger.error("处理支付完成事件失败", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("处理支付完成事件失败", error=str(e), exc_info=True)
         return {"success": True, "action": "payment_recorded"}
 
     async def _handle_inventory_low_stock(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -357,10 +359,10 @@ class NeuralSystemOrchestrator:
                 await wechat.send_text_message(
                     "@all", f"【库存预警】{item_name} 库存不足（当前：{current_qty}），请尽快补货！"
                 )
-            except Exception as we:
+            except (ConnectionError, TimeoutError, OSError) as we:
                 logger.warning("库存预警企微推送失败", error=str(we))
-        except Exception as e:
-            logger.error("处理库存不足事件失败", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("处理库存不足事件失败", error=str(e), exc_info=True)
         return {"success": True, "action": "low_stock_alert_sent"}
 
     async def _handle_compliance_expire_soon(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -394,10 +396,10 @@ class NeuralSystemOrchestrator:
                 await wechat.send_text_message(
                     "@all", f"【证照预警】{license_name}{holder_str} 还剩 {days_left} 天到期，请尽快续期！"
                 )
-            except Exception as we:
+            except (ConnectionError, TimeoutError, OSError) as we:
                 logger.warning("compliance_expire_soon_wechat_failed", error=str(we))
-        except Exception as e:
-            logger.error("handle_compliance_expire_soon_failed", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_compliance_expire_soon_failed", error=str(e), exc_info=True)
         return {"success": True, "action": "compliance_expire_soon_alerted"}
 
     async def _handle_compliance_expired(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -430,10 +432,10 @@ class NeuralSystemOrchestrator:
                 await wechat.send_text_message(
                     "@all", f"【紧急】{license_name}{holder_str} 已过期！请立即续期，否则面临合规风险！"
                 )
-            except Exception as we:
+            except (ConnectionError, TimeoutError, OSError) as we:
                 logger.warning("compliance_expired_wechat_failed", error=str(we))
-        except Exception as e:
-            logger.error("handle_compliance_expired_failed", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_compliance_expired_failed", error=str(e), exc_info=True)
         return {"success": True, "action": "compliance_expired_alerted"}
 
     # ==================== quality.* 事件处理器 ====================
@@ -466,10 +468,10 @@ class NeuralSystemOrchestrator:
 
                 wechat = WeChatWorkMessageService()
                 await wechat.send_text_message("@all", f"【质量预警】{dish_name} 质量评分 {score:.1f}，请立即检查！")
-            except Exception as we:
+            except (ConnectionError, TimeoutError, OSError) as we:
                 logger.warning("quality_fail_wechat_failed", error=str(we))
-        except Exception as e:
-            logger.error("handle_quality_inspection_failed_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_quality_inspection_failed_error", error=str(e), exc_info=True)
         return {"success": True, "action": "quality_fail_alerted"}
 
     async def _handle_quality_inspection_passed(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -495,8 +497,8 @@ class NeuralSystemOrchestrator:
                     )
                 )
                 await session.commit()
-        except Exception as e:
-            logger.error("handle_quality_inspection_passed_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_quality_inspection_passed_error", error=str(e), exc_info=True)
         return {"success": True, "action": "quality_pass_recorded"}
 
     async def _handle_quality_alert(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -526,10 +528,10 @@ class NeuralSystemOrchestrator:
 
                 wechat = WeChatWorkMessageService()
                 await wechat.send_text_message("@all", f"【质量告警】{message}")
-            except Exception as we:
+            except (ConnectionError, TimeoutError, OSError) as we:
                 logger.warning("quality_alert_wechat_failed", error=str(we))
-        except Exception as e:
-            logger.error("handle_quality_alert_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_quality_alert_error", error=str(e), exc_info=True)
         return {"success": True, "action": "quality_alert_sent"}
 
     # ==================== equipment.* 事件处理器 ====================
@@ -562,10 +564,10 @@ class NeuralSystemOrchestrator:
 
                 wechat = WeChatWorkMessageService()
                 await wechat.send_text_message("@all", f"【设备故障】{equipment_name} 发生故障：{fault_desc}，请立即处理！")
-            except Exception as we:
+            except (ConnectionError, TimeoutError, OSError) as we:
                 logger.warning("equipment_fault_wechat_failed", error=str(we))
-        except Exception as e:
-            logger.error("handle_equipment_fault_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_equipment_fault_error", error=str(e), exc_info=True)
         return {"success": True, "action": "equipment_fault_alerted"}
 
     async def _handle_equipment_maintenance_due(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -591,8 +593,8 @@ class NeuralSystemOrchestrator:
                     )
                 )
                 await session.commit()
-        except Exception as e:
-            logger.error("handle_equipment_maintenance_due_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_equipment_maintenance_due_error", error=str(e), exc_info=True)
         return {"success": True, "action": "equipment_maintenance_notified"}
 
     async def _handle_equipment_repaired(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -617,8 +619,8 @@ class NeuralSystemOrchestrator:
                     )
                 )
                 await session.commit()
-        except Exception as e:
-            logger.error("handle_equipment_repaired_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_equipment_repaired_error", error=str(e), exc_info=True)
         return {"success": True, "action": "equipment_repaired_recorded"}
 
     # ==================== crm.* 事件处理器 ====================
@@ -646,8 +648,8 @@ class NeuralSystemOrchestrator:
                     )
                 )
                 await session.commit()
-        except Exception as e:
-            logger.error("handle_crm_member_joined_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_crm_member_joined_error", error=str(e), exc_info=True)
         return {"success": True, "action": "member_joined_recorded"}
 
     async def _handle_crm_member_birthday(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -672,8 +674,8 @@ class NeuralSystemOrchestrator:
                     )
                 )
                 await session.commit()
-        except Exception as e:
-            logger.error("handle_crm_member_birthday_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_crm_member_birthday_error", error=str(e), exc_info=True)
         return {"success": True, "action": "member_birthday_notified"}
 
     async def _handle_crm_review_received(self, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -709,10 +711,10 @@ class NeuralSystemOrchestrator:
                     await wechat.send_text_message(
                         "@all", f"【差评预警】{platform} 收到 {rating} 星差评，请及时处理！\n内容：{content[:100]}"
                     )
-                except Exception as we:
+                except (ConnectionError, TimeoutError, OSError) as we:
                     logger.warning("crm_review_wechat_failed", error=str(we))
-        except Exception as e:
-            logger.error("handle_crm_review_received_error", error=str(e))
+        except sa_exc.SQLAlchemyError as e:
+            logger.error("handle_crm_review_received_error", error=str(e), exc_info=True)
         return {"success": True, "action": "review_recorded"}
 
     # ==================== 语义搜索接口 ====================
@@ -834,7 +836,7 @@ class NeuralSystemOrchestrator:
             }
 
         except Exception as e:
-            logger.error("参与联邦学习失败", error=str(e))
+            logger.error("参与联邦学习失败", error=str(e), exc_info=True)
             return {
                 "success": False,
                 "error": str(e),

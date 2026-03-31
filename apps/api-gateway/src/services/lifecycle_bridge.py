@@ -35,7 +35,7 @@ from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, exc as sa_exc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.order import Order, OrderItem, OrderStatus
 from src.models.queue import Queue
@@ -123,7 +123,7 @@ async def prepare_order_from_reservation(
 
             # 标记预排菜为备料中
             po.status = PreOrderStatus.PREPARING
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError, AttributeError) as e:
         logger.warning("prepare_order.pre_order_failed", error=str(e))
 
     # 创建订单
@@ -271,7 +271,7 @@ async def trigger_procurement_from_beo(
                 "beo_id": beo_data.get("beo_id"),
             },
         )
-    except Exception as e:
+    except sa_exc.SQLAlchemyError as e:
         logger.warning("procurement_event_emit_failed", error=str(e))
 
     # 触发企微通知（fire-and-forget）
@@ -292,8 +292,8 @@ async def trigger_procurement_from_beo(
                     "total_items": str(len(procurement_items)),
                 },
             )
-    except Exception:
-        pass
+    except (ImportError, ConnectionError, TimeoutError, ValueError) as e:
+        logger.debug("procurement_wecom_notify_skipped", error=str(e))
 
     logger.info(
         "procurement_triggered_from_beo",
@@ -353,7 +353,7 @@ async def on_order_completed(
                 consumer_id = consumer.id
                 order.consumer_id = consumer_id
                 actions_taken.append("consumer_id_linked")
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
             logger.warning("order_cdp.resolve_failed", error=str(e))
 
     # Step 2: 发射 order_completed 信号
@@ -372,7 +372,7 @@ async def on_order_completed(
             },
         )
         actions_taken.append(f"signal_emitted:{signal_id}")
-    except Exception as e:
+    except sa_exc.SQLAlchemyError as e:
         logger.warning("order_cdp.signal_failed", error=str(e))
 
     # Step 3: 更新私域 RFM
@@ -385,7 +385,7 @@ async def on_order_completed(
                 float(order.total_amount or 0),
             )
             actions_taken.append("rfm_updated")
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
             logger.warning("order_cdp.rfm_failed", error=str(e))
 
     # Step 4: 评估旅程 success_metrics
@@ -398,7 +398,7 @@ async def on_order_completed(
             )
             if evaluated:
                 actions_taken.append(f"journeys_evaluated:{evaluated}")
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ImportError, KeyError) as e:
             logger.warning("order_cdp.journey_eval_failed", error=str(e))
 
     # Step 5: 反向更新预订
@@ -406,7 +406,7 @@ async def on_order_completed(
         res_id = await sync_order_completion_to_reservation(session, str(order_id), ctx=ctx)
         if res_id:
             actions_taken.append(f"reservation_completed:{res_id}")
-    except Exception as e:
+    except sa_exc.SQLAlchemyError as e:
         logger.warning("order_cdp.reservation_sync_failed", error=str(e))
 
     # 累积最终状态到上下文
@@ -450,7 +450,7 @@ async def _update_rfm_on_order(
             if hasattr(consumer, "total_spent"):
                 consumer.total_spent = (consumer.total_spent or 0) + int(amount_yuan * 100)
             logger.info("rfm_updated", consumer_id=consumer_id, amount=amount_yuan)
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
         logger.warning("rfm_update_failed", consumer_id=consumer_id, error=str(e))
 
 
@@ -498,7 +498,7 @@ async def _evaluate_journey_success(
                 )
                 evaluated += 1
                 logger.info("journey_success", journey_id=str(j_id), type=j_type)
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, KeyError) as e:
         logger.warning("journey_eval_failed", error=str(e))
 
     return evaluated
@@ -568,7 +568,7 @@ async def check_active_journeys_on_reservation(
                 """),
                 {"now": datetime.utcnow().isoformat(), "jid": j_id},
             )
-    except Exception as e:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError) as e:
         logger.warning("check_journeys_failed", error=str(e))
 
     return {
@@ -612,7 +612,7 @@ async def _emit_lifecycle_event(
                 "now": datetime.utcnow(),
             },
         )
-    except Exception as e:
+    except sa_exc.SQLAlchemyError as e:
         # 表名可能不同，降级处理
         logger.warning("lifecycle_event_emit_fallback", event_type=event_type, error=str(e))
 
@@ -667,7 +667,7 @@ async def get_customer_lifecycle_view(
                 for r in reservations[:5]
             ],
         }
-    except Exception:
+    except sa_exc.SQLAlchemyError:
         view["reservations"] = {"total": 0, "recent": []}
 
     # 2. 订单历史
@@ -691,7 +691,7 @@ async def get_customer_lifecycle_view(
             "avg_order_yuan": round(total_spent / len(orders), 2) if orders else 0,
             "last_order": orders[0].order_time.isoformat() if orders and orders[0].order_time else None,
         }
-    except Exception:
+    except sa_exc.SQLAlchemyError:
         view["orders"] = {"total": 0, "total_spent_yuan": 0}
 
     # 3. CDP 消费者画像
@@ -708,7 +708,7 @@ async def get_customer_lifecycle_view(
             }
         else:
             view["cdp"] = None
-    except Exception:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError):
         view["cdp"] = None
 
     # 4. 活跃旅程
@@ -719,7 +719,7 @@ async def get_customer_lifecycle_view(
             store_id,
         )
         view["active_journeys"] = journey_info
-    except Exception:
+    except (sa_exc.SQLAlchemyError, ImportError, ValueError):
         view["active_journeys"] = {"has_active_journey": False, "journeys": []}
 
     return view

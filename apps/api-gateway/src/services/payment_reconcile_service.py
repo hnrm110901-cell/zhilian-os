@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import and_, case, func, select
+from sqlalchemy import exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
 from src.models.order import Order, OrderStatus
@@ -123,7 +124,7 @@ class PaymentReconcileService:
                         )
                         session.add(record)
                         records_created += 1
-                    except Exception as row_err:
+                    except (ValueError, KeyError, IndexError, TypeError) as row_err:
                         errors.append(f"行{i + 2}: {str(row_err)}")
                         if len(errors) > 50:
                             errors.append("错误过多，停止解析")
@@ -435,7 +436,7 @@ class PaymentReconcileService:
                 "diff_count": len(diffs),
             }
 
-        except Exception as e:
+        except (sa_exc.SQLAlchemyError, ValueError, KeyError) as e:
             logger.error("对账执行失败", error=str(e), exc_info=e)
             try:
                 async with get_db_session() as session:
