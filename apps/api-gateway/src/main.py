@@ -264,6 +264,9 @@ from src.api import (
     reservations,
     review_action,
 )
+# AI经营合伙人 — 目标管理 + 复盘体系
+from src.api import objectives, reviews
+from src.api import benchmarks, predictions
 from src.api import roles as roles_api
 from src.api import (
     scheduler,
@@ -707,6 +710,11 @@ app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(reservations.router, prefix="/api/v1", tags=["reservations"])
 app.include_router(kpis.router, prefix="/api/v1", tags=["kpis"])
 app.include_router(orders.router, prefix="/api/v1", tags=["orders"])
+# AI经营合伙人 — 目标管理 + 复盘体系（Sprint 5-6）
+app.include_router(objectives.router, prefix="/api/v1", tags=["objectives"])
+app.include_router(reviews.router, prefix="/api/v1", tags=["reviews"])
+app.include_router(benchmarks.router, prefix="/api/v1", tags=["benchmarks"])
+app.include_router(predictions.router, prefix="/api/v1", tags=["predictions"])
 # Phase 1 本体层 — BOM 版本化配方管理
 app.include_router(bom.router, tags=["bom"])
 # Phase 2 本体层 — 推理层 / 企微 Action FSM / 自然语言查询

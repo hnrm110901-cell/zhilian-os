@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db, validate_store_brand
@@ -72,6 +73,68 @@ async def _safe(coro, default=None):
         return default
 
 
+# ── AI经营合伙人子调用 ─────────────────────────────────────────────────────────
+
+
+async def _fetch_daily_pnl(store_id: str, db: AsyncSession) -> Optional[Dict]:
+    """获取最新日度P&L（店长5个数字 — 阿米巴简化版）"""
+    result = await db.execute(text("""
+        SELECT total_revenue_fen, material_cost_ratio, labor_cost_ratio,
+               operating_profit_fen, mtd_profit_fen, mtd_target_pct, period_date
+        FROM store_pnl
+        WHERE store_id = :sid AND period_type = 'daily'
+        ORDER BY period_date DESC LIMIT 1
+    """), {"sid": store_id})
+    row = result.mappings().first()
+    if not row:
+        return None
+    return {
+        "date": str(row["period_date"]),
+        "today_revenue_yuan": (row["total_revenue_fen"] or 0) / 100,
+        "material_cost_ratio": float(row["material_cost_ratio"] or 0),
+        "labor_cost_ratio": float(row["labor_cost_ratio"] or 0),
+        "operating_profit_yuan": (row["operating_profit_fen"] or 0) / 100,
+        "mtd_profit_yuan": (row["mtd_profit_fen"] or 0) / 100,
+        "mtd_target_pct": float(row["mtd_target_pct"] or 0),
+    }
+
+
+async def _fetch_store_scorecard_for_bff(store_id: str, db: AsyncSession) -> Optional[Dict]:
+    """门店评分卡摘要（BFF用，内部获取brand_id）"""
+    try:
+        result = await db.execute(text("SELECT brand_id FROM stores WHERE id = :sid"), {"sid": store_id})
+        row = result.mappings().first()
+        if not row:
+            return None
+        from src.services.benchmark_engine_service import BenchmarkEngineService
+        svc = BenchmarkEngineService()
+        return await svc.get_store_scorecard(db, store_id, row["brand_id"])
+    except Exception:
+        return None
+
+
+async def _fetch_latest_review_summary(store_id: str, db: AsyncSession) -> Optional[Dict]:
+    """获取最新复盘摘要（highlights + anomalies数量）"""
+    result = await db.execute(text("""
+        SELECT review_type, period_end, ai_summary, status
+        FROM review_sessions
+        WHERE store_id = :sid
+        ORDER BY period_end DESC LIMIT 1
+    """), {"sid": store_id})
+    row = result.mappings().first()
+    if not row:
+        return None
+    summary = row["ai_summary"] or {}
+    return {
+        "review_type": row["review_type"],
+        "period_end": str(row["period_end"]),
+        "status": row["status"],
+        "highlights": summary.get("highlights", [])[:3],
+        "anomaly_count": len(summary.get("anomalies", [])),
+        "recommendation_count": len(summary.get("recommendations", [])),
+    }
+
+
 # ── GET /api/v1/bff/sm/{store_id} ─────────────────────────────────────────────
 
 
@@ -109,8 +172,11 @@ async def sm_home(
     alerts_task = _fetch_unread_alerts_count(store_id, db)
     hub_task = _fetch_edge_hub_status(store_id, db)
     trust_task = _fetch_ai_trust_summary(store_id, db)
+    pnl_task = _fetch_daily_pnl(store_id, db)
+    review_task = _fetch_latest_review_summary(store_id, db)
+    scorecard_task = _fetch_store_scorecard_for_bff(store_id, db)
 
-    health, top3, queue, pending, revenue, fc, alerts_count, hub_status, trust = await asyncio.gather(
+    health, top3, queue, pending, revenue, fc, alerts_count, hub_status, trust, pnl, review, store_scorecard = await asyncio.gather(
         _safe(health_task, default=None),
         _safe(top3_task, default=[]),
         _safe(queue_task, default=None),
@@ -120,6 +186,9 @@ async def sm_home(
         _safe(alerts_task, default=0),
         _safe(hub_task, default=None),
         _safe(trust_task, default=None),
+        _safe(pnl_task, default=None),
+        _safe(review_task, default=None),
+        _safe(scorecard_task, default=None),
     )
 
     payload = {
@@ -134,6 +203,9 @@ async def sm_home(
         "unread_alerts_count": alerts_count,
         "edge_hub_status": hub_status,
         "ai_trust_summary": trust,
+        "daily_pnl": pnl,
+        "latest_review": review,
+        "store_scorecard": store_scorecard,
     }
 
     await _cache_set(cache_key, payload)
@@ -263,7 +335,9 @@ async def hq_overview(
     hub_summary_task = _fetch_hq_edge_hub_summary(db)
     trust_task = _fetch_hq_ai_trust_overview(db)
 
-    health_ranking, fc_ranking, pending, revenue_trend, cross_decisions, hub_summary, trust_overview = await asyncio.gather(
+    # Sprint 7-8: 对标数据 + 目标偏差（需要 brand_id）
+    _brand_id = getattr(current_user, "brand_id", None)
+    gather_tasks = [
         _safe(health_task, default=[]),
         _safe(fc_rank_task, default=[]),
         _safe(pending_task, default=0),
@@ -271,7 +345,18 @@ async def hq_overview(
         _safe(decisions_task, default=[]),
         _safe(hub_summary_task, default=None),
         _safe(trust_task, default=None),
-    )
+    ]
+    if _brand_id:
+        gather_tasks.append(_safe(_fetch_brand_benchmark_insights(_brand_id, db), default=None))
+        gather_tasks.append(_safe(_fetch_objective_deviations(_brand_id, db), default=None))
+    else:
+        gather_tasks.append(_safe(asyncio.sleep(0), default=None))
+        gather_tasks.append(_safe(asyncio.sleep(0), default=None))
+
+    _results = await asyncio.gather(*gather_tasks)
+    health_ranking, fc_ranking, pending, revenue_trend, cross_decisions, hub_summary, trust_overview = _results[:7]
+    benchmark_insights = _results[7] if len(_results) > 7 else None
+    objective_deviations = _results[8] if len(_results) > 8 else None
 
     # 计算汇总指标
     avg_health = round(sum(s.get("score", 0) for s in health_ranking) / len(health_ranking), 1) if health_ranking else 0.0
@@ -295,6 +380,8 @@ async def hq_overview(
         },
         "edge_hub_summary": hub_summary,
         "ai_trust_overview": trust_overview,
+        "benchmark_insights": benchmark_insights,
+        "objective_deviations": objective_deviations,
     }
 
     await _cache_set(cache_key, payload)
@@ -929,6 +1016,26 @@ async def _fetch_cross_store_decisions(db: AsyncSession) -> List[Dict]:
 
     merged.sort(key=lambda x: x.get("priority_score", 0), reverse=True)
     return merged[:5]
+
+
+async def _fetch_brand_benchmark_insights(brand_id: str, db: AsyncSession) -> Optional[Dict]:
+    """品牌级跨店洞察（总部HQ用）"""
+    try:
+        from src.services.benchmark_engine_service import BenchmarkEngineService
+        svc = BenchmarkEngineService()
+        return await svc.cross_store_insights(db, brand_id, period_type='monthly')
+    except Exception:
+        return None
+
+
+async def _fetch_objective_deviations(brand_id: str, db: AsyncSession) -> Optional[Dict]:
+    """目标偏差预警（总部HQ用）"""
+    try:
+        from src.services.agent_event_processor import AgentEventProcessor
+        proc = AgentEventProcessor()
+        return await proc.check_objective_deviations(db, brand_id)
+    except Exception:
+        return None
 
 
 # ── GET /api/v1/bff/banquet/{store_id} ────────────────────────────────────────

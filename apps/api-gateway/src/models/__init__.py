@@ -46,6 +46,17 @@ from .banquet_event_order import BanquetEventOrder, BEOStatus
 from .banquet_lifecycle import BanquetStage, BanquetStageHistory
 from .base import Base
 from .bom import BOMItem, BOMTemplate
+
+# AI经营合伙人 — Sprint 5-6
+from .business_objective import (
+    BscDimension,
+    BusinessObjective,
+    ObjectiveKeyResult,
+    ObjectiveLevel,
+    PeriodType,
+)
+from .operation_snapshot import OperationSnapshot, SnapshotPeriodType
+from .store_pnl import BreakevenTracker, StorePnl
 from .channel_config import SalesChannelConfig
 from .competitor import CompetitorPrice, CompetitorStore
 from .compliance import ComplianceLicense, LicenseStatus, LicenseType
@@ -780,3 +791,14 @@ from .mission_journey import (
     JourneyMilestone,
     JourneyStats,
 )
+
+# ── S1-4 经营目标树 + 经营快照 + 门店损益 ──
+from .business_objective import (
+    BscDimension,
+    BusinessObjective,
+    ObjectiveKeyResult,
+    ObjectiveLevel,
+    PeriodType,
+)
+from .operation_snapshot import OperationSnapshot, SnapshotPeriodType
+from .store_pnl import BreakevenTracker, StorePnl
