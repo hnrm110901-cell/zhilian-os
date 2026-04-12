@@ -54,6 +54,7 @@ class PinzhiAdapter:
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
         data: Optional[Dict[str, Any]] = None,
+        content_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         发送HTTP请求
@@ -63,6 +64,10 @@ class PinzhiAdapter:
             endpoint: API端点
             params: URL参数
             data: 请求体数据
+            content_type: POST 请求体格式，支持:
+                - "form" (默认): application/x-www-form-urlencoded
+                - "json": application/json
+                - "multipart": multipart/form-data
 
         Returns:
             API响应数据
@@ -75,8 +80,18 @@ class PinzhiAdapter:
                 if method.upper() == "GET":
                     response = await self.client.get(endpoint, params=params)
                 elif method.upper() == "POST":
-                    # 品智接口要求 multipart/form-data，不是 application/json
-                    response = await self.client.post(endpoint, data=data)
+                    if content_type == "json":
+                        response = await self.client.post(endpoint, json=data)
+                    elif content_type == "multipart":
+                        # httpx: data= 发送 multipart/form-data
+                        response = await self.client.post(endpoint, data=data)
+                    else:
+                        # 默认 application/x-www-form-urlencoded
+                        response = await self.client.post(
+                            endpoint,
+                            content="&".join(f"{k}={v}" for k, v in data.items()),
+                            headers={"Content-Type": "application/x-www-form-urlencoded"},
+                        )
                 else:
                     raise ValueError(f"不支持的HTTP方法: {method}")
 
@@ -184,32 +199,66 @@ class PinzhiAdapter:
         """
         查询菜品信息
 
+        品智有两个菜品接口，不同网关部署可能只支持其中一个：
+        1. querydishes.do — POST JSON body，签名含 updatetime
+        2. queryDishesInfo.do — POST form / GET，签名规则可能不同
+
+        本方法按优先级尝试多种 endpoint + Content-Type 组合：
+        - querydishes.do POST JSON（品智文档推荐）
+        - querydishes.do POST form-urlencoded
+        - queryDishesInfo.do GET（签名走 URL params，最兼容）
+        - queryDishesInfo.do POST form-urlencoded
+        - queryDishesInfo.do POST multipart（部分网关要求）
+        - queryDishesInfo.do POST JSON
+        签名均使用标准算法（业务参数排序 + token 拼接 + MD5）。
+
         Args:
             updatetime: 同步时间戳，传0拉取所有，传日期拉取该日期后修改的菜品
 
         Returns:
             菜品信息列表
         """
-        params = {"updatetime": updatetime}
-        params = self._add_sign(params)
+        params = {"updatetime": str(updatetime)}
+        signed_params = self._add_sign(dict(params))
         logger.info("查询菜品信息", updatetime=updatetime)
 
-        # 品智菜品接口有多个路径和请求方式组合，不同网关部署可能不同
-        # queryDishesInfo.do 的 POST multipart 签名规则与 GET 不同，
-        # 需和品智确认具体签名方式；当前已知 querydishes.do POST 可用
-        for method, path in [
-            ("POST", "/pinzhi/querydishes.do"),
-            ("POST", "/pinzhi/queryDishesInfo.do"),
-            ("GET", "/pinzhi/queryDishesInfo.do"),
-        ]:
+        # 尝试策略列表：(method, path, content_type)
+        strategies = [
+            ("POST", "/pinzhi/querydishes.do", "json"),
+            ("POST", "/pinzhi/querydishes.do", "form"),
+            ("GET", "/pinzhi/queryDishesInfo.do", None),
+            ("POST", "/pinzhi/queryDishesInfo.do", "form"),
+            ("POST", "/pinzhi/queryDishesInfo.do", "multipart"),
+            ("POST", "/pinzhi/queryDishesInfo.do", "json"),
+        ]
+
+        for method, path, ct in strategies:
             try:
+                # 每次重新签名，避免被上一轮修改污染
+                p = self._add_sign(dict(params))
                 if method == "GET":
-                    response = await self._request("GET", path, params=params)
+                    response = await self._request("GET", path, params=p)
                 else:
-                    response = await self._request("POST", path, data=params)
-                return response.get("data", [])
+                    response = await self._request("POST", path, data=p, content_type=ct)
+                dishes = response.get("data", [])
+                if isinstance(dishes, list):
+                    logger.info(
+                        "查询菜品成功",
+                        path=path,
+                        method=method,
+                        content_type=ct,
+                        count=len(dishes),
+                    )
+                    return dishes
             except Exception as e:
-                logger.warning("查询菜品失败", method=method, path=path, error=str(e))
+                logger.debug(
+                    "查询菜品尝试失败",
+                    method=method,
+                    path=path,
+                    content_type=ct,
+                    error=str(e),
+                )
+        logger.warning("查询菜品: 所有策略均失败")
         return []
 
     async def get_practice(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -239,24 +288,82 @@ class PinzhiAdapter:
         """
         查询收银桌台信息
 
+        品智桌台接口有两条路径：
+        1. /pinzhi/queryTable.do — 主网关，GET，部分部署已下线(404)
+        2. /weix/getTableInfoById.do — 微信/小程序网关，GET，需传门店参数
+           走 weix_base_url（如配置），否则用主网关 base_url
+
+        两个接口签名算法相同，响应字段略有差异：
+        - queryTable.do 返回 res: [...]
+        - getTableInfoById.do 返回 data: [...] 或 res: [...]
+
         Args:
-            ognid: 门店omsID，部分网关要求传门店参数
+            ognid: 门店omsID，getTableInfoById.do 必须传
 
         Returns:
             桌台信息列表
         """
-        params = {}
-        if ognid:
-            params["ognid"] = ognid
-        params = self._add_sign(params)
         logger.info("查询桌台信息", ognid=ognid)
 
+        # 策略1：主网关 queryTable.do
         try:
+            params = {}
+            if ognid:
+                params["ognid"] = ognid
+            params = self._add_sign(params)
             response = await self._request("GET", "/pinzhi/queryTable.do", params=params)
-            return response.get("res", [])
+            tables = response.get("res", response.get("data", []))
+            if isinstance(tables, list) and len(tables) > 0:
+                logger.info("查询桌台成功(queryTable.do)", count=len(tables))
+                return tables
         except Exception as e:
-            logger.warning("查询桌台失败", error=str(e))
-            return []
+            logger.debug("queryTable.do 失败", error=str(e))
+
+        # 策略2：weix 网关 getTableInfoById.do（需要 ognid）
+        if ognid:
+            weix_base_url = self.config.get("weix_base_url")
+            # 按品智文档，getTableInfoById.do 在 weix 路径下
+            # 若配了 weix_base_url 用单独 client，否则用主网关试 /weix/ 前缀
+            weix_paths = ["/weix/getTableInfoById.do"]
+            if not weix_base_url:
+                # 主网关也可能挂载了 weix 路径
+                weix_paths.append("/pinzhi/getTableInfoById.do")
+
+            for weix_path in weix_paths:
+                try:
+                    # getTableInfoById 需要门店标识参数
+                    # 品智文档提到参数可能是 storeId / ognid / id，逐个尝试
+                    for id_key in ["ognid", "storeId", "id"]:
+                        try:
+                            p = {id_key: ognid}
+                            p = self._add_sign(p)
+                            if weix_base_url:
+                                async with httpx.AsyncClient(
+                                    base_url=weix_base_url,
+                                    timeout=self.timeout,
+                                ) as weix_client:
+                                    resp = await weix_client.get(weix_path, params=p)
+                                    resp.raise_for_status()
+                                    result = resp.json()
+                                    self.handle_error(result)
+                            else:
+                                result = await self._request("GET", weix_path, params=p)
+                            tables = result.get("data", result.get("res", []))
+                            if isinstance(tables, list) and len(tables) > 0:
+                                logger.info(
+                                    "查询桌台成功(weix)",
+                                    path=weix_path,
+                                    id_key=id_key,
+                                    count=len(tables),
+                                )
+                                return tables
+                        except Exception:
+                            continue
+                except Exception as e:
+                    logger.debug("weix桌台接口失败", path=weix_path, error=str(e))
+
+        logger.warning("查询桌台: 所有策略均失败", ognid=ognid)
+        return []
 
     async def get_employees(self, ognid: Optional[str] = None) -> List[Dict[str, Any]]:
         """
@@ -329,7 +436,7 @@ class PinzhiAdapter:
             page=page_index,
         )
 
-        response = await self._request("POST", "/pinzhi/orderNew.do", data=params)
+        response = await self._request("POST", "/pinzhi/orderNew.do", data=params, content_type="form")
         return response.get("res", [])
 
     async def query_order_summary(
@@ -550,10 +657,10 @@ class PinzhiAdapter:
             ("按门店收入数据", "GET", "/pinzhi/queryOrderSummary.do", lambda: {"ognid": ognid or "", "businessDate": business_date}, True),
             ("订单列表V2", "POST", "/pinzhi/orderNew.do", lambda: {"ognid": ognid or "", "businessDate": business_date, "pageIndex": 1, "pageSize": 5}, True),
             ("菜品类别", "GET", "/pinzhi/reportcategory.do", lambda: {}, True),
-            ("菜品列表", "POST", "/pinzhi/querydishes.do", lambda: {"updatetime": 0}, False),  # 签名机制待品智确认
+            ("菜品列表", "CUSTOM", "get_dishes", lambda: {}, False),  # 走 get_dishes() 多策略探测
             ("支付方式", "GET", "/pinzhi/payment.do", lambda: {}, True),
             ("挂账客户", "GET", "/pinzhi/paymentCustomer.do", lambda: {}, False),
-            ("桌台信息", "GET", "/pinzhi/queryTable.do", lambda: {**({"ognid": ognid} if ognid else {})}, False),
+            ("桌台信息", "CUSTOM", "get_tables", lambda: {"ognid": ognid} if ognid else {}, False),  # 走 get_tables() 多策略探测
             ("门店用户", "GET", "/pinzhi/queryUserInfo.do", lambda: {**({"ognid": ognid} if ognid else {})}, False),
         ]
 
@@ -570,33 +677,47 @@ class PinzhiAdapter:
             required = name in core_names
             params = {k: v for k, v in params_builder().items() if v is not None and v != ""}
             try:
-                p = self._add_sign(params)
-                if method == "GET":
-                    r = await self._request(method, endpoint, params=p)
+                if method == "CUSTOM":
+                    # 调用适配器自身方法（含多策略探测）
+                    handler = getattr(self, endpoint)
+                    data = await handler(**params)
+                    count = f"共{len(data)}条" if isinstance(data, list) else "成功"
+                    ok = isinstance(data, list) and len(data) > 0
+                    results.append({
+                        "name": name,
+                        "endpoint": endpoint,
+                        "ok": ok,
+                        "message": count if ok else "返回空列表（接口可能不可用）",
+                        "required": required,
+                    })
                 else:
-                    r = await self._request(method, endpoint, data=p)
-                # 解析条数
-                count = ""
-                if isinstance(r, dict):
-                    for key in ("res", "data"):
-                        val = r.get(key)
-                        if isinstance(val, list):
-                            count = f"共{len(val)}条"
-                            break
-                        if isinstance(val, dict) and "list" in val:
-                            count = f"list共{len(val.get('list', []))}条"
-                            break
-                results.append({
-                    "name": name,
-                    "endpoint": endpoint.split("/")[-1],
-                    "ok": True,
-                    "message": count or "成功",
-                    "required": required,
-                })
+                    p = self._add_sign(params)
+                    if method == "GET":
+                        r = await self._request(method, endpoint, params=p)
+                    else:
+                        r = await self._request(method, endpoint, data=p)
+                    # 解析条数
+                    count = ""
+                    if isinstance(r, dict):
+                        for key in ("res", "data"):
+                            val = r.get(key)
+                            if isinstance(val, list):
+                                count = f"共{len(val)}条"
+                                break
+                            if isinstance(val, dict) and "list" in val:
+                                count = f"list共{len(val.get('list', []))}条"
+                                break
+                    results.append({
+                        "name": name,
+                        "endpoint": endpoint.split("/")[-1],
+                        "ok": True,
+                        "message": count or "成功",
+                        "required": required,
+                    })
             except Exception as e:
                 results.append({
                     "name": name,
-                    "endpoint": endpoint.split("/")[-1],
+                    "endpoint": endpoint.split("/")[-1] if "/" in endpoint else endpoint,
                     "ok": False,
                     "message": str(e)[:80],
                     "required": required,

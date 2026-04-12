@@ -347,6 +347,159 @@ class TestErrorHandling:
         adapter.handle_error(response)
 
 
+class TestGetDishesMultiStrategy:
+    """菜品接口多策略探测测试"""
+
+    @pytest.mark.asyncio
+    async def test_get_dishes_tries_json_first(self, adapter, monkeypatch):
+        """验证 get_dishes 优先尝试 querydishes.do + JSON"""
+        call_log = []
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            call_log.append((method, endpoint, content_type))
+            if endpoint == "/pinzhi/querydishes.do" and content_type == "json":
+                return {"data": [{"dishesId": "D1", "dishesName": "红烧肉"}]}
+            raise Exception("mock fail")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        result = await adapter.get_dishes(updatetime=0)
+
+        assert len(result) == 1
+        assert result[0]["dishesName"] == "红烧肉"
+        # 应该只调用了第一种策略就成功返回
+        assert len(call_log) == 1
+        assert call_log[0] == ("POST", "/pinzhi/querydishes.do", "json")
+
+    @pytest.mark.asyncio
+    async def test_get_dishes_falls_through_to_get(self, adapter, monkeypatch):
+        """验证 POST 失败后降级到 GET queryDishesInfo.do"""
+        call_log = []
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            call_log.append((method, endpoint, content_type))
+            if method == "GET" and endpoint == "/pinzhi/queryDishesInfo.do":
+                return {"data": [{"dishesId": "D2"}]}
+            raise Exception("sign error")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        result = await adapter.get_dishes()
+
+        assert len(result) == 1
+        # 应该尝试了 json, form 然后 GET 成功
+        assert ("GET", "/pinzhi/queryDishesInfo.do", None) in call_log
+
+    @pytest.mark.asyncio
+    async def test_get_dishes_all_fail_returns_empty(self, adapter, monkeypatch):
+        """验证所有策略失败时返回空列表"""
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            raise Exception("all fail")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        result = await adapter.get_dishes()
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_get_dishes_updatetime_as_string(self, adapter, monkeypatch):
+        """验证 updatetime 被转为字符串传递"""
+        captured_data = {}
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            if data:
+                captured_data.update(data)
+            return {"data": []}
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        await adapter.get_dishes(updatetime=1672531200)
+
+        assert captured_data.get("updatetime") == "1672531200"
+
+
+class TestGetTablesMultiStrategy:
+    """桌台接口多策略探测测试"""
+
+    @pytest.mark.asyncio
+    async def test_get_tables_queryTable_success(self, adapter, monkeypatch):
+        """验证 queryTable.do 成功时直接返回"""
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            if endpoint == "/pinzhi/queryTable.do":
+                return {"res": [{"tableId": "T1", "tableName": "A01"}]}
+            raise Exception("fail")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        result = await adapter.get_tables(ognid="2461")
+
+        assert len(result) == 1
+        assert result[0]["tableName"] == "A01"
+
+    @pytest.mark.asyncio
+    async def test_get_tables_fallback_to_weix(self, adapter, monkeypatch):
+        """验证 queryTable.do 404 后降级到 weix getTableInfoById.do"""
+        call_log = []
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            call_log.append(endpoint)
+            if endpoint == "/pinzhi/queryTable.do":
+                raise Exception("HTTP请求失败: 404")
+            if "getTableInfoById" in endpoint:
+                return {"data": [{"tableId": "T2", "tableName": "B01"}]}
+            raise Exception("fail")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        result = await adapter.get_tables(ognid="2461")
+
+        assert len(result) == 1
+        assert result[0]["tableName"] == "B01"
+
+    @pytest.mark.asyncio
+    async def test_get_tables_no_ognid_only_tries_queryTable(self, adapter, monkeypatch):
+        """验证不传 ognid 时不尝试 weix（需要门店参数）"""
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            if endpoint == "/pinzhi/queryTable.do":
+                return {"res": []}
+            raise Exception("fail")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        result = await adapter.get_tables()
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_get_tables_all_fail_returns_empty(self, adapter, monkeypatch):
+        """验证所有策略失败返回空列表"""
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            raise Exception("fail")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        result = await adapter.get_tables(ognid="2461")
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_get_tables_weix_base_url(self, monkeypatch):
+        """验证配置了 weix_base_url 时使用独立客户端"""
+        config = {
+            "base_url": "http://main-gateway/pzcatering-gateway",
+            "token": "test_token",
+            "weix_base_url": "http://weix-gateway/pzcatering-weix",
+        }
+        adapter = PinzhiAdapter(config)
+
+        async def mock_request(method, endpoint, params=None, data=None, content_type=None):
+            raise Exception("HTTP请求失败: 404")
+
+        monkeypatch.setattr(adapter, "_request", mock_request)
+        # weix_base_url 配置后会尝试用独立 httpx client 连接
+        # 这里只验证不会报非预期的异常
+        result = await adapter.get_tables(ognid="2461")
+        assert isinstance(result, list)
+        await adapter.close()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
