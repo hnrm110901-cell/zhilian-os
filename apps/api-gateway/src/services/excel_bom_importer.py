@@ -231,7 +231,7 @@ class ExcelBOMImporter:
             from decimal import Decimal as _Decimal
 
             dish_price = _Decimal(str(price_val)).quantize(_Decimal("0.01")) if price_val not in (None, "", 0, "0") else None
-        except Exception:
+        except (ValueError, TypeError, ArithmeticError):
             dish_price = None
 
         return ImportRow(
