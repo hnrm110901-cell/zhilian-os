@@ -53,12 +53,14 @@ interface HealthIndexData {
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────────
 
-function levelBadgeType(color: string): string {
-  const map: Record<string, string> = {
+type BadgeType = 'critical' | 'warning' | 'success' | 'info' | 'default' | 'accent' | 'error' | 'neutral';
+
+function levelBadgeType(color: string): BadgeType {
+  const map: Record<string, BadgeType> = {
     green:  'success',
     blue:   'info',
     orange: 'warning',
-    red:    'danger',
+    red:    'critical',
   };
   return map[color] ?? 'default';
 }

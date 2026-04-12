@@ -88,7 +88,7 @@ const FranchisePage: React.FC<FranchisePageProps> = ({
         const [overviewResp, listResp] = await Promise.all([
           apiClient.get(`/api/v1/franchise/overview/${brandId}`),
           apiClient.get(`/api/v1/franchise/franchisees?brand_id=${brandId}&limit=50`),
-        ]);
+        ]) as any[];
         setOverview(overviewResp.data?.data ?? null);
         setFranchisees(listResp.data?.data?.items ?? []);
       } catch (err: any) {
