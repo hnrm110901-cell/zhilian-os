@@ -465,6 +465,7 @@ __all__ = [
     "KnowledgeCapture",
 ]
 
+<<<<<<< HEAD
 from .business_intel import (
     BizMetricSnapshot, RevenueAlert, KpiScorecard, OrderForecast,
     BizDecision, ScenarioRecord, BizIntelLog,
@@ -497,6 +498,8 @@ from .inventory_ext import InventoryBatch, InventoryCount
 from .purchase_order_item import PurchaseOrderItem
 from .daily_summary import DailyRevenueSummary, DailyWasteSummary, DailyPnlSummary
 
+=======
+>>>>>>> origin/chore/merge-stability-fixes
 from .agent_collab import AgentCollabSnapshot, AgentConflict, GlobalOptimizationLog
 from .agent_okr import AgentOKRSnapshot, AgentResponseLog
 
@@ -538,6 +541,7 @@ from .consumer_id_mapping import ConsumerIdMapping, IdType
 
 # Sprint 1 — CDP 地基层
 from .consumer_identity import ConsumerIdentity
+<<<<<<< HEAD
 from .consumer_id_mapping import ConsumerIdMapping, IdType
 # HR 模块 — 薪酬/假勤/审批/招聘/绩效/合同/生命周期（部分 model 文件尚未实现，跳过缺失项）
 try:
@@ -623,6 +627,8 @@ from .hr_knowledge import (
 # P1 — 识客 + 菜品偏好
 from .member_check_in import MemberCheckIn
 from .member_dish_preference import MemberDishPreference
+=======
+>>>>>>> origin/chore/merge-stability-fixes
 from .cost_truth import CostTruthDaily, CostTruthDishDetail, CostVarianceAttribution
 from .customer_ownership import CustomerOwnership, CustomerRiskAlert, RiskLevel, RiskType, TransferReason
 from .daily_summary import DailyPnlSummary, DailyRevenueSummary, DailyWasteSummary
@@ -725,6 +731,7 @@ from .social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
 
 # HR Phase 4 — 培训认证/师徒制
 from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
+<<<<<<< HEAD
 
 # HR架构重构 — skill_node/behavior_pattern/retention_signal/knowledge_capture
 # 已迁移到 hr_knowledge/ 子目录（上方 z55 区块已导入），此处仅补充 Achievement
@@ -803,3 +810,5 @@ from .business_objective import (
 )
 from .operation_snapshot import OperationSnapshot, SnapshotPeriodType
 from .store_pnl import BreakevenTracker, StorePnl
+=======
+>>>>>>> origin/chore/merge-stability-fixes

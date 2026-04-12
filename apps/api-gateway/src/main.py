@@ -1134,6 +1134,7 @@ from src.api import waste_guard
 
 app.include_router(waste_guard.router, tags=["waste_guard"])
 
+<<<<<<< HEAD
 # HR模块 — 薪酬/假勤/审批/招聘/绩效/合同/报表（部分 API 文件尚未实现，跳过缺失项）
 try:
     from src.api import payroll as payroll_api
@@ -1197,11 +1198,78 @@ try:
 except ImportError as _e:
     import structlog as _sl
     _sl.get_logger().warning("HR API 模块未实现，跳过注册", error=str(_e))
+=======
+# HR模块 — 薪酬/假勤/审批/招聘/绩效/合同/报表
+from src.api import hr_attendance
+from src.api import hr_dashboard as hr_dashboard_api
+from src.api import hr_employee, hr_leave, hr_performance, hr_recruitment
+from src.api import payroll as payroll_api
+>>>>>>> origin/chore/merge-stability-fixes
 
 # 知识OS层 — 技能图谱 / 知识采集 / 技能护照 / 行为模式 / 离职风险
 from src.api.knowledge import router as knowledge_router
 
+<<<<<<< HEAD
 app.include_router(knowledge_router, tags=["knowledge"])
+=======
+app.include_router(hr_schedule.router, prefix="/api/v1", tags=["hr_schedule"])
+from src.api import hr_commission, hr_lifecycle, hr_reward_penalty, hr_social_insurance
+
+app.include_router(hr_lifecycle.router, prefix="/api/v1", tags=["hr_lifecycle"])
+app.include_router(hr_commission.router, prefix="/api/v1", tags=["hr_commission"])
+app.include_router(hr_reward_penalty.router, prefix="/api/v1", tags=["hr_reward_penalty"])
+app.include_router(hr_social_insurance.router, prefix="/api/v1", tags=["hr_social_insurance"])
+from src.api import hr_growth
+
+app.include_router(hr_growth.router, prefix="/api/v1", tags=["hr_growth"])
+from src.api import hr_import
+
+app.include_router(hr_import.router, prefix="/api/v1", tags=["hr_import"])
+from src.api import hr_exit_interview
+
+app.include_router(hr_exit_interview.router, prefix="/api/v1", tags=["hr_exit_interview"])
+from src.api import hr_settlement
+
+app.include_router(hr_settlement.router, prefix="/api/v1", tags=["hr_settlement"])
+from src.api import hr_training
+
+app.include_router(hr_training.router, prefix="/api/v1", tags=["hr_training"])
+from src.api import hr_report
+
+app.include_router(hr_report.router, prefix="/api/v1", tags=["hr_report"])
+from src.api import hr_sensitive
+
+app.include_router(hr_sensitive.router, prefix="/api/v1", tags=["hr_sensitive"])
+from src.api import hr_rules
+
+app.include_router(hr_rules.router, prefix="/api/v1", tags=["hr_rules"])
+from src.api import hr_payslip
+
+app.include_router(hr_payslip.router, prefix="/api/v1", tags=["hr_payslip"])
+from src.api import hr_employee_self_service
+
+app.include_router(hr_employee_self_service.router, prefix="/api/v1", tags=["hr_employee_self_service"])
+from src.api import hr_approval
+
+app.include_router(hr_approval.router, prefix="/api/v1", tags=["hr_approval"])
+from src.api import hr_audit as hr_audit_api
+
+app.include_router(hr_audit_api.router, prefix="/api/v1", tags=["hr_audit"])
+from src.api import im_callback, im_self_service, im_sync
+
+app.include_router(im_sync.router, prefix="/api/v1", tags=["im_sync"])
+app.include_router(im_callback.router, prefix="/api/v1", tags=["im_callback"])
+app.include_router(im_self_service.router, prefix="/api/v1", tags=["im_self_service"])
+from src.api import hr_batch
+
+app.include_router(hr_batch.router, prefix="/api/v1", tags=["hr_batch"])
+from src.api import hr_ai
+
+app.include_router(hr_ai.router, prefix="/api/v1", tags=["hr_ai"])
+from src.api import hr_decision_flywheel
+
+app.include_router(hr_decision_flywheel.router, prefix="/api/v1", tags=["decision_flywheel"])
+>>>>>>> origin/chore/merge-stability-fixes
 
 # Month 1 (P0) — 外部集成
 app.include_router(e_invoice.router, prefix="/api/v1", tags=["e-invoices"])
