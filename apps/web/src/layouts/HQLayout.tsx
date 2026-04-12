@@ -130,7 +130,9 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    sectionKey: 'data-fusion',
     title: '数据融合',
+    icon: <CloudSyncOutlined />,
     items: [
       { key: 'data-fusion',  path: '/hq/data-fusion',  label: '数据融合向导', icon: <CloudSyncOutlined />, badge: 'new' as const },
       { key: 'shadow-mode',  path: '/hq/shadow-mode',  label: 'SaaS切换管理', icon: <SwapOutlined />, badge: 'new' as const },

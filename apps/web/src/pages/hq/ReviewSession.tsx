@@ -372,7 +372,7 @@ export default function ReviewSession() {
                     <td>
                       <ZBadge
                         text={s.status === 'completed' ? '已完成' : s.status === 'in_progress' ? '进行中' : '草稿'}
-                        variant={s.status === 'completed' ? 'success' : s.status === 'in_progress' ? 'warning' : 'default'}
+                        type={s.status === 'completed' ? 'success' : s.status === 'in_progress' ? 'warning' : 'default'}
                       />
                     </td>
                     <td>
@@ -419,7 +419,7 @@ export default function ReviewSession() {
         <div className={styles.controls}>
           <ZBadge
             text={detail.status === 'completed' ? '已完成' : `Step ${detail.current_step}`}
-            variant={detail.status === 'completed' ? 'success' : 'info'}
+            type={detail.status === 'completed' ? 'success' : 'info'}
           />
           <ZButton size="sm" variant="ghost" onClick={() => { setDetail(null); loadSessions(); }}>
             返回列表
@@ -710,7 +710,7 @@ export default function ReviewSession() {
                       )}
                       <ZBadge
                         text={a.progress_status === 'completed' ? '已完成' : a.progress_status === 'overdue' ? '逾期' : `${a.progress_pct}%`}
-                        variant={a.progress_status === 'completed' ? 'success' : a.progress_status === 'overdue' ? 'danger' : 'info'}
+                        type={a.progress_status === 'completed' ? 'success' : a.progress_status === 'overdue' ? 'error' : 'info'}
                       />
                     </span>
                   </div>

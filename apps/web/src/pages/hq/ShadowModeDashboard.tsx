@@ -242,8 +242,8 @@ export default function ShadowModeDashboard() {
                       <div className={styles.tableActions}>
                         {mod.phase !== 'sole' && (
                           <ZButton
-                            type="primary"
-                            size="small"
+                            variant="primary"
+                            size="sm"
                             disabled={mod.health_gate !== 'pass'}
                             loading={actionLoading === `advance-${mod.module_name}`}
                             onClick={() => handleAdvance(mod.module_name)}
@@ -253,7 +253,7 @@ export default function ShadowModeDashboard() {
                         )}
                         {mod.phase !== 'shadow' && (
                           <ZButton
-                            size="small"
+                            size="sm"
                             loading={actionLoading === `rollback-${mod.module_name}`}
                             onClick={() => handleRollback(mod.module_name)}
                           >

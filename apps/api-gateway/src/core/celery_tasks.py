@@ -5721,7 +5721,7 @@ def generate_ops_analysis_report(self) -> Dict[str, Any]:
             "html_path": html_path,
         }
 
-    return _run_async(_run())
+    return asyncio.run(_run())
 
 
 # ============================================================

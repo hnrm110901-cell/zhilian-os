@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from "react";
 import styles from "./FranchisePage.module.css";
-import apiClient from "../../utils/apiClient";
+import { apiClient } from "../../utils/apiClient";
 
 // ================================================================ #
 // 类型定义

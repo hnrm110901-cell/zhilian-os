@@ -235,7 +235,7 @@ export default function DataFusionWizardPage() {
           <div className={styles.actions}>
             <div />
             <ZButton
-              type="primary"
+              variant="primary"
               disabled={selectedSystems.length === 0}
               onClick={() => setCurrentStep(1)}
             >
@@ -272,7 +272,7 @@ export default function DataFusionWizardPage() {
               {[3, 6, 12].map(m => (
                 <ZButton
                   key={m}
-                  type={dateRange.months === m ? 'primary' : 'default'}
+                  variant={dateRange.months === m ? 'primary' : 'default'}
                   onClick={() => setDateRange({ months: m })}
                 >
                   过去{m}个月
@@ -292,7 +292,7 @@ export default function DataFusionWizardPage() {
 
           <div className={styles.actions}>
             <ZButton onClick={() => setCurrentStep(0)}>上一步</ZButton>
-            <ZButton type="primary" loading={loading} onClick={startFusion}>
+            <ZButton variant="primary" loading={loading} onClick={startFusion}>
               开始融合
             </ZButton>
           </div>
@@ -354,7 +354,7 @@ export default function DataFusionWizardPage() {
                   </div>
                 </div>
                 {task.status === 'running' && (
-                  <ZBadge status="processing" text={`${task.progress_pct}%`} />
+                  <ZBadge type="info" text={`${task.progress_pct}%`} />
                 )}
               </div>
             ))}
@@ -363,7 +363,7 @@ export default function DataFusionWizardPage() {
           {projectInfo.status === 'resolving' || projectInfo.status === 'completed' ? (
             <div className={styles.actions}>
               <div />
-              <ZButton type="primary" onClick={() => setCurrentStep(3)}>
+              <ZButton variant="primary" onClick={() => setCurrentStep(3)}>
                 查看经营体检报告
               </ZButton>
             </div>

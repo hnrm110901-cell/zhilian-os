@@ -18,6 +18,7 @@ Webhook POS 适配器
 import hashlib
 import hmac
 import os
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 

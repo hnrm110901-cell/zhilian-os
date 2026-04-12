@@ -461,17 +461,17 @@ class PayrollService(BaseService):
         existing = await db.execute(
             select(PayrollRecord).where(
                 and_(
-                    PayrollRecord.employee_id == employee.id,
+                    PayrollRecord.employee_id == employee_id,
                     PayrollRecord.pay_month == pay_month,
                 )
             )
         )
         record = existing.scalar_one_or_none()
         if record and record.status in (PayrollStatus.PAID, PayrollStatus.CONFIRMED):
-            raise ValueError(f"员工 {employee.id} {pay_month} 工资单已确认/已发放，不可重算")
+            raise ValueError(f"员工 {employee_id} {pay_month} 工资单已确认/已发放，不可重算")
 
         if not record:
-            record = PayrollRecord(store_id=store_id, employee_id=employee.id, pay_month=pay_month)
+            record = PayrollRecord(store_id=store_id, employee_id=employee_id, pay_month=pay_month)
             db.add(record)
 
         # 从公式引擎结果中提取各类目汇总
