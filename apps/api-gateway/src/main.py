@@ -29,6 +29,7 @@ from src.api import pos_sync
 from src.api import roles as roles_api
 from src.api import merchants
 from src.api import prep_suggestion, soldout, agent_configs
+from src.api import dish_variants
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue, meituan_reservation
@@ -646,6 +647,8 @@ app.include_router(pos_sync.router, tags=["pos-sync"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliation"])
 app.include_router(dishes.router, prefix="/api/v1", tags=["dishes"])
+app.include_router(dish_variants.router, prefix="/api/v1", tags=["dish-variants"])
+app.include_router(dish_variants.update_router, tags=["dish-variants"])
 app.include_router(dish_master.router, tags=["dish-master"])
 app.include_router(benchmark.router, prefix="/api/v1", tags=["benchmark"])
 
@@ -1273,6 +1276,34 @@ app.include_router(finance_analytics_router)
 # 五步闭环经营复盘（拆细账→找真因→定措施→追执行→看结果）
 from src.api import review_session
 app.include_router(review_session.router, tags=["review-session"])
+
+# Phase P1 — 数据融合引擎（历史数据智能融合 + 知识库生成 + 经营体检报告）
+from src.api.data_fusion import router as data_fusion_router
+app.include_router(data_fusion_router, tags=["data-fusion"])
+
+# Phase P2.1 — 影子模式 + 灰度切换（SaaS渐进替换安全网）
+from src.api.shadow_mode import router as shadow_mode_router
+app.include_router(shadow_mode_router, tags=["shadow-mode"])
+
+# Phase P2.2 — 功能平权（轻量POS + 采购工作台 + 移动盘点）
+from src.api.pos_terminal import router as pos_terminal_router
+app.include_router(pos_terminal_router, tags=["pos-terminal"])
+from src.api.purchase_workbench import router as purchase_workbench_router
+app.include_router(purchase_workbench_router, tags=["purchase-workbench"])
+from src.api.mobile_stocktake import router as mobile_stocktake_router
+app.include_router(mobile_stocktake_router, tags=["mobile-stocktake"])
+
+# 活海鲜养殖管理（徐记海鲜鱼缸管理）
+from src.api import aquarium as aquarium_api
+app.include_router(aquarium_api.router, tags=["aquarium"])
+
+# 统一POS收银引擎（平替天财商龙）
+from src.api import unified_pos
+app.include_router(unified_pos.router, tags=["unified-pos"])
+
+# 奥琦玮POS Webhook实时推送
+from src.api import aoqiwei_webhook
+app.include_router(aoqiwei_webhook.router, tags=["aoqiwei-webhook"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):

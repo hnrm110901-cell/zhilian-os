@@ -1,0 +1,56 @@
+.page { padding: 16px; padding-bottom: 80px; background: var(--bg-primary, #f5f5f5); min-height: 100vh; font-family: 'Noto Sans SC', -apple-system, sans-serif; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.title { font-size: 18px; font-weight: 700; color: var(--text-primary, #1a1a1a); }
+.createBtn { background: var(--accent, #FF6B2C); color: #fff; border: none; border-radius: var(--radius-md, 8px); padding: 0 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px; font-family: inherit; }
+.sessionList { display: flex; flex-direction: column; gap: 12px; }
+.sessionCard { background: #fff; border-radius: var(--radius-lg, 12px); padding: 14px; border: 1px solid var(--border-color, #e8e8e8); cursor: pointer; }
+.sessionCard:active { background: var(--bg-secondary, #f5f5f5); }
+.sessionCardHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sessionName { font-size: 14px; font-weight: 700; color: var(--text-primary, #1a1a1a); }
+.sessionDate { font-size: 12px; color: var(--text-secondary, #888); }
+.sessionCardBody { display: flex; justify-content: space-between; align-items: center; }
+.sessionScope { font-size: 13px; color: var(--text-secondary, #888); }
+.sessionProgress { font-size: 12px; color: var(--text-secondary, #888); }
+.emptyWrap { padding: 40px 0; text-align: center; }
+.overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-primary, #f5f5f5); z-index: 100; overflow-y: auto; padding: 16px; padding-bottom: 120px; }
+.overlayHeader { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.backBtn { background: none; border: none; font-size: 20px; color: var(--text-primary, #1a1a1a); cursor: pointer; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+.overlayTitle { font-size: 18px; font-weight: 700; color: var(--text-primary, #1a1a1a); flex: 1; }
+.formSection { background: #fff; border-radius: var(--radius-lg, 12px); padding: 14px; margin-bottom: 12px; }
+.field { margin-bottom: 14px; }
+.label { font-size: 13px; font-weight: 600; color: var(--text-primary, #333); display: block; margin-bottom: 6px; }
+.required { color: var(--color-error, #ff4d4f); }
+.select { width: 100%; border: 1px solid var(--border-color, #e8e8e8); border-radius: var(--radius-md, 8px); padding: 10px 12px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text-primary, #1a1a1a); min-height: 44px; box-sizing: border-box; appearance: none; }
+.select:focus { outline: none; border-color: var(--accent, #FF6B2C); }
+.scopeGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.scopeBtn { padding: 12px 0; text-align: center; border: 1px solid var(--border-color, #e8e8e8); border-radius: var(--radius-md, 8px); background: #fff; font-size: 14px; font-weight: 500; color: var(--text-primary, #1a1a1a); cursor: pointer; min-height: 44px; font-family: inherit; }
+.scopeBtn:active { background: var(--bg-secondary, #f0f0f0); }
+.scopeActive { border-color: var(--accent, #FF6B2C); color: var(--accent, #FF6B2C); background: #fff5f0; }
+.sectionTitle { font-size: 14px; font-weight: 600; color: var(--text-primary, #1a1a1a); margin-bottom: 8px; }
+.countList { display: flex; flex-direction: column; gap: 10px; }
+.countItem { background: #fff; border-radius: var(--radius-md, 8px); padding: 12px; border: 1px solid var(--border-color, #e8e8e8); }
+.countItemHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.countItemName { font-size: 14px; font-weight: 600; color: var(--text-primary, #1a1a1a); }
+.countItemLocation { font-size: 12px; color: var(--text-secondary, #888); }
+.countItemBody { display: flex; align-items: center; gap: 12px; }
+.countField { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.countLabel { font-size: 11px; color: var(--text-secondary, #888); }
+.countSystemQty { font-size: 16px; font-weight: 600; color: var(--text-secondary, #888); padding: 8px 12px; background: var(--bg-secondary, #f5f5f5); border-radius: 6px; min-height: 40px; display: flex; align-items: center; }
+.countInput { width: 100%; border: 1px solid var(--border-color, #e8e8e8); border-radius: 6px; padding: 8px 12px; font-size: 18px; font-weight: 700; font-family: inherit; background: #fff; color: var(--text-primary, #1a1a1a); min-height: 44px; box-sizing: border-box; text-align: center; }
+.countInput:focus { outline: none; border-color: var(--accent, #FF6B2C); }
+.countUnit { font-size: 12px; color: var(--text-secondary, #888); min-width: 28px; text-align: center; }
+.varianceMatch { color: var(--color-success, #52c41a); font-size: 12px; font-weight: 600; min-width: 48px; text-align: center; }
+.varianceDeviation { color: var(--color-error, #ff4d4f); font-size: 12px; font-weight: 600; min-width: 48px; text-align: center; }
+.summaryCard { background: #fff; border-radius: var(--radius-lg, 12px); padding: 14px; margin-bottom: 12px; }
+.summaryGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.summaryItem { text-align: center; padding: 10px 4px; }
+.summaryValue { font-size: 20px; font-weight: 700; color: var(--text-primary, #1a1a1a); display: block; }
+.summaryValueError { font-size: 20px; font-weight: 700; color: var(--color-error, #ff4d4f); display: block; }
+.summaryValueAccent { font-size: 20px; font-weight: 700; color: var(--accent, #FF6B2C); display: block; }
+.summaryLabel { font-size: 11px; color: var(--text-secondary, #888); margin-top: 4px; display: block; }
+.bottomBar { position: sticky; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 16px; border-top: 1px solid var(--border-color, #e8e8e8); display: flex; gap: 12px; z-index: 10; }
+.submitBtn { flex: 1; background: var(--accent, #FF6B2C); color: #fff; border: none; padding: 14px; border-radius: var(--radius-md, 8px); font-size: 16px; font-weight: 700; cursor: pointer; min-height: 48px; font-family: inherit; }
+.submitBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+.secondaryBtn { flex: 1; background: #fff; color: var(--accent, #FF6B2C); border: 1px solid var(--accent, #FF6B2C); padding: 14px; border-radius: var(--radius-md, 8px); font-size: 16px; font-weight: 600; cursor: pointer; min-height: 48px; font-family: inherit; }
+.skeleton { height: 400px; background: #fff; border-radius: var(--radius-lg, 12px); animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }

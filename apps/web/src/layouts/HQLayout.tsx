@@ -43,6 +43,8 @@ import {
   MenuUnfoldOutlined,
   SearchOutlined,
   ClockCircleOutlined,
+  CloudSyncOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './HQLayout.module.css';
@@ -125,6 +127,13 @@ const NAV_SECTIONS: NavSection[] = [
       { key: 'banquet',     path: '/hq/banquet',     label: '宴会管理',   icon: <CrownOutlined /> },
       { key: 'pareto',      path: '/hq/pareto-analysis', label: '帕累托分析', icon: <FundOutlined /> },
       { key: 'flow-inspect', path: '/hq/flow-inspection', label: '流程巡检',  icon: <ClockCircleOutlined /> },
+    ],
+  },
+  {
+    title: '数据融合',
+    items: [
+      { key: 'data-fusion',  path: '/hq/data-fusion',  label: '数据融合向导', icon: <CloudSyncOutlined />, badge: 'new' as const },
+      { key: 'shadow-mode',  path: '/hq/shadow-mode',  label: 'SaaS切换管理', icon: <SwapOutlined />, badge: 'new' as const },
     ],
   },
 ];

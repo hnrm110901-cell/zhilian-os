@@ -497,3 +497,19 @@ from .inventory_ext import InventoryBatch, InventoryCount
 from .purchase_order_item import PurchaseOrderItem
 from .daily_summary import DailyRevenueSummary, DailyWasteSummary, DailyPnlSummary
 
+# ── 活海鲜养殖 + 菜品变体 + 数据融合 + shadow模式 ──────────────────────
+from .aquarium import (
+    AquariumTank, AquariumWaterMetric, LiveSeafoodBatch,
+    SeafoodMortalityLog, AquariumInspection,
+)
+from .dish_method_variant import DishMethodVariant
+from .dish_specification import DishSpecification
+from .fusion_task import (
+    FusionProject, FusionTask, FusionEntityMap,
+    FusionProvenance, FusionConflict,
+)
+from .shadow_mode import (
+    ShadowSession, ShadowRecord, ConsistencyReport,
+    CutoverState, CutoverEvent,
+)
+

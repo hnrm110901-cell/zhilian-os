@@ -722,3 +722,64 @@ Employee → ShiftFairnessScore （员工级公平性追踪）
 - 会员档案管理 API: GET /members/{store_id}/list（分页+搜索+多维过滤）+ PATCH /members/{store_id}/{customer_id}（更新 birth_date/wechat_openid/channel_source）
 - MemberSystemPage.tsx: 从 null stub 重建为完整会员档案表格（RFM tag、生命周期 tag、内联生日编辑、旅程触发）
 - test_member_profile_api.py: 13个测试（GET×7 + PATCH×6）
+
+---
+
+## Phase P1 — 数据融合引擎 + 知识库生成（2026-03-23）
+
+> 战略：屯象OS 定位餐饮行业 Palantir，面向复杂集团/多品牌/品质中大型餐饮
+> 两阶段目标：
+>   Phase 1 — 历史数据智能融合 → 知识库自动生成 → 接入即出经营体检报告
+>   Phase 2 — 影子模式验证 → 灰度切换 → SaaS 渐进替换（零停机）
+
+### Phase 1.1 — 数据融合引擎（Data Fusion Engine）— 全部完成 ✅（2026-03-23）
+
+- [x] 数据模型 `models/fusion_task.py`：5张表 + 5 Enum
+- [x] Alembic 迁移 `z69_data_fusion_engine.py`（down_revision=z68_mission_journey）
+- [x] 实体解析服务 `services/entity_resolver.py`：跨系统实体识别与合并
+- [x] 数据融合引擎 `services/data_fusion_engine.py`：多源采集编排 + 断点续传
+- [x] 历史回填服务 `services/historical_backfill.py`：三通道批量回填（API/CSV/DB镜像）
+- [x] 时间线组装器 `services/timeline_assembler.py`：跨系统事件时间轴对齐
+- [x] 知识库生成管道 `services/knowledge_generator.py`：6维经营体检报告
+- [x] API路由 `api/data_fusion.py`：8个端点 + 总部BFF
+- [x] 注册路由到 main.py
+- [x] 60个单元测试全部通过（`tests/test_data_fusion.py`）
+
+### Phase 1.2 — 经营体检报告 + 前端向导 — 全部完成 ✅（2026-03-23）
+
+- [x] 体检报告生成器集成在 `knowledge_generator.py`：营收/成本/菜品/会员/人效/供应商6维
+- [x] 前端迁移向导页面 `pages/hq/DataFusionWizard.tsx`：4步向导 + 10个SaaS系统选择
+- [ ] 种子客户试跑验证（待尝在一起品智POS数据接入后执行）
+
+### Phase 2.1 — 影子模式 + 灰度切换 — 全部完成 ✅（2026-03-23）
+
+- [x] 数据模型 `models/shadow_mode.py`：5张表（ShadowSession/Record/ConsistencyReport/CutoverState/Event）+ 5 Enum
+- [x] Alembic 迁移 `z70_shadow_mode_cutover.py`（down_revision=z69）
+- [x] 影子模式引擎 `services/shadow_mode_engine.py`：影子记账 + 一致性比对 + 灰度切换控制器
+- [x] API路由 `api/shadow_mode.py`：10个端点 + 总部BFF
+- [x] 注册路由到 main.py
+- [x] 30个单元测试全部通过（`tests/test_shadow_mode.py`）
+
+### Phase 2.2 — 功能平权 — 全部完成 ✅（2026-03-23）
+
+- [x] 轻量POS收银 `services/pos_terminal_service.py`：开单/加菜/折扣/结账/作废
+- [x] 采购工作台 `services/purchase_workbench_service.py`：创建PO/提交/供应商确认/收货/对账
+- [x] 移动盘点 `services/mobile_stocktake_service.py`：创建盘点/逐条计数/批量/差异报告/审批
+- [x] API路由 `api/pos_terminal.py` + `api/purchase_workbench.py` + `api/mobile_stocktake.py`
+- [x] 注册路由到 main.py
+- [x] 前端路由注册 App.tsx + 导航菜单 HQLayout.tsx
+- [x] 影子模式驾驶舱 `pages/hq/ShadowModeDashboard.tsx`
+
+### Phase 2.2 前端页面 — 全部完成 ✅（2026-03-23）
+
+- [x] 40个单元测试全部通过（`tests/test_pos_purchase_stocktake.py`）
+- [x] POS收银界面 `pages/sm/PosTerminal.tsx`（开单/加菜/折扣/结账/作废，移动端）
+- [x] 采购工作台 `pages/sm/PurchaseWorkbench.tsx`（创建PO/提交/确认/收货/对账，移动端）
+- [x] 移动盘点 `pages/sm/MobileStocktake.tsx`（全盘/分类盘/抽盘/差异/审批，移动端）
+- [x] 注册路由 App.tsx + 导航菜单 StoreManagerLayout.tsx
+
+### 待做（下一阶段）
+
+- [ ] 种子客户试跑（尝在一起品智POS数据接入后执行）
+- [ ] Phase 2.3：实体解析器接入Neo4j本体图（OntologyAdapter集成）
+- [ ] Phase 2.3：POS收银数据实时同步到影子模式引擎

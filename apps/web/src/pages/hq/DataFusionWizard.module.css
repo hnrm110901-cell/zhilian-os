@@ -1,0 +1,260 @@
+/* 数据融合向导页面 — 引导商家完成历史数据接入 */
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  margin-bottom: 32px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* 步骤指示器 */
+.steps {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.step {
+  flex: 1;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.stepActive {
+  border-color: var(--accent);
+  background: var(--bg-primary);
+}
+
+.stepDone {
+  border-color: var(--color-success);
+  background: var(--bg-primary);
+}
+
+.stepNumber {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.stepActive .stepNumber {
+  background: var(--accent);
+  color: #fff;
+}
+
+.stepDone .stepNumber {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.stepTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.stepDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* 系统选择网格 */
+.systemGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.systemCard {
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.systemCard:hover {
+  border-color: var(--accent);
+}
+
+.systemCardSelected {
+  border-color: var(--accent);
+  background: var(--bg-primary);
+}
+
+.systemIcon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.systemName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.systemCategory {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* 进度面板 */
+.progressPanel {
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  margin-bottom: 24px;
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  margin: 16px 0;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.5s ease;
+}
+
+.progressStats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 体检报告预览 */
+.reportGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.reportCard {
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.reportCardTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.reportCardValue {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reportCardSub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* 操作按钮区 */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 任务列表 */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.taskItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.taskStatus {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.taskPending { background: var(--text-secondary); }
+.taskRunning { background: var(--accent); }
+.taskCompleted { background: var(--color-success); }
+.taskFailed { background: var(--color-error); }
+
+.taskInfo {
+  flex: 1;
+}
+
+.taskName {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.taskMeta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
