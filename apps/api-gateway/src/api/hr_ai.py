@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
+from src.core.dependencies import get_current_active_user
+from src.models.user import User
 from src.services.hr_ai_decision_service import HRAIDecisionService
 from src.services.hr_growth_agent_service import generate_growth_plan
 
@@ -29,7 +31,7 @@ class GrowthPlanRequest(BaseModel):
 async def get_turnover_risk(
     employee_id: str,
     store_id: str = Query(..., description="门店ID"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user),
 ):
     """
     单员工离职风险分析（Claude AI + 规则引擎融合）
@@ -63,7 +65,7 @@ async def get_turnover_risk(
 @router.get("/turnover-scan/{store_id}")
 async def scan_store_turnover(
     store_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user),
 ):
     """
     全店离职风险扫描
@@ -96,7 +98,7 @@ async def scan_store_turnover(
 @router.post("/growth-plan/generate")
 async def ai_generate_growth_plan(
     body: GrowthPlanRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user),
 ):
     """
     AI生成成长计划 -- Claude驱动
@@ -141,7 +143,7 @@ async def ai_generate_growth_plan(
 async def get_salary_competitiveness(
     store_id: str,
     brand_id: Optional[str] = Query("", description="品牌ID（可选）"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_active_user),
 ):
     """
     薪资竞争力分析 -- Claude驱动
