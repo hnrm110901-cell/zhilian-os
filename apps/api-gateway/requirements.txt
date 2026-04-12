@@ -31,6 +31,7 @@ torch>=2.2.0
 numpy==1.26.3
 pandas>=2.0.0
 openpyxl>=3.1.0
+python-docx>=0.8.11
 
 # Graph Database (本体层 / 推理层)
 neo4j>=5.17.0
