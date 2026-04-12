@@ -349,6 +349,7 @@ const SmAbnormalTasks   = lazy(() => import('./pages/sm/AbnormalTasks'));
 const SmWeeklyReview    = lazy(() => import('./pages/sm/WeeklyReview'));
 const SmDailyFlow       = lazy(() => import('./pages/sm/DailyFlow'));
 const HqParetoAnalysis  = lazy(() => import('./pages/hq/ParetoAnalysis'));
+const HqReviewSession   = lazy(() => import('./pages/hq/ReviewSession'));
 const HqFlowInspection  = lazy(() => import('./pages/hq/FlowInspection'));
 
 // 岗位标准化知识库 + 员工成长溯源 (Phase 2-3 HR知识OS)
@@ -1194,6 +1195,8 @@ const AppContent: React.FC = () => {
                   {/* v3.0 全天流程 + 帕累托分析 */}
                   <Route path="flow-inspection"  element={<HqFlowInspection />} />
                   <Route path="pareto-analysis"  element={<HqParetoAnalysis />} />
+                  {/* 五步闭环经营复盘（周复盘 + 月复盘） */}
+                  <Route path="review"           element={<HqReviewSession />} />
                 </Route>
 
                 {/* Role-based views — Employee H5 Self-Service (手机) */}

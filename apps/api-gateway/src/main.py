@@ -1279,6 +1279,10 @@ app.include_router(franchise_router)
 from src.api.finance_analytics import router as finance_analytics_router
 app.include_router(finance_analytics_router)
 
+# 五步闭环经营复盘（拆细账→找真因→定措施→追执行→看结果）
+from src.api import review_session
+app.include_router(review_session.router, tags=["review-session"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:
